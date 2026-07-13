@@ -8,7 +8,6 @@ import { ActionCard } from '@/components/atoms/ActionCard';
 import { Compass, Bot, Zap, Terminal, Globe, Smartphone, FileUp, X, Check } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readTextFile } from '@tauri-apps/plugin-fs';
-import { AppSettings } from '@/lib/settings';
 import { motion } from 'framer-motion';
 import { feedback } from '@/lib/feedback';
 
@@ -38,7 +37,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 multiple: false,
                 filters: [{ name: 'JSON', extensions: ['json'] }]
             });
-            
+
             if (!selected) {
                 setImporting(false);
                 return;
@@ -46,11 +45,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
             const path = Array.isArray(selected) ? selected[0] : selected;
             const fileContent = await readTextFile(path.path || path as string);
-            
+
             let parsed;
             try {
                 parsed = JSON.parse(fileContent);
-            } catch(e) {
+            } catch (e) {
                 feedback.toast.error(t('onboarding.error_invalid_json', 'Invalid JSON file'));
                 setImporting(false);
                 return;
@@ -99,10 +98,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         }
         feedback.toast.success(t('onboarding.success_import', 'Settings imported successfully'));
         setShowPathWarning(false);
-        
+
         // Fast forward if we have valid modes
         const activeProfileSettings = settingsToApply.profiles ? settingsToApply.profiles[settingsToApply.activeProfileId]?.settings : settingsToApply;
-        
+
         if (activeProfileSettings?.usageMode) {
             setSelectedMode(activeProfileSettings.usageMode);
             if (activeProfileSettings.usageMode === 'automator' && activeProfileSettings.automationFramework) {
@@ -121,7 +120,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     const confirmPaths = (keepAutomationRoot: boolean, keepCustomAdb: boolean) => {
         if (!importedSettings) return;
         const toApply = { ...importedSettings };
-        
+
         if (toApply.profiles && toApply.activeProfileId) {
             const activeSettings = toApply.profiles[toApply.activeProfileId].settings;
             if (!keepAutomationRoot && activeSettings.paths) {
@@ -138,7 +137,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 toApply.customAdbPath = '';
             }
         }
-        
+
         applyImportedSettings(toApply);
     };
 
@@ -243,9 +242,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                                     {t('onboarding.step_import_description', 'Do you have a previous settings.json file you want to import to skip manual configuration? AI API Keys will be safely ignored.')}
                                 </p>
                                 <div className="flex flex-col items-center gap-4">
-                                    <Button 
-                                        variant="primary" 
-                                        className="w-64 justify-center" 
+                                    <Button
+                                        variant="primary"
+                                        className="w-64 justify-center"
                                         onClick={handleImportFile}
                                         disabled={importing}
                                     >
@@ -268,7 +267,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                                 <p className="text-on-surface-variant text-sm text-center mb-6">
                                     {t('onboarding.path_warning_description', 'The imported file contains absolute local paths. Do you want to keep them or clear them?')}
                                 </p>
-                                
+
                                 <div className="space-y-4 bg-surface-variant/30 p-4 rounded-lg border border-outline-variant/30 text-sm">
                                     {(() => {
                                         let automationRoot = '';
@@ -278,18 +277,18 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                                             automationRoot = importedSettings?.paths?.automationRoot || '';
                                         }
                                         return automationRoot ? (
-                                        <div className="flex flex-col gap-2 p-2 border-b border-outline-variant/30">
-                                            <span className="font-semibold text-primary">{t('onboarding.path_automation_root', 'Automation Root:')}</span>
-                                            <span className="text-on-surface-variant font-mono break-all">{automationRoot}</span>
-                                            <div className="flex gap-2 mt-2">
-                                                <Button size="sm" variant="outline" onClick={() => confirmPaths(true, (importedSettings?.profiles ? importedSettings.profiles[importedSettings.activeProfileId]?.settings?.customAdbPath : importedSettings?.customAdbPath) === '')}>
-                                                    <Check size={14} className="mr-1" /> {t('common.keep', 'Keep')}
-                                                </Button>
-                                                <Button size="sm" variant="ghost" className="text-error" onClick={() => confirmPaths(false, (importedSettings?.profiles ? importedSettings.profiles[importedSettings.activeProfileId]?.settings?.customAdbPath : importedSettings?.customAdbPath) === '')}>
-                                                    <X size={14} className="mr-1" /> {t('common.clear', 'Clear')}
-                                                </Button>
+                                            <div className="flex flex-col gap-2 p-2 border-b border-outline-variant/30">
+                                                <span className="font-semibold text-primary">{t('onboarding.path_automation_root', 'Automation Root:')}</span>
+                                                <span className="text-on-surface-variant font-mono break-all">{automationRoot}</span>
+                                                <div className="flex gap-2 mt-2">
+                                                    <Button size="sm" variant="outline" onClick={() => confirmPaths(true, (importedSettings?.profiles ? importedSettings.profiles[importedSettings.activeProfileId]?.settings?.customAdbPath : importedSettings?.customAdbPath) === '')}>
+                                                        <Check size={14} className="mr-1" /> {t('common.keep', 'Keep')}
+                                                    </Button>
+                                                    <Button size="sm" variant="ghost" className="text-error" onClick={() => confirmPaths(false, (importedSettings?.profiles ? importedSettings.profiles[importedSettings.activeProfileId]?.settings?.customAdbPath : importedSettings?.customAdbPath) === '')}>
+                                                        <X size={14} className="mr-1" /> {t('common.clear', 'Clear')}
+                                                    </Button>
+                                                </div>
                                             </div>
-                                        </div>
                                         ) : null;
                                     })()}
                                     {(() => {
@@ -303,18 +302,18 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                                             automationRoot = importedSettings?.paths?.automationRoot || '';
                                         }
                                         return customAdbPath ? (
-                                        <div className="flex flex-col gap-2 p-2">
-                                            <span className="font-semibold text-primary">{t('onboarding.path_custom_adb', 'Custom ADB Path:')}</span>
-                                            <span className="text-on-surface-variant font-mono break-all">{customAdbPath}</span>
-                                            <div className="flex gap-2 mt-2">
-                                                <Button size="sm" variant="outline" onClick={() => confirmPaths(automationRoot === '', true)}>
-                                                    <Check size={14} className="mr-1" /> {t('common.keep', 'Keep')}
-                                                </Button>
-                                                <Button size="sm" variant="ghost" className="text-error" onClick={() => confirmPaths(automationRoot === '', false)}>
-                                                    <X size={14} className="mr-1" /> {t('common.clear', 'Clear')}
-                                                </Button>
+                                            <div className="flex flex-col gap-2 p-2">
+                                                <span className="font-semibold text-primary">{t('onboarding.path_custom_adb', 'Custom ADB Path:')}</span>
+                                                <span className="text-on-surface-variant font-mono break-all">{customAdbPath}</span>
+                                                <div className="flex gap-2 mt-2">
+                                                    <Button size="sm" variant="outline" onClick={() => confirmPaths(automationRoot === '', true)}>
+                                                        <Check size={14} className="mr-1" /> {t('common.keep', 'Keep')}
+                                                    </Button>
+                                                    <Button size="sm" variant="ghost" className="text-error" onClick={() => confirmPaths(automationRoot === '', false)}>
+                                                        <X size={14} className="mr-1" /> {t('common.clear', 'Clear')}
+                                                    </Button>
+                                                </div>
                                             </div>
-                                        </div>
                                         ) : null;
                                     })()}
                                     {(() => {
@@ -328,10 +327,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                                             automationRoot = importedSettings?.paths?.automationRoot || '';
                                         }
                                         return (automationRoot && customAdbPath) ? (
-                                        <div className="flex justify-center gap-4 mt-4 pt-4 border-t border-outline-variant/30">
-                                            <Button size="sm" variant="primary" onClick={() => confirmPaths(true, true)}>{t('common.keep_all', 'Keep All')}</Button>
-                                            <Button size="sm" variant="ghost" className="text-error" onClick={() => confirmPaths(false, false)}>{t('common.clear_all', 'Clear All')}</Button>
-                                        </div>
+                                            <div className="flex justify-center gap-4 mt-4 pt-4 border-t border-outline-variant/30">
+                                                <Button size="sm" variant="primary" onClick={() => confirmPaths(true, true)}>{t('common.keep_all', 'Keep All')}</Button>
+                                                <Button size="sm" variant="ghost" className="text-error" onClick={() => confirmPaths(false, false)}>{t('common.clear_all', 'Clear All')}</Button>
+                                            </div>
                                         ) : null;
                                     })()}
                                 </div>

@@ -3,6 +3,7 @@ use std::fs;
 use crate::errors::{AppError, AppResult};
 use serde::{Deserialize, Serialize};
 use tauri::command;
+use crate::cmd_utils::expand_env_vars;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FileEntry {
@@ -17,7 +18,7 @@ pub fn list_directory(path: Option<String>) -> AppResult<Vec<FileEntry>> {
         if p.is_empty() {
             ".".to_string()
         } else {
-            p
+            expand_env_vars(&p)
         }
     } else {
         ".".to_string()
@@ -62,8 +63,9 @@ pub fn list_directory(path: Option<String>) -> AppResult<Vec<FileEntry>> {
 
 #[command]
 pub fn list_directory_recursive(path: String) -> AppResult<Vec<FileEntry>> {
+    let expanded_path = expand_env_vars(&path);
     let mut entries = Vec::new();
-    let mut stack = vec![std::path::PathBuf::from(&path)];
+    let mut stack = vec![std::path::PathBuf::from(&expanded_path)];
 
     while let Some(current_dir) = stack.pop() {
         if let Ok(read_dir) = fs::read_dir(&current_dir) {
@@ -80,7 +82,7 @@ pub fn list_directory_recursive(path: String) -> AppResult<Vec<FileEntry>> {
                     }
 
                     // Use relative path for name to show folder structure
-                    let relative_name = if let Ok(rel) = path_buf.strip_prefix(&path) {
+                    let relative_name = if let Ok(rel) = path_buf.strip_prefix(&expanded_path) {
                         rel.to_string_lossy().to_string().replace("\\", "/")
                     } else {
                         name.clone()
@@ -103,15 +105,17 @@ pub fn list_directory_recursive(path: String) -> AppResult<Vec<FileEntry>> {
 #[command]
 pub fn save_file(path: String, content: String, append: bool) -> AppResult<()> {
     use std::io::Write;
+    
+    let expanded_path = expand_env_vars(&path);
 
     let mut file = if append {
         fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .open(&path)
+            .open(&expanded_path)
             .map_err(|e| AppError::FileSystemError(e.to_string()))?
     } else {
-        fs::File::create(&path).map_err(|e| AppError::FileSystemError(e.to_string()))?
+        fs::File::create(&expanded_path).map_err(|e| AppError::FileSystemError(e.to_string()))?
     };
 
     file.write_all(content.as_bytes())
@@ -121,7 +125,8 @@ pub fn save_file(path: String, content: String, append: bool) -> AppResult<()> {
 
 #[command]
 pub fn read_file(path: String) -> AppResult<String> {
-    fs::read_to_string(&path).map_err(|e| AppError::FileSystemError(e.to_string()))
+    let expanded_path = expand_env_vars(&path);
+    fs::read_to_string(&expanded_path).map_err(|e| AppError::FileSystemError(e.to_string()))
 }
 
 pub fn read_file_tail_internal(path: &str, max_bytes: u64) -> AppResult<String> {
@@ -150,13 +155,15 @@ pub fn read_file_tail_internal(path: &str, max_bytes: u64) -> AppResult<String> 
 
 #[command]
 pub fn read_file_tail(path: String, max_bytes: u64) -> AppResult<String> {
-    read_file_tail_internal(&path, max_bytes)
+    let expanded_path = expand_env_vars(&path);
+    read_file_tail_internal(&expanded_path, max_bytes)
 }
 
 #[command]
 pub fn read_image_base64(path: String) -> AppResult<String> {
     use base64::{engine::general_purpose, Engine as _};
-    let bytes = fs::read(&path).map_err(|e| AppError::FileSystemError(e.to_string()))?;
+    let expanded_path = expand_env_vars(&path);
+    let bytes = fs::read(&expanded_path).map_err(|e| AppError::FileSystemError(e.to_string()))?;
     let b64 = general_purpose::STANDARD.encode(bytes);
     Ok(b64)
 }
@@ -164,15 +171,17 @@ pub fn read_image_base64(path: String) -> AppResult<String> {
 #[command]
 pub fn read_compressed_image_base64(path: String, max_width: Option<u32>, max_height: Option<u32>) -> AppResult<String> {
     use crate::image_utils;
+    let expanded_path = expand_env_vars(&path);
     let w = max_width.unwrap_or(800);
     let h = max_height.unwrap_or(800);
-    image_utils::compress_image_path(&path, w, h, 80)
+    image_utils::compress_image_path(&expanded_path, w, h, 80)
 }
 
 #[command]
 pub fn save_image(path: String, content: Vec<u8>) -> AppResult<()> {
     use std::io::Write;
-    let mut file = fs::File::create(&path).map_err(|e| AppError::FileSystemError(e.to_string()))?;
+    let expanded_path = expand_env_vars(&path);
+    let mut file = fs::File::create(&expanded_path).map_err(|e| AppError::FileSystemError(e.to_string()))?;
     file.write_all(&content)
         .map_err(|e| AppError::FileSystemError(e.to_string()))?;
     Ok(())
@@ -246,12 +255,13 @@ pub fn resolve_test_path(root: String, name: String) -> AppResult<Option<String>
         ));
     }
 
-    let root_path = std::path::Path::new(&root);
+    let expanded_root = expand_env_vars(&root);
+    let root_path = std::path::Path::new(&expanded_root);
 
     if !root_path.exists() || !root_path.is_dir() {
         return Err(AppError::StringError(format!(
             "resolve_test_path: root '{}' does not exist or is not a directory",
-            root
+            expanded_root
         )));
     }
 
@@ -264,37 +274,38 @@ pub fn resolve_test_path(root: String, name: String) -> AppResult<Option<String>
 
 #[command]
 pub fn fs_exists(path: String) -> bool {
-    std::path::Path::new(&path).exists()
+    std::path::Path::new(&expand_env_vars(&path)).exists()
 }
 
 #[command]
 pub fn fs_mkdir(path: String) -> AppResult<()> {
-    std::fs::create_dir_all(&path).map_err(|e| AppError::FileSystemError(e.to_string()))
+    std::fs::create_dir_all(&expand_env_vars(&path)).map_err(|e| AppError::FileSystemError(e.to_string()))
 }
 
 #[command]
 pub fn fs_write_text_file(path: String, content: String) -> AppResult<()> {
-    if let Some(parent) = std::path::Path::new(&path).parent() {
+    let expanded = expand_env_vars(&path);
+    if let Some(parent) = std::path::Path::new(&expanded).parent() {
         if !parent.exists() {
             std::fs::create_dir_all(parent).map_err(|e| AppError::FileSystemError(e.to_string()))?;
         }
     }
-    std::fs::write(&path, content).map_err(|e| AppError::FileSystemError(e.to_string()))
+    std::fs::write(&expanded, content).map_err(|e| AppError::FileSystemError(e.to_string()))
 }
 
 #[command]
 pub fn fs_read_text_file(path: String) -> AppResult<String> {
-    std::fs::read_to_string(&path).map_err(|e| AppError::FileSystemError(e.to_string()))
+    std::fs::read_to_string(&expand_env_vars(&path)).map_err(|e| AppError::FileSystemError(e.to_string()))
 }
 
 #[command]
 pub fn fs_remove_file(path: String) -> AppResult<()> {
-    std::fs::remove_file(&path).map_err(|e| AppError::FileSystemError(e.to_string()))
+    std::fs::remove_file(&expand_env_vars(&path)).map_err(|e| AppError::FileSystemError(e.to_string()))
 }
 
 #[command]
 pub fn fs_read_dir_names(path: String) -> AppResult<Vec<String>> {
-    let read_dir = std::fs::read_dir(&path).map_err(|e| AppError::FileSystemError(e.to_string()))?;
+    let read_dir = std::fs::read_dir(&expand_env_vars(&path)).map_err(|e| AppError::FileSystemError(e.to_string()))?;
     let mut names = Vec::new();
     for entry in read_dir {
         if let Ok(entry) = entry {
