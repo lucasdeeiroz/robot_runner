@@ -742,6 +742,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         <h1>${t('toolbox.checkup.report_title', 'Device Checkup Report')}</h1>
         <div><strong>${t('toolbox.checkup.device_name', 'Device Name')}:</strong> ${deviceName}<br><strong>${t('toolbox.checkup.device_udid', 'Device UDID')}:</strong> <code>${selectedDevice}</code><br><strong>${t('toolbox.checkup.date', 'Date')}:</strong> ${new Date().toLocaleString()}</div>
     </div>
+    <!-- HEADER_END -->
 `;
 
             if (standardChecks.length > 0 && reportShowStandardChecks) {
@@ -1188,11 +1189,11 @@ ${html}`;
                         aiHtmlContent = aiHtmlContent.replace(/^```\n?/, '').replace(/\n?```$/, '');
                     }
 
-                    const insertPoint = modifiedHtml.indexOf('</p>');
+                    const insertPoint = modifiedHtml.indexOf('<!-- HEADER_END -->');
                     if (insertPoint !== -1) {
-                        modifiedHtml = modifiedHtml.slice(0, insertPoint + 4) + '\n\n' + aiHtmlContent + '\n\n' + modifiedHtml.slice(insertPoint + 4);
+                        modifiedHtml = modifiedHtml.slice(0, insertPoint + 19) + '\n\n<div class="section" style="padding: 1rem; background-color: #f8f9fa; border-left: 4px solid #2563eb; margin-top: 1rem;"><strong>' + t('toolbox.checkup.ai_analysis', 'AI Analysis') + ':</strong><br/><br/>' + aiHtmlContent + '</div>\n\n' + modifiedHtml.slice(insertPoint + 19);
                     } else {
-                        // Fallback if </p> is not found
+                        // Fallback
                         modifiedHtml = aiHtmlContent + modifiedHtml;
                     }
                 }
@@ -1200,9 +1201,9 @@ ${html}`;
                 console.warn("[verifyReportWithAI] Failed to parse ai_section_html, injecting fallback raw response.", e);
                 let rawResponse = typeof response.response === 'string' ? response.response : JSON.stringify(response.response);
 
-                const insertPoint = modifiedHtml.indexOf('</p>');
+                const insertPoint = modifiedHtml.indexOf('<!-- HEADER_END -->');
                 if (insertPoint !== -1) {
-                    modifiedHtml = modifiedHtml.slice(0, insertPoint + 4) + '\n\n<div class="section"><div class="section-header">AI Verification Output</div><p>Failed to parse structured response. Raw output:</p><pre>' + rawResponse + '</pre></div>\n\n' + modifiedHtml.slice(insertPoint + 4);
+                    modifiedHtml = modifiedHtml.slice(0, insertPoint + 19) + '\n\n<div class="section"><div class="section-header">AI Verification Output</div><p>Failed to parse structured response. Raw output:</p><pre>' + rawResponse + '</pre></div>\n\n' + modifiedHtml.slice(insertPoint + 19);
                 } else {
                     modifiedHtml = rawResponse + modifiedHtml;
                 }
