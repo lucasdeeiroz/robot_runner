@@ -35,6 +35,15 @@ interface PropComparison {
     isExtra?: boolean;
 }
 
+interface PackageComparison {
+    name: string;
+    goldenVersion?: string;
+    deviceVersion?: string;
+    isMatch: boolean;
+    isMissing: boolean;
+    isExtra: boolean;
+}
+
 interface PackageInfo {
     name: string;
     path: string;
@@ -51,6 +60,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     const [devicePropsCache, setDevicePropsCache] = useState<Record<string, string>>({});
     const [filterDivergent, setFilterDivergent] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
 
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [isAiVerifyModalOpen, setIsAiVerifyModalOpen] = useState(false);
@@ -86,6 +96,19 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         return stored ? JSON.parse(stored) : ['ro.soc.model'];
     });
 
+    const [isBasePropsModalOpen, setIsBasePropsModalOpen] = useState(false);
+    const [basePropsPrefixes, setBasePropsPrefixes] = useState<string[]>(() => {
+        const stored = localStorage.getItem('checkup_basePropsPrefixes');
+        return stored ? JSON.parse(stored) : [
+            'gsm.version.', 'persist.sys.device_provisioned', 'persist.sys.fuse', 'persist.sys.usb.config',
+            'persist.vendor.connsys.', 'ro.board.', 'ro.boot.hardware', 'ro.boot.serialno', 'ro.boot.vbmeta.',
+            'ro.boot.verifiedbootstate', 'ro.boot.veritymode', 'ro.bootloader', 'ro.build.', 'ro.config.low_ram',
+            'ro.crypto.', 'ro.debuggable', 'ro.hardware.', 'ro.odm.', 'ro.product.', 'ro.secure', 'ro.revision',
+            'ro.serialno', 'ro.soc.model', 'ro.system.', 'ro.telephony.', 'ro.vendor.mediatek.', 'ro.vendor.wifi.',
+            'ro.zygote', 'sys.usb.config'
+        ];
+    });
+
     useEffect(() => {
         localStorage.setItem('checkup_reportPropsCompare', reportPropsCompare);
         localStorage.setItem('checkup_reportShowPropsBase', String(reportShowPropsBase));
@@ -96,16 +119,18 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         localStorage.setItem('checkup_packageFilterPrefixes', JSON.stringify(packageFilterPrefixes));
         localStorage.setItem('checkup_propsFilterMode', propsFilterMode);
         localStorage.setItem('checkup_propsFilterPrefixes', JSON.stringify(propsFilterPrefixes));
+        localStorage.setItem('checkup_basePropsPrefixes', JSON.stringify(basePropsPrefixes));
     }, [
         reportPropsCompare, reportShowPropsBase, reportShowStandardChecks,
         reportShowAdditionalChecks, reportShowPackages, packageFilterMode, packageFilterPrefixes,
-        propsFilterMode, propsFilterPrefixes
+        propsFilterMode, propsFilterPrefixes, basePropsPrefixes
     ]);
 
     // Standard checks based on POS Checklist
-    const [checkResults, setCheckResults] = useState<Record<string, { status: 'idle' | 'running' | 'correct' | 'incorrect', found?: string }>>({});
+    const [checkResults, setCheckResults] = useState<Record<string, { status: 'idle' | 'running' | 'correct' | 'incorrect', found?: string, goldenExpected?: string, isGoldenMatch?: boolean }>>({});
 
-    const [additionalCheckResults, setAdditionalCheckResults] = useState<Record<string, { status: 'idle' | 'running' | 'done', found?: string }>>({});
+    const [additionalCheckResults, setAdditionalCheckResults] = useState<Record<string, { status: 'idle' | 'running' | 'done', found?: string, goldenExpected?: string, isGoldenMatch?: boolean }>>({});
+    const [packageComparisons, setPackageComparisons] = useState<PackageComparison[]>([]);
 
     const standardChecksBase = useMemo(() => [
         {
@@ -348,6 +373,156 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         return props;
     };
 
+
+    const handleImportGoldenFile = async () => {
+        if (!selectedDevice) return;
+        try {
+            const selected = await open({
+                multiple: false,
+                filters: [{ name: 'JSON Golden File', extensions: ['json'] }]
+            });
+
+            if (selected && typeof selected === 'string') {
+                setIsLoading(true);
+                const fileContent = await readTextFile(selected);
+                const goldenData = JSON.parse(fileContent);
+
+                // Fetch device properties
+                let currentDeviceProps = devicePropsCache;
+                if (!currentDeviceProps || Object.keys(currentDeviceProps).length === 0) {
+                    const deviceOutput: string = await invoke('run_adb_command', {
+                        device: selectedDevice,
+                        args: ['shell', 'getprop']
+                    });
+                    currentDeviceProps = parseDeviceProps(deviceOutput);
+                    setDevicePropsCache(currentDeviceProps);
+                }
+
+                // 1. Process Properties
+                if (goldenData.properties) {
+                    const expectedProps = goldenData.properties;
+                    const newComparisons: PropComparison[] = Object.keys(expectedProps).map(key => {
+                        const expected = expectedProps[key];
+                        const found = currentDeviceProps[key] || '';
+                        return {
+                            key,
+                            expected,
+                            found,
+                            isMatch: expected === found
+                        };
+                    });
+                    setComparisons(newComparisons);
+                }
+
+                // Run Live Checks for Comparison
+                const newStandardResults: Record<string, any> = {};
+                if (goldenData.standard_checks) {
+                    await Promise.all(standardChecksBase.map(async (check) => {
+                        if (goldenData.standard_checks[check.id]) {
+                            const goldenCheck = goldenData.standard_checks[check.id];
+                            try {
+                                const output: string = await invoke('run_adb_command', {
+                                    device: selectedDevice,
+                                    args: check.command
+                                });
+                                const isMatch = check.expected(output);
+                                const foundDisplay = check.foundDisplay(output);
+                                newStandardResults[check.id] = {
+                                    status: isMatch ? 'correct' : 'incorrect',
+                                    found: foundDisplay,
+                                    goldenExpected: goldenCheck.found,
+                                    isGoldenMatch: goldenCheck.found === foundDisplay
+                                };
+                            } catch (error) {
+                                newStandardResults[check.id] = {
+                                    status: 'incorrect',
+                                    found: t('toolbox.checkup.error_exec', 'Execution error'),
+                                    goldenExpected: goldenCheck.found,
+                                    isGoldenMatch: false
+                                };
+                            }
+                        }
+                    }));
+                    setCheckResults(newStandardResults);
+                }
+
+                const newAdditionalResults: Record<string, any> = {};
+                if (goldenData.additional_checks) {
+                    await Promise.all(additionalChecksBase.map(async (check) => {
+                        if (goldenData.additional_checks[check.id]) {
+                            const goldenCheck = goldenData.additional_checks[check.id];
+                            try {
+                                const output: string = await invoke('run_adb_command', {
+                                    device: selectedDevice,
+                                    args: check.command
+                                });
+                                const foundDisplay = check.foundDisplay(output);
+                                newAdditionalResults[check.id] = {
+                                    status: 'done',
+                                    found: foundDisplay,
+                                    goldenExpected: goldenCheck.found,
+                                    isGoldenMatch: goldenCheck.found === foundDisplay
+                                };
+                            } catch (error) {
+                                newAdditionalResults[check.id] = {
+                                    status: 'done',
+                                    found: t('toolbox.checkup.error_exec', 'Execution error'),
+                                    goldenExpected: goldenCheck.found,
+                                    isGoldenMatch: false
+                                };
+                            }
+                        }
+                    }));
+                    setAdditionalCheckResults(newAdditionalResults);
+                }
+
+                // Packages Compare
+                if (goldenData.installed_packages) {
+                    const pkgs = await invoke<PackageInfo[]>("get_installed_packages", { device: selectedDevice });
+                    const goldenPkgs: any[] = goldenData.installed_packages;
+
+                    const devicePkgsMap = new Map(pkgs.map(p => [p.name, p]));
+                    const goldenPkgsMap = new Map(goldenPkgs.map(p => [p.name, p]));
+
+                    const pkgComps: PackageComparison[] = [];
+
+                    for (const gPkg of goldenPkgs) {
+                        const dPkg = devicePkgsMap.get(gPkg.name);
+                        pkgComps.push({
+                            name: gPkg.name,
+                            goldenVersion: gPkg.version,
+                            deviceVersion: dPkg?.version,
+                            isMatch: dPkg?.version === gPkg.version,
+                            isMissing: !dPkg,
+                            isExtra: false
+                        });
+                    }
+
+                    for (const dPkg of pkgs) {
+                        if (!goldenPkgsMap.has(dPkg.name)) {
+                            pkgComps.push({
+                                name: dPkg.name,
+                                deviceVersion: dPkg.version,
+                                isMatch: false,
+                                isMissing: false,
+                                isExtra: true
+                            });
+                        }
+                    }
+
+                    setPackageComparisons(pkgComps);
+                }
+
+                toast.success(t('toolbox.checkup.golden_file_imported', 'Golden file imported successfully!'), { id: 'golden-import' });
+            }
+        } catch (error) {
+            console.error('Failed to import golden file:', error);
+            toast.error(t('toolbox.checkup.golden_file_import_error', 'Failed to import golden file'), { id: 'golden-import-error' });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleImportFile = async (append = false) => {
         if (!selectedDevice) return;
         try {
@@ -407,38 +582,6 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         }
     };
 
-    const COMMON_PROP_PREFIXES = [
-        'gsm.version.',
-        'persist.sys.device_provisioned',
-        'persist.sys.fuse',
-        'persist.sys.usb.config',
-        'persist.vendor.connsys.',
-        'ro.board.',
-        'ro.boot.hardware',
-        'ro.boot.serialno',
-        'ro.boot.vbmeta.',
-        'ro.boot.verifiedbootstate',
-        'ro.boot.veritymode',
-        'ro.bootloader',
-        'ro.build.',
-        'ro.config.low_ram',
-        'ro.crypto.',
-        'ro.debuggable',
-        'ro.hardware.',
-        'ro.odm.',
-        'ro.product.',
-        'ro.secure',
-        'ro.revision',
-        'ro.serialno',
-        'ro.soc.model',
-        'ro.system.',
-        'ro.telephony.',
-        'ro.vendor.mediatek.',
-        'ro.vendor.wifi.',
-        'ro.zygote',
-        'sys.usb.config'
-    ];
-
     const handleLoadRemainingProps = async () => {
         if (!selectedDevice) return;
         setIsLoading(true);
@@ -458,7 +601,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
 
             for (const [key, value] of Object.entries(currentDeviceProps)) {
                 if (!existingKeys.has(key)) {
-                    if (COMMON_PROP_PREFIXES.some(prefix => key.startsWith(prefix))) {
+                    if (basePropsPrefixes.some(prefix => key.startsWith(prefix))) {
                         if (value.trim() !== '') {
                             newComparisons.push({
                                 key,
@@ -549,8 +692,22 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     const buildHtmlReport = async (): Promise<string | null> => {
         if (!selectedDevice) return null;
         try {
+            let currentDeviceProps = devicePropsCache;
+            if (!currentDeviceProps || Object.keys(currentDeviceProps).length === 0) {
+                const deviceOutput: string = await invoke('run_adb_command', {
+                    device: selectedDevice,
+                    args: ['shell', 'getprop']
+                });
+                currentDeviceProps = parseDeviceProps(deviceOutput);
+                setDevicePropsCache(currentDeviceProps);
+            }
+
+            const deviceName = currentDeviceProps['ro.product.model'] || currentDeviceProps['ro.product.marketname'] || 'Unknown Device';
+
             let filteredPkgs: PackageInfo[] = [];
+
             if (reportShowPackages) {
+
                 const pkgs = await invoke<PackageInfo[]>("get_installed_packages", { device: selectedDevice });
                 filteredPkgs = pkgs.filter(p => {
                     const matchesPrefix = packageFilterPrefixes.some(prefix => p.name.startsWith(prefix));
@@ -563,7 +720,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
 <html lang="${t('language', 'en')}">
 <head>
     <meta charset="UTF-8">
-    <title>${t('toolbox.checkup.report_title', 'Device Checkup Report')} - ${selectedDevice}</title>
+    <title>${t('toolbox.checkup.report_title', 'Device Checkup Report')} - ${deviceName} - ${selectedDevice}</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 2rem; max-width: 1200px; margin: 0 auto; color: #333; }
         h1, h2 { color: #111; }
@@ -581,8 +738,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
 </head>
 <body>
     ${settings.customLogoLight ? `<img src="${settings.customLogoLight}" alt="Logo" style="max-height: 48px; margin-bottom: 1rem;" />` : ''}
-    <h1>${t('toolbox.checkup.report_title', 'Device Checkup Report')}</h1>
-    <p><strong>Device UDID:</strong> <code>${selectedDevice}</code><br><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+        <h1>${t('toolbox.checkup.report_title', 'Device Checkup Report')}</h1>
+        <div><strong>${t('toolbox.checkup.device_name', 'Device Name')}:</strong> ${deviceName}<br><strong>${t('toolbox.checkup.device_udid', 'Device UDID')}:</strong> <code>${selectedDevice}</code><br><strong>${t('toolbox.checkup.date', 'Date')}:</strong> ${new Date().toLocaleString()}</div>
+    </div>
 `;
 
             if (standardChecks.length > 0 && reportShowStandardChecks) {
@@ -592,9 +751,9 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     <table>
                         <thead>
                             <tr>
-                                <th>Check</th>
+                                <th>${t('toolbox.checkup.check', 'Check')}</th>
                                 <th>${t('toolbox.checkup.found', 'Found')}</th>
-                                <th>Status</th>
+                                <th>${t('toolbox.checkup.status', 'Status')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -602,13 +761,23 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 standardChecks.forEach(c => {
                     let statusText = '-';
                     let statusClass = '';
-                    if (c.status === 'correct') { statusText = t('toolbox.checkup.status_correct', 'Correct'); statusClass = 'success'; }
-                    else if (c.status === 'incorrect') { statusText = t('toolbox.checkup.status_incorrect', 'Incorrect'); statusClass = 'error'; }
+
+                    if (checkResults[c.id]?.goldenExpected !== undefined) {
+                        const isMatch = checkResults[c.id]?.isGoldenMatch;
+                        statusText = isMatch ? t('toolbox.checkup.status_match', 'Match') : t('toolbox.checkup.status_mismatch', 'Mismatch');
+                        statusClass = isMatch ? 'success' : 'error';
+                    } else {
+                        if (c.status === 'correct') { statusText = t('toolbox.checkup.status_correct', 'Correct'); statusClass = 'success'; }
+                        else if (c.status === 'incorrect') { statusText = t('toolbox.checkup.status_incorrect', 'Incorrect'); statusClass = 'error'; }
+                    }
 
                     html += `
                         <tr>
                             <td><strong>${c.name}</strong><br><code>${c.command.join(' ')}</code></td>
-                            <td><code class="${statusClass}">${c.found || '-'}</code></td>
+                            <td>
+                                ${checkResults[c.id]?.goldenExpected !== undefined ? `<div>${t('toolbox.checkup.golden', 'Golden')}: <code>${checkResults[c.id]?.goldenExpected}</code></div>` : ''}
+                                <div>${t('toolbox.checkup.found', 'Found')}: <code class="${statusClass}">${c.found || '-'}</code></div>
+                            </td>
                             <td class="${statusClass}">${statusText}</td>
                         </tr>
                 `;
@@ -623,10 +792,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     <table>
                         <thead>
                             <tr>
-                                <th>Key</th>
+                                <th>${t('toolbox.checkup.key', 'Key')}</th>
                                 <th>${t('toolbox.checkup.expected', 'Expected')}</th>
                                 <th>${t('toolbox.checkup.found', 'Found')}</th>
-                                <th>Status</th>
+                                <th>${t('toolbox.checkup.status', 'Status')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -641,14 +810,51 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                 <td><code>${c.key}</code></td>
                                 <td><code>${c.expected}</code></td>
                                 <td><code class="${c.isMatch ? 'success' : 'error'}">${c.found || '-'}</code></td>
-                                <td class="${c.isMatch ? 'success' : 'error'}">${c.isMatch ? t('toolbox.checkup.status_correct', 'Correct') : t('toolbox.checkup.status_incorrect', 'Incorrect')}</td>
+                                <td class="${c.isMatch ? 'success' : 'error'}">${c.isMatch ? t('toolbox.checkup.status_match', 'Match') : t('toolbox.checkup.status_mismatch', 'Mismatch')}</td>
                             </tr>
                     `;
                 });
                 html += `</tbody></table></div>`;
             }
 
-            if (reportShowPackages) {
+
+            if (packageComparisons.length > 0 && reportShowPackages) {
+                const filteredComps = packageComparisons.filter(p => {
+                    if (packageFilterPrefixes.length === 0) return packageFilterMode === 'exclude';
+                    const matchesPrefix = packageFilterPrefixes.some(prefix => p.name.startsWith(prefix));
+                    if (packageFilterMode === 'include') return matchesPrefix;
+                    return !matchesPrefix;
+                });
+
+                if (filteredComps.length > 0) {
+                    html += `
+                    <div class="section">
+                    <div class="section-header">${t('toolbox.checkup.packages_compare', 'Packages Compare')}</div>
+                    <table>
+                    <thead>
+                    <tr>
+                    <th>${t('toolbox.checkup.package_name', 'Package')}</th>
+                    <th>${t('toolbox.checkup.golden', 'Golden')}</th>
+                    <th>${t('toolbox.checkup.device', 'Device')}</th>
+                    <th>${t('toolbox.checkup.status', 'Status')}</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    `;
+                    filteredComps.forEach(p => {
+                        html += `
+                        <tr>
+                        <td><code>${p.name}</code></td>
+                        <td><code>${p.goldenVersion || '-'}</code></td>
+                        <td><code class="${p.isMatch ? 'success' : 'error'}">${p.deviceVersion || '-'}</code></td>
+                        <td class="${p.isMatch ? 'success' : 'error'}">${p.isMatch ? t('toolbox.checkup.status_match', 'Match') : (p.isMissing ? t('toolbox.checkup.status_missing', 'Missing') : t('toolbox.checkup.status_extra', 'Extra'))}</td>
+                        </tr>
+                        `;
+                    });
+                    html += `</tbody></table></div>`;
+                }
+            } else if (reportShowPackages) {
+
                 html += `
                 <div class="section">
                 <div class="section-header">${t('toolbox.checkup.installed_packages', 'Installed Packages')}</div>
@@ -657,7 +863,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 <tr>
                 <th>${t('toolbox.checkup.package_name', 'Package')}</th>
                 <th>${t('toolbox.checkup.version', 'Version')}</th>
-                <th>Type</th>
+                <th>${t('toolbox.checkup.type', 'Type')}</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -667,7 +873,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     <tr>
                     <td><code>${p.name}</code></td>
                     <td><code>${p.version || '-'}</code></td>
-                    <td><span class="${p.is_system ? 'warning' : 'info'}">${p.is_system ? 'System' : 'User'}</span></td>
+                    <td><span class="${p.is_system ? 'warning' : 'info'}">${p.is_system ? t('toolbox.checkup.system', 'System') : t('toolbox.checkup.user', 'User')}</span></td>
                     </tr>
                     `;
                 });
@@ -681,17 +887,31 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>Check</th>
+                                            <th>${t('toolbox.checkup.check', 'Check')}</th>
                                             <th>${t('toolbox.checkup.found', 'Found')}</th>
+                                            <th>${t('toolbox.checkup.status', 'Status')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                             `;
                 additionalChecks.forEach(c => {
+                    let statusText = '-';
+                    let statusClass = 'info';
+
+                    if (additionalCheckResults[c.id]?.goldenExpected !== undefined) {
+                        const isMatch = additionalCheckResults[c.id]?.isGoldenMatch;
+                        statusText = isMatch ? t('toolbox.checkup.status_match', 'Match') : t('toolbox.checkup.status_mismatch', 'Mismatch');
+                        statusClass = isMatch ? 'success' : 'warning';
+                    }
+
                     html += `
                                     <tr>
                                         <td><strong>${c.name}</strong><br><code>${c.command.join(' ')}</code></td>
-                                        <td><code class="info">${c.found || '-'}</code></td>
+                                        <td>
+                                            ${additionalCheckResults[c.id]?.goldenExpected !== undefined ? `<div>${t('toolbox.checkup.golden', 'Golden')}: <code>${additionalCheckResults[c.id]?.goldenExpected}</code></div>` : ''}
+                                            <div>${t('toolbox.checkup.found', 'Found')}: <code>${c.found || '-'}</code></div>
+                                        </td>
+                                        <td class="${statusClass}">${statusText}</td>
                                     </tr>
                             `;
                 });
@@ -716,7 +936,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Key</th>
+                                    <th>${t('toolbox.checkup.key', 'Key')}</th>
                                     <th>${t('toolbox.checkup.found', 'Found')}</th>
                                 </tr>
                             </thead>
@@ -739,6 +959,141 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         } catch (error) {
             console.error('Failed to build HTML report', error);
             return null;
+        }
+    };
+
+    const generateGoldenFile = async () => {
+        if (!selectedDevice) return;
+
+        let toastId = toast.loading(t('toolbox.checkup.golden_file.generating', 'Generating golden file...'));
+        try {
+            // Fetch everything we need
+            let currentDeviceProps = devicePropsCache;
+            if (!currentDeviceProps || Object.keys(currentDeviceProps).length === 0) {
+                const deviceOutput: string = await invoke('run_adb_command', {
+                    device: selectedDevice,
+                    args: ['shell', 'getprop']
+                });
+                currentDeviceProps = parseDeviceProps(deviceOutput);
+                setDevicePropsCache(currentDeviceProps);
+            }
+
+            const capturedProps: Record<string, string> = {};
+            const newComparisons: PropComparison[] = [];
+            Object.keys(currentDeviceProps).forEach(key => {
+                if (basePropsPrefixes.some(prefix => key.startsWith(prefix))) {
+                    capturedProps[key] = currentDeviceProps[key];
+                    newComparisons.push({
+                        key,
+                        expected: currentDeviceProps[key],
+                        found: currentDeviceProps[key],
+                        isMatch: true
+                    });
+                }
+            });
+            setComparisons(newComparisons);
+
+            // Run standard checks if not already run
+            const newStandardResults: Record<string, any> = { ...checkResults };
+            await Promise.all(standardChecksBase.map(async (check) => {
+                if (newStandardResults[check.id]?.status !== 'correct' && newStandardResults[check.id]?.status !== 'incorrect') {
+                    try {
+                        const output: string = await invoke('run_adb_command', {
+                            device: selectedDevice,
+                            args: check.command
+                        });
+                        const isMatch = check.expected(output);
+                        newStandardResults[check.id] = {
+                            status: isMatch ? 'correct' : 'incorrect',
+                            found: check.foundDisplay(output)
+                        };
+                    } catch (error) {
+                        newStandardResults[check.id] = {
+                            status: 'incorrect',
+                            found: t('toolbox.checkup.error_exec', 'Execution error')
+                        };
+                    }
+                }
+            }));
+            setCheckResults(newStandardResults);
+
+            // Run additional checks if not already run
+            const newAdditionalResults: Record<string, any> = { ...additionalCheckResults };
+            await Promise.all(additionalChecksBase.map(async (check) => {
+                if (newAdditionalResults[check.id]?.status !== 'done') {
+                    try {
+                        const output: string = await invoke('run_adb_command', {
+                            device: selectedDevice,
+                            args: check.command
+                        });
+                        newAdditionalResults[check.id] = {
+                            status: 'done',
+                            found: check.foundDisplay(output)
+                        };
+                    } catch (error) {
+                        newAdditionalResults[check.id] = {
+                            status: 'done',
+                            found: t('toolbox.checkup.error_exec', 'Execution error')
+                        };
+                    }
+                }
+            }));
+            setAdditionalCheckResults(newAdditionalResults);
+
+            const pkgs = await invoke<PackageInfo[]>("get_installed_packages", { device: selectedDevice });
+
+            const newPkgComps: PackageComparison[] = pkgs.map(p => ({
+                name: p.name,
+                goldenVersion: p.version,
+                deviceVersion: p.version,
+                isMatch: true,
+                isMissing: false,
+                isExtra: false
+            }));
+            setPackageComparisons(newPkgComps);
+
+            const goldenData = {
+                device: selectedDevice,
+                timestamp: new Date().toISOString(),
+                properties: capturedProps,
+                standard_checks: standardChecksBase.reduce((acc: any, check) => {
+                    acc[check.id] = {
+                        name: check.name,
+                        command: check.command.join(' '),
+                        status: newStandardResults[check.id]?.status,
+                        found: newStandardResults[check.id]?.found
+                    };
+                    return acc;
+                }, {}),
+                additional_checks: additionalChecksBase.reduce((acc: any, check) => {
+                    acc[check.id] = {
+                        name: check.name,
+                        command: check.command.join(' '),
+                        found: newAdditionalResults[check.id]?.found
+                    };
+                    return acc;
+                }, {}),
+                installed_packages: pkgs.map(p => ({
+                    name: p.name,
+                    version: p.version,
+                    is_system: p.is_system
+                }))
+            };
+
+            const filePath = await save({
+                filters: [{ name: 'JSON Golden File', extensions: ['json'] }],
+                defaultPath: `golden_${selectedDevice.replace(/[^a-zA-Z0-9]/g, '_')}.json`
+            });
+
+            if (filePath) {
+                await writeTextFile(filePath, JSON.stringify(goldenData, null, 2));
+                toast.success(t('toolbox.checkup.golden_file.saved', 'Golden file saved successfully!'), { id: toastId });
+            } else {
+                toast.dismiss(toastId);
+            }
+        } catch (error) {
+            console.error('Failed to generate golden file', error);
+            toast.error(t('toolbox.checkup.golden_file.error', 'Failed to generate golden file'), { id: toastId });
         }
     };
 
@@ -818,13 +1173,13 @@ ${html}`;
             const response = await askAgent(aiPrompt, [], aiSystemInstruction, settings);
             console.log("[verifyReportWithAI] AI Response received:", response);
             let modifiedHtml = html;
-            
+
             try {
                 const responseData = typeof response.response === 'string' ? JSON.parse(response.response) : response.response;
-                
+
                 // Fetch the HTML content, either from our custom property or the standard 'reply' property
                 let aiHtmlContent = responseData.ai_section_html || responseData.reply;
-                
+
                 if (aiHtmlContent) {
                     // Clean up any potential markdown formatting
                     if (aiHtmlContent.startsWith('```html')) {
@@ -844,7 +1199,7 @@ ${html}`;
             } catch (e) {
                 console.warn("[verifyReportWithAI] Failed to parse ai_section_html, injecting fallback raw response.", e);
                 let rawResponse = typeof response.response === 'string' ? response.response : JSON.stringify(response.response);
-                
+
                 const insertPoint = modifiedHtml.indexOf('</p>');
                 if (insertPoint !== -1) {
                     modifiedHtml = modifiedHtml.slice(0, insertPoint + 4) + '\n\n<div class="section"><div class="section-header">AI Verification Output</div><p>Failed to parse structured response. Raw output:</p><pre>' + rawResponse + '</pre></div>\n\n' + modifiedHtml.slice(insertPoint + 4);
@@ -880,219 +1235,410 @@ ${html}`;
 
             <div className="flex-1 min-h-0 flex flex-wrap gap-6 overflow-y-auto">
 
-                {/* Props Comparison Panel */}
                 <Section
-                    title={t('toolbox.checkup.prop_compare', '.prop Compare')}
-                    icon={FileText}
-                    className="flex-[2] min-w-[350px] flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
-                    contentClassName="flex-1 flex flex-col min-h-0 pr-2"
+                    title={t('toolbox.checkup.check_os', 'Check OS')}
+                    icon={ShieldCheck}
+                    className="flex-[4] min-w-full flex flex-col min-h-0 overflow-hidden"
+                    contentClassName="flex-1 flex flex-col md:flex-row gap-4 min-h-0 p-2 overflow-x-auto"
+                    menus={
+                        <>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={generateGoldenFile}
+                                aria-label={t('toolbox.checkup.generate_golden_file', 'Generate Golden File')}
+                                title={t('toolbox.checkup.generate_golden_file', 'Generate Golden File')}
+                                tooltipPosition='left'
+                                disabled={disabled}
+                            >
+                                <Download size={16} />
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleImportGoldenFile}
+                                aria-label={t('toolbox.checkup.import_golden_file', 'Import Golden File')}
+                                title={t('toolbox.checkup.import_golden_file', 'Import Golden File')}
+                                tooltipPosition='left'
+                                disabled={disabled}
+                            >
+                                <FileText size={16} />
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setIsBasePropsModalOpen(true)}
+                                aria-label={t('toolbox.checkup.base_props.config_title', 'Base Props Configuration')}
+                                title={t('toolbox.checkup.base_props.config_title', 'Base Props Configuration')}
+                                tooltipPosition='left'
+                                disabled={disabled}
+                            >
+                                <ListPlus size={16} />
+                            </Button>
+                        </>
+                    }
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
-                            <SplitButton
-                                variant="primary"
-                                disabled={disabled || isLoading}
-                                primaryAction={{
-                                    label: t('toolbox.checkup.upload_prop', 'Import'),
-                                    icon: <Upload size={16} />,
-                                    onClick: () => handleImportFile(false)
-                                }}
-                                secondaryActions={[
-                                    {
-                                        label: t('toolbox.checkup.upload_additional_prop', 'Additional .prop file'),
-                                        icon: <ListPlus size={16} />,
-                                        onClick: () => handleImportFile(true)
-                                    },
-                                    {
-                                        label: t('toolbox.checkup.load_remaining', 'Load remaining base props'),
-                                        icon: <FileText size={16} />,
-                                        onClick: handleLoadRemainingProps,
-                                        disabled: !selectedDevice
-                                    }
-                                ]}
-                            />
+                            {selectedDevice && (
+                                <Button
+                                    variant="primary"
+                                    disabled={disabled || isLoading}
+                                    onClick={() => setIsReportModalOpen(true)}
+                                    title={t('toolbox.checkup.generate_report', 'Generate Report')}
+                                    aria-label={t('toolbox.checkup.generate_report', 'Generate Report')}
+                                    tooltipPosition='left'
+                                    size="sm"
+                                    className="flex items-center gap-2"
+                                >
+                                    <FileText size={16} />
+                                    {t('toolbox.checkup.generate_report', 'Generate Report')}
+                                </Button>
+                            )}
                         </div>
                     }
                 >
-                    <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
-                        <div className="flex items-center gap-2">
-                            {selectedDevice && (
-                                <Button
-                                    variant="outline"
-                                    tooltipPosition="right"
-                                    onClick={() => setIsReportModalOpen(true)}
-                                    disabled={disabled || isLoading}
-                                    className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
-                                    title={t('toolbox.checkup.generate_report', 'Generate Report')}
-                                >
-                                    <Download size={16} />
-                                </Button>
-                            )}
-                            <Button
-                                variant={filterDivergent ? "primary" : "ghost"}
-                                size="sm"
-                                tooltipPosition="right"
-                                onClick={() => setFilterDivergent(!filterDivergent)}
-                                className={clsx("relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md", filterDivergent && "bg-error/10 text-error hover:bg-error/20 hover:text-error")}
-                                title={filterDivergent ? t('toolbox.checkup.show_all', 'Show all') : t('toolbox.checkup.show_divergent', 'Show only divergences')}
-                            >
-                                {filterDivergent ? <FilterX size={16} /> : <Filter size={16} />}
-                            </Button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {comparisons.length > 0 && (
-                                <span className="text-xs px-2 h-9 flex items-center justify-center text-on-surface rounded-full font-medium whitespace-nowrap">
-                                    {matchCount} / {comparisons.length} {t('toolbox.checkup.matches', 'matches')}
-                                </span>
-                            )}
-                            <div className="relative">
-                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50" />
-                                <Input
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder={t('toolbox.checkup.search_placeholder', 'Search key...')}
-                                    className="pl-9 h-9 text-sm w-36 sm:w-48"
-                                />
+                    <div className="flex-1 flex flex-col md:flex-row gap-4 w-full h-full min-h-[400px]">
+
+                        {/* Props Comparison Panel */}
+                        <Section
+                            title={t('toolbox.checkup.prop_compare', '.prop Compare')}
+                            icon={FileText}
+                            className="flex-[2] min-w-[350px] flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
+                            contentClassName="flex-1 flex flex-col min-h-0 pr-2"
+                            actions={
+                                <>
+                                    <div className="relative">
+                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50 z-10 pointer-events-none" />
+                                        <Input
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            onFocus={() => setIsSearchFocused(true)}
+                                            onBlur={() => setIsSearchFocused(false)}
+                                            placeholder={isSearchFocused ? t('toolbox.checkup.search_placeholder', 'Search key...') : ''}
+                                            className={`pl-9 h-9 text-sm transition-all duration-300 ${isSearchFocused ? "w-36 sm:w-48" : "w-10 cursor-pointer"}`}
+                                        />
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <SplitButton
+                                            variant="primary"
+                                            disabled={disabled || isLoading}
+                                            primaryAction={{
+                                                label: isSearchFocused ? "" : t('toolbox.checkup.upload_prop', 'Import'),
+                                                icon: <Upload size={16} />,
+                                                onClick: () => handleImportFile(false)
+                                            }}
+                                            secondaryActions={[
+                                                {
+                                                    label: t('toolbox.checkup.upload_additional_prop', 'Additional .prop file'),
+                                                    icon: <ListPlus size={16} />,
+                                                    onClick: () => handleImportFile(true)
+                                                },
+                                                {
+                                                    label: t('toolbox.checkup.load_remaining', 'Load remaining base props'),
+                                                    icon: <FileText size={16} />,
+                                                    onClick: handleLoadRemainingProps,
+                                                    disabled: !selectedDevice
+                                                }
+                                            ]}
+                                        />
+                                    </div>
+                                </>
+                            }
+                            menus={
+                                <>
+                                    <div className="flex items-center gap-2">
+                                        {comparisons.length > 0 && (
+                                            <span className="text-xs px-2 h-9 flex items-center justify-center text-on-surface rounded-full font-medium whitespace-nowrap">
+                                                {matchCount} / {comparisons.length}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <Button
+                                        variant={filterDivergent ? "primary" : "ghost"}
+                                        size="sm"
+                                        tooltipPosition="left"
+                                        onClick={() => setFilterDivergent(!filterDivergent)}
+                                        className={clsx("relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md", filterDivergent && "bg-error/10 text-error hover:bg-error/20 hover:text-error")}
+                                        title={filterDivergent ? t('toolbox.checkup.show_all', 'Show all') : t('toolbox.checkup.show_divergent', 'Show only divergences')}
+                                    >
+                                        {filterDivergent ? <FilterX size={16} /> : <Filter size={16} />}
+                                    </Button>
+                                </>
+                            }
+                        >
+                            <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
+                                <div className="flex-1 h-full min-h-0 bg-surface-variant/10 rounded-xl border border-outline-variant/30 overflow-hidden">
+                                    <div className="h-full overflow-y-auto overflow-x-auto custom-scrollbar">
+                                        {isLoading ? (
+                                            <div className="flex items-center justify-center h-full text-on-surface-variant/60 gap-3 min-h-[200px]">
+                                                <ExpressiveLoading variant="circular" size="md" />
+                                                <span>{t('toolbox.checkup.fetching', 'Fetching properties...')}</span>
+                                            </div>
+                                        ) : comparisons.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center h-full text-on-surface-variant/40 p-8 text-center min-h-[200px]">
+                                                <Upload size={40} className="mb-3 opacity-50" />
+                                                <p className="text-sm max-w-[250px]">{t('toolbox.checkup.upload_prop_desc', 'Import a .prop file to compare.')}</p>
+                                            </div>
+                                        ) : (
+                                            <table className="w-full min-w-[400px] text-left border-collapse text-sm table-fixed">
+                                                <thead className="bg-surface-variant/30 backdrop-blur-md sticky top-0 shadow-sm z-10 text-on-surface-variant">
+                                                    <tr>
+                                                        <th className="p-3 font-medium border-b border-outline-variant/30 w-4/12 md:w-5/12">Key</th>
+                                                        <th className="p-3 font-medium border-b border-outline-variant/30 w-3/12">{t('toolbox.checkup.expected', 'Expected')}</th>
+                                                        <th className="p-3 font-medium border-b border-outline-variant/30 w-3/12">{t('toolbox.checkup.found', 'Found')}</th>
+                                                        <th className="p-3 font-medium border-b border-outline-variant/30 w-2/12 md:w-1/12 text-center min-w-[60px]">Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {filteredComparisons.map(c => (
+                                                        <tr key={c.key} className="border-b border-outline-variant/10 hover:bg-surface-variant/20 transition-colors">
+                                                            <td className="p-3 font-mono text-[11px] text-on-surface break-words leading-relaxed">{c.key}</td>
+                                                            <td className="p-3 font-mono text-[11px] text-on-surface-variant break-words leading-relaxed">{c.expected}</td>
+                                                            <td className={clsx(
+                                                                "p-3 font-mono text-[11px] break-words leading-relaxed",
+                                                                c.isMatch ? "text-success" : (c.isExtra ? "text-warning" : "text-error font-semibold")
+                                                            )}>
+                                                                {c.found || <span className="italic opacity-50">{t('toolbox.checkup.not_found', 'Not found')}</span>}
+                                                            </td>
+                                                            <td className="p-3 text-center align-middle">
+                                                                {c.isMatch
+                                                                    ? <span data-tooltip={`adb shell getprop ${c.key}`} data-position="left"><CheckCircle2 size={16} className="text-success mx-auto drop-shadow-sm" /></span>
+                                                                    : (c.isExtra
+                                                                        ? <span data-tooltip={`adb shell getprop ${c.key}`} data-position="left"><Info size={16} className="text-warning mx-auto drop-shadow-sm" /></span>
+                                                                        : <span data-tooltip={`adb shell getprop ${c.key}`} data-position="left"><XCircle size={16} className="text-error mx-auto drop-shadow-sm" /></span>
+                                                                    )
+                                                                }
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                    {filteredComparisons.length === 0 && (
+                                                        <tr>
+                                                            <td colSpan={4} className="p-8 text-center text-on-surface-variant/50 italic">
+                                                                {t('toolbox.checkup.no_results', 'No results found.')}
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        </Section>
+
+                        {/* Standard Checks Panel */}
+                        <Section
+                            title={t('toolbox.checkup.standard_checks', 'Standard Checklist')}
+                            icon={ShieldCheck}
+                            className="flex-1 min-w-[280px] flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
+                            contentClassName="flex-1 overflow-y-auto pr-2 space-y-3 min-h-0"
+                            actions={
+                                <Button
+                                    variant="secondary"
+                                    tooltipPosition="left"
+                                    title={t('toolbox.checkup.run_checks', 'Run Checks')}
+                                    onClick={runStandardChecks}
+                                    disabled={disabled || standardChecks.some(c => c.status === 'running')}
+                                    className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
+                                >
+                                    <Play size={16} className={clsx(standardChecks.some(c => c.status === 'running') && "animate-spin")} />
+                                </Button>
+                            }
+                        >
+                            {standardChecks.map(check => (
+                                <div key={check.id} className="flex flex-col p-4 rounded-xl border border-outline-variant/30 bg-surface-variant/10 backdrop-blur-md hover:bg-surface-variant/20 transition-all shadow-sm text-sm">
+                                    <div className="flex justify-between items-center mb-1 gap-2">
+                                        <span className="font-medium text-on-surface leading-tight drop-shadow-sm">{check.name}</span>
+                                        {check.status === 'running' && <span data-tooltip={`adb shell ${check.command}`} data-position="left"><ExpressiveLoading variant="circular" size="sm" /></span>}
+                                        {checkResults[check.id]?.goldenExpected !== undefined ? (
+                                            checkResults[check.id]?.isGoldenMatch
+                                                ? <span data-tooltip={`adb shell ${check.command}`} data-position="left"><CheckCircle2 size={18} className="text-success shrink-0 drop-shadow-sm cursor-help" /></span>
+                                                : <span data-tooltip={`adb shell ${check.command}`} data-position="left"><XCircle size={18} className="text-error shrink-0 drop-shadow-sm cursor-help" /></span>
+                                        ) : (
+                                            <>
+                                                {check.status === 'correct' && <span data-tooltip={`adb shell ${check.command}`} data-position="left"><CheckCircle2 size={18} className="text-success shrink-0 drop-shadow-sm cursor-help" /></span>}
+                                                {check.status === 'incorrect' && <span data-tooltip={`adb shell ${check.command}`} data-position="left"><XCircle size={18} className="text-error shrink-0 drop-shadow-sm cursor-help" /></span>}
+                                            </>
+                                        )}
+                                    </div>
+                                    {check.found && (
+                                        <div className="flex justify-between items-center text-xs mt-3 pt-2 border-t border-outline-variant/20">
+                                            <div className="flex flex-col gap-1 w-full">
+                                                {checkResults[check.id]?.goldenExpected && (
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-on-surface-variant/80 font-medium text-[10px] uppercase tracking-wider">{t('toolbox.checkup.golden', 'Golden')}:</span>
+                                                        <span className="font-mono px-2 py-[2px] rounded text-[11px] bg-surface-variant text-on-surface-variant break-all max-w-[70%] text-right opacity-80">
+                                                            {checkResults[check.id]?.goldenExpected}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-on-surface-variant/80 font-medium">{t('toolbox.checkup.found', 'Found')}:</span>
+                                                    <span className={clsx(
+                                                        "font-mono px-2 py-1 rounded-md shadow-inner text-[11px] break-all max-w-[70%] text-right",
+                                                        checkResults[check.id]?.goldenExpected !== undefined
+                                                            ? (checkResults[check.id]?.isGoldenMatch ? "bg-success/15 text-success" : "bg-error/15 text-error")
+                                                            : (check.status === 'correct' ? "bg-success/15 text-success" : "bg-error/15 text-error")
+                                                    )}>
+                                                        {check.found}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </Section>
+
+                        {/* Additional Checks */}
+                        <Section
+                            title={t('toolbox.checkup.additional_checks', 'Additional Checks')}
+                            icon={ListPlus}
+                            className="flex-1 min-w-[280px] flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
+                            contentClassName="flex-1 overflow-y-auto pr-2 space-y-3 min-h-0"
+                            actions={
+                                <Button
+                                    variant="secondary"
+                                    tooltipPosition="left"
+                                    title={t('toolbox.checkup.run_additional_checks', 'Run Additional Checks')}
+                                    onClick={runAdditionalChecks}
+                                    disabled={disabled || additionalChecks.some(c => c.status === 'running')}
+                                    className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
+                                >
+                                    <Play size={16} className={clsx(additionalChecks.some(c => c.status === 'running') && "animate-spin")} />
+                                </Button>
+                            }
+                        >
+                            {additionalChecks.map(check => (
+                                <div key={check.id} className="flex flex-col p-4 rounded-xl border border-outline-variant/30 bg-surface-variant/10 backdrop-blur-md hover:bg-surface-variant/20 transition-all shadow-sm text-sm">
+                                    <div className="flex justify-between items-center mb-1 gap-2">
+                                        <span className="font-medium text-on-surface leading-tight drop-shadow-sm">{check.name}</span>
+                                        {check.status === 'running' && <span data-tooltip={`adb ${check.command.join(' ')}`} data-position="left"><ExpressiveLoading variant="circular" size="sm" /></span>}
+                                        {additionalCheckResults[check.id]?.goldenExpected !== undefined ? (
+                                            additionalCheckResults[check.id]?.isGoldenMatch
+                                                ? <span data-tooltip={`adb ${check.command.join(' ')}`} data-position="left"><CheckCircle2 size={18} className="text-success shrink-0 drop-shadow-sm cursor-help" /></span>
+                                                : <span data-tooltip={`adb ${check.command.join(' ')}`} data-position="left"><Info size={18} className="text-warning shrink-0 drop-shadow-sm cursor-help" /></span>
+                                        ) : (
+                                            check.status === 'done' && <span data-tooltip={`adb ${check.command.join(' ')}`} data-position="left"><Info size={18} className="text-primary shrink-0 drop-shadow-sm cursor-help" /></span>
+                                        )}
+                                    </div>
+                                    {check.found && (
+                                        <div className="flex justify-between items-center text-xs mt-3 pt-2 border-t border-outline-variant/20">
+                                            <div className="flex flex-col gap-1 w-full">
+                                                {additionalCheckResults[check.id]?.goldenExpected && (
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-on-surface-variant/80 font-medium text-[10px] uppercase tracking-wider">{t('toolbox.checkup.golden', 'Golden')}:</span>
+                                                        <span className="font-mono px-2 py-[2px] rounded text-[11px] bg-surface-variant text-on-surface-variant break-all max-w-[70%] text-right opacity-80">
+                                                            {additionalCheckResults[check.id]?.goldenExpected}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-on-surface-variant/80 font-medium">{t('toolbox.checkup.found', 'Found')}:</span>
+                                                    <span className={clsx(
+                                                        "font-mono px-2 py-1 rounded-md shadow-inner text-[11px] break-all max-w-[70%] text-right",
+                                                        additionalCheckResults[check.id]?.goldenExpected !== undefined
+                                                            ? (additionalCheckResults[check.id]?.isGoldenMatch ? "bg-success/15 text-success" : "bg-warning/15 text-warning")
+                                                            : "bg-primary/15 text-primary"
+                                                    )}>
+                                                        {check.found}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </Section>
                     </div>
-                    <div className="flex-1 h-full min-h-0 bg-surface-variant/10 rounded-xl border border-outline-variant/30 overflow-hidden">
-                        <div className="h-full overflow-y-auto overflow-x-auto custom-scrollbar">
-                            {isLoading ? (
-                                <div className="flex items-center justify-center h-full text-on-surface-variant/60 gap-3 min-h-[200px]">
-                                    <ExpressiveLoading variant="circular" size="md" />
-                                    <span>{t('toolbox.checkup.fetching', 'Fetching properties...')}</span>
-                                </div>
-                            ) : comparisons.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-full text-on-surface-variant/40 p-8 text-center min-h-[200px]">
-                                    <Upload size={40} className="mb-3 opacity-50" />
-                                    <p className="text-sm max-w-[250px]">{t('toolbox.checkup.upload_prop_desc', 'Import a .prop file to compare.')}</p>
-                                </div>
-                            ) : (
+                </Section>
+                {/* Package Comparisons Panel */}
+                {packageComparisons.length > 0 && (
+                    <Section
+                        title={t('toolbox.checkup.packages_compare', 'Packages Compare')}
+                        icon={ShieldCheck}
+                        className="col-span-1 md:col-span-2 xl:col-span-1 flex-1 min-w-[280px] flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
+                        contentClassName="flex flex-col h-full overflow-hidden p-0"
+                        actions={
+                            <Button
+                                variant="secondary"
+                                tooltipPosition="left"
+                                title={t('toolbox.checkup.clear', 'Clear')}
+                                onClick={() => setPackageComparisons([])}
+                                className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
+                            >
+                                <XCircle size={16} />
+                            </Button>
+                        }
+                    >
+                        <div className="flex-1 h-full min-h-0 bg-surface-variant/10 rounded-xl border border-outline-variant/30 overflow-hidden m-4 mt-0">
+                            <div className="h-full overflow-y-auto overflow-x-auto custom-scrollbar">
                                 <table className="w-full min-w-[400px] text-left border-collapse text-sm table-fixed">
                                     <thead className="bg-surface-variant/30 backdrop-blur-md sticky top-0 shadow-sm z-10 text-on-surface-variant">
                                         <tr>
-                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-4/12 md:w-5/12">Key</th>
-                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-3/12">{t('toolbox.checkup.expected', 'Expected')}</th>
-                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-3/12">{t('toolbox.checkup.found', 'Found')}</th>
-                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-2/12 md:w-1/12 text-center min-w-[60px]">Status</th>
+                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-5/12">{t('toolbox.checkup.package_name', 'Package')}</th>
+                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-3/12">{t('toolbox.checkup.golden', 'Golden')}</th>
+                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-3/12">{t('toolbox.checkup.device', 'Device')}</th>
+                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-1/12 text-center">{t('toolbox.checkup.status', 'Status')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {filteredComparisons.map(c => (
-                                            <tr key={c.key} className="border-b border-outline-variant/10 hover:bg-surface-variant/20 transition-colors">
-                                                <td className="p-3 font-mono text-[11px] text-on-surface break-words leading-relaxed">{c.key}</td>
-                                                <td className="p-3 font-mono text-[11px] text-on-surface-variant break-words leading-relaxed">{c.expected}</td>
+                                        {packageComparisons.map(c => (
+                                            <tr key={c.name} className="border-b border-outline-variant/10 hover:bg-surface-variant/20 transition-colors">
+                                                <td className="p-3 font-mono text-[11px] text-on-surface break-words">{c.name}</td>
+                                                <td className="p-3 font-mono text-[11px] text-on-surface-variant break-words">{c.goldenVersion || '-'}</td>
                                                 <td className={clsx(
-                                                    "p-3 font-mono text-[11px] break-words leading-relaxed",
+                                                    "p-3 font-mono text-[11px] break-words",
                                                     c.isMatch ? "text-success" : (c.isExtra ? "text-warning" : "text-error font-semibold")
                                                 )}>
-                                                    {c.found || <span className="italic opacity-50">{t('toolbox.checkup.not_found', 'Not found')}</span>}
+                                                    {c.deviceVersion || <span className="italic opacity-50">{t('toolbox.checkup.status_missing', 'Missing')}</span>}
                                                 </td>
                                                 <td className="p-3 text-center align-middle">
                                                     {c.isMatch
-                                                        ? <span data-tooltip={`adb shell getprop ${c.key}`} data-position="left"><CheckCircle2 size={16} className="text-success mx-auto drop-shadow-sm" /></span>
+                                                        ? <CheckCircle2 size={16} className="text-success mx-auto drop-shadow-sm" />
                                                         : (c.isExtra
-                                                            ? <span data-tooltip={`adb shell getprop ${c.key}`} data-position="left"><Info size={16} className="text-warning mx-auto drop-shadow-sm" /></span>
-                                                            : <span data-tooltip={`adb shell getprop ${c.key}`} data-position="left"><XCircle size={16} className="text-error mx-auto drop-shadow-sm" /></span>
+                                                            ? <Info size={16} className="text-warning mx-auto drop-shadow-sm" />
+                                                            : <XCircle size={16} className="text-error mx-auto drop-shadow-sm" />
                                                         )
                                                     }
                                                 </td>
                                             </tr>
                                         ))}
-                                        {filteredComparisons.length === 0 && (
-                                            <tr>
-                                                <td colSpan={4} className="p-8 text-center text-on-surface-variant/50 italic">
-                                                    {t('toolbox.checkup.no_results', 'No results found.')}
-                                                </td>
-                                            </tr>
-                                        )}
                                     </tbody>
                                 </table>
-                            )}
-                        </div>
-                    </div>
-                </Section>
-
-                {/* Standard Checks Panel */}
-                <Section
-                    title={t('toolbox.checkup.standard_checks', 'Standard Checklist')}
-                    icon={ShieldCheck}
-                    className="flex-1 min-w-[280px] flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
-                    contentClassName="flex-1 overflow-y-auto pr-2 space-y-3 min-h-0"
-                    actions={
-                        <Button
-                            variant="secondary"
-                            tooltipPosition="left"
-                            title={t('toolbox.checkup.run_checks', 'Run Checks')}
-                            onClick={runStandardChecks}
-                            disabled={disabled || standardChecks.some(c => c.status === 'running')}
-                            className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
-                        >
-                            <Play size={16} className={clsx(standardChecks.some(c => c.status === 'running') && "animate-spin")} />
-                        </Button>
-                    }
-                >
-                    {standardChecks.map(check => (
-                        <div key={check.id} className="flex flex-col p-4 rounded-xl border border-outline-variant/30 bg-surface-variant/10 backdrop-blur-md hover:bg-surface-variant/20 transition-all shadow-sm text-sm">
-                            <div className="flex justify-between items-center mb-1 gap-2">
-                                <span className="font-medium text-on-surface leading-tight drop-shadow-sm">{check.name}</span>
-                                {check.status === 'running' && <span data-tooltip={`adb shell ${check.command}`} data-position="left"><ExpressiveLoading variant="circular" size="sm" /></span>}
-                                {check.status === 'correct' && <span data-tooltip={`adb shell ${check.command}`} data-position="left"><CheckCircle2 size={18} className="text-success shrink-0 drop-shadow-sm cursor-help" /></span>}
-                                {check.status === 'incorrect' && <span data-tooltip={`adb shell ${check.command}`} data-position="left"><XCircle size={18} className="text-error shrink-0 drop-shadow-sm cursor-help" /></span>}
                             </div>
-                            {check.found && (
-                                <div className="flex justify-between items-center text-xs mt-3 pt-2 border-t border-outline-variant/20">
-                                    <span className="text-on-surface-variant/80 font-medium">{t('toolbox.checkup.found', 'Found')}:</span>
-                                    <span className={clsx(
-                                        "font-mono px-2 py-1 rounded-md shadow-inner",
-                                        check.status === 'correct' ? "bg-success/15 text-success" : "bg-error/15 text-error"
-                                    )}>
-                                        {check.found}
-                                    </span>
-                                </div>
-                            )}
                         </div>
-                    ))}
-                </Section>
+                    </Section>
+                )}
 
-                {/* Additional Checks */}
-                <Section
-                    title={t('toolbox.checkup.additional_checks', 'Additional Checks')}
-                    icon={ListPlus}
-                    className="flex-1 min-w-[280px] flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
-                    contentClassName="flex-1 overflow-y-auto pr-2 space-y-3 min-h-0"
-                    actions={
-                        <Button
-                            variant="secondary"
-                            tooltipPosition="left"
-                            title={t('toolbox.checkup.run_additional_checks', 'Run Additional Checks')}
-                            onClick={runAdditionalChecks}
-                            disabled={disabled || additionalChecks.some(c => c.status === 'running')}
-                            className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
-                        >
-                            <Play size={16} className={clsx(additionalChecks.some(c => c.status === 'running') && "animate-spin")} />
-                        </Button>
-                    }
-                >
-                    {additionalChecks.map(check => (
-                        <div key={check.id} className="flex flex-col p-4 rounded-xl border border-outline-variant/30 bg-surface-variant/10 backdrop-blur-md hover:bg-surface-variant/20 transition-all shadow-sm text-sm">
-                            <div className="flex justify-between items-center mb-1 gap-2">
-                                <span className="font-medium text-on-surface leading-tight drop-shadow-sm">{check.name}</span>
-                                {check.status === 'running' && <span data-tooltip={`adb ${check.command.join(' ')}`} data-position="left"><ExpressiveLoading variant="circular" size="sm" /></span>}
-                                {check.status === 'done' && <span data-tooltip={`adb ${check.command.join(' ')}`} data-position="left"><Info size={18} className="text-primary shrink-0 drop-shadow-sm cursor-help" /></span>}
-                            </div>
-                            {check.found && (
-                                <div className="flex justify-between items-center text-xs mt-3 pt-2 border-t border-outline-variant/20">
-                                    <span className="text-on-surface-variant/80 font-medium">{t('toolbox.checkup.found', 'Found')}:</span>
-                                    <span className="font-mono px-2 py-1 rounded-md shadow-inner bg-primary/15 text-primary break-all max-w-[70%] text-right">
-                                        {check.found}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </Section>
             </div>
+
+            {/* Base Props Configuration Modal */}
+            <Modal
+                isOpen={isBasePropsModalOpen}
+                onClose={() => setIsBasePropsModalOpen(false)}
+                title={t('toolbox.checkup.base_props.config_title', 'Base Props Configuration')}
+                className="max-w-2xl w-[90vw]"
+            >
+                <div className="flex flex-col gap-6 max-h-[70vh] overflow-y-auto pr-2">
+                    <p className="text-sm text-on-surface-variant">
+                        {t('toolbox.checkup.base_props.config_desc', 'Configure the prefixes used to fetch base properties for the golden file and the properties comparison list.')}
+                    </p>
+                    <div className="bg-surface-variant/30 p-4 rounded-xl border border-outline-variant/30 flex flex-col gap-4">
+                        <TagInput
+                            label={t('toolbox.checkup.base_props.prefixes', 'Prefixes (e.g. ro.build)')}
+                            tags={basePropsPrefixes}
+                            onChange={setBasePropsPrefixes}
+                            placeholder={t('toolbox.checkup.base_props.add_prefix', 'Add prefix...')}
+                        />
+                    </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-outline-variant/30">
+                    <Button variant="primary" onClick={() => setIsBasePropsModalOpen(false)}>
+                        {t('common.done', 'Done')}
+                    </Button>
+                </div>
+            </Modal>
 
             {/* Report Configuration Modal */}
             <Modal
