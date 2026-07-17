@@ -75,9 +75,12 @@ export async function askClaudeCode(
 
     try {
         if (fullPrompt.length > 7000) {
-            tempFilePath = await join(projectRoot, '.rr_prompt.tmp');
+            const { tempDir } = await import('@tauri-apps/api/path');
+            const osTemp = await tempDir();
+            const uniqueFilename = `.rr_prompt_${Date.now()}.tmp`;
+            tempFilePath = await join(osTemp, uniqueFilename);
             await invoke('fs_write_text_file', { path: tempFilePath, content: fullPrompt });
-            promptToPass = "Read the file .rr_prompt.tmp for your full instructions and history. Execute the request.";
+            promptToPass = `Read the file at absolute path "${tempFilePath}" for your full instructions and history. Execute the request.`;
         }
 
         const cleanBase64 = options?.imageBase64?.includes('base64,') 
