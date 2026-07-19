@@ -1863,7 +1863,13 @@ export const en = {
                     text_success: "Text sent",
                     text_error: "Failed to send text",
                     key_success: "Key event sent",
-                    key_error: "Failed to send key event"
+                    key_error: "Failed to send key event",
+                    home: "Home",
+                    back: "Back",
+                    recents: "Recents",
+                    power: "Power",
+                    volume_up: "Volume Up",
+                    volume_down: "Volume Down"
                 },
                 deeplink: {
                     title: "Deep Link Tester",

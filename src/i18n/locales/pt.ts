@@ -1865,7 +1865,13 @@ export const pt = {
                     text_success: "Texto enviado",
                     text_error: "Falha ao enviar texto",
                     key_success: "Evento de tecla enviado",
-                    key_error: "Falha ao enviar evento de tecla"
+                    key_error: "Falha ao enviar evento de tecla",
+                    home: "Início",
+                    back: "Voltar",
+                    recents: "Recentes",
+                    power: "Ligar/Desligar",
+                    volume_up: "Aumentar Volume",
+                    volume_down: "Diminuir Volume"
                 },
                 deeplink: {
                     title: "Testador de Deep Link",

@@ -426,12 +426,12 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
                                 </Button>
                             </div>
                             <div className="grid grid-cols-6 gap-2">
-                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('3')} disabled={disabled} title="Home"><Home size={16} /></Button>
-                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('4')} disabled={disabled} title="Back"><ArrowLeft size={16} /></Button>
-                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('187')} disabled={disabled} title="Recents"><Square size={16} /></Button>
-                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('26')} disabled={disabled} title="Power"><Power size={16} /></Button>
-                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('24')} disabled={disabled} title="Volume Up"><Volume2 size={16} /></Button>
-                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('25')} disabled={disabled} title="Volume Down"><Volume1 size={16} /></Button>
+                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('3')} disabled={disabled} title={t('toolbox.hardware.input.home', 'Home')}><Home size={16} /></Button>
+                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('4')} disabled={disabled} title={t('toolbox.hardware.input.back', 'Back')}><ArrowLeft size={16} /></Button>
+                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('187')} disabled={disabled} title={t('toolbox.hardware.input.recents', 'Recents')}><Square size={16} /></Button>
+                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('26')} disabled={disabled} title={t('toolbox.hardware.input.power', 'Power')}><Power size={16} /></Button>
+                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('24')} disabled={disabled} title={t('toolbox.hardware.input.volume_up', 'Volume Up')}><Volume2 size={16} /></Button>
+                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('25')} disabled={disabled} title={t('toolbox.hardware.input.volume_down', 'Volume Down')}><Volume1 size={16} /></Button>
                             </div>
                         </div>
                     </Section>

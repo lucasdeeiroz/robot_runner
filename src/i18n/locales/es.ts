@@ -1874,7 +1874,13 @@ export const es = {
                     text_success: "Texto enviado",
                     text_error: "Error al enviar texto",
                     key_success: "Evento de tecla enviado",
-                    key_error: "Error al enviar evento de tecla"
+                    key_error: "Error al enviar evento de tecla",
+                    home: "Inicio",
+                    back: "Atrás",
+                    recents: "Recientes",
+                    power: "Encender/Apagar",
+                    volume_up: "Subir Volumen",
+                    volume_down: "Bajar Volumen"
                 },
                 deeplink: {
                     title: "Probador de Deep Link",
