@@ -1827,7 +1827,26 @@ export const en = {
                     data_success: "Mobile Data toggled",
                     data_error: "Failed to toggle Mobile Data",
                     airplane_success: "Airplane mode toggled",
-                    airplane_error: "Failed to toggle Airplane mode"
+                    airplane_error: "Failed to toggle Airplane mode",
+                    dark_mode: "Dark Mode",
+                    dark_mode_success: "Dark Mode toggled",
+                    dark_mode_error: "Failed to toggle Dark Mode",
+                    keep_awake: "Keep Awake (Stay On)",
+                    keep_awake_success: "Keep Awake toggled",
+                    keep_awake_error: "Failed to toggle Keep Awake",
+                    dnd: "Do Not Disturb",
+                    dnd_success: "Do Not Disturb toggled",
+                    dnd_error: "Failed to toggle DND",
+                    mute: "Mute Media Volume",
+                    volume_success: "Volume mute toggled",
+                    volume_error: "Failed to toggle Volume Mute",
+                    rotation: "Screen Rotation",
+                    rotation_success: "Screen rotation updated",
+                    rotation_error: "Failed to update screen rotation",
+                    portrait: "Portrait",
+                    landscape: "Landscape",
+                    rev_portrait: "Rev. Portrait",
+                    rev_landscape: "Rev. Landscape"
                 },
                 broadcast: {
                     title: "System Broadcasts",
@@ -1836,6 +1855,45 @@ export const en = {
                     send: "Send Broadcast",
                     success: "Broadcast sent",
                     error: "Failed to send broadcast"
+                },
+                input: {
+                    title: "Input & Navigation",
+                    text_placeholder: "Enter text to inject...",
+                    send_text: "Send Text",
+                    text_success: "Text sent",
+                    text_error: "Failed to send text",
+                    key_success: "Key event sent",
+                    key_error: "Failed to send key event",
+                    home: "Home",
+                    back: "Back",
+                    recents: "Recents",
+                    power: "Power",
+                    volume_up: "Volume Up",
+                    volume_down: "Volume Down"
+                },
+                deeplink: {
+                    title: "Deep Link Tester",
+                    uri: "Target URI",
+                    send: "Launch Deep Link",
+                    success: "Deep Link sent",
+                    error: "Failed to send Deep Link"
+                },
+                permission: {
+                    title: "Permissions",
+                    success: "Permission updated",
+                    error: "Failed to update permission",
+                    camera: "Camera",
+                    location: "Location",
+                    notifications: "Notifications",
+                    storage: "Storage",
+                    grant: "Grant",
+                    revoke: "Revoke"
+                },
+                locale: {
+                    title: "Locale Override",
+                    apply: "Apply",
+                    success: "Locale updated (Restart app to apply)",
+                    error: "Failed to update locale"
                 }
             },
             checkup: {

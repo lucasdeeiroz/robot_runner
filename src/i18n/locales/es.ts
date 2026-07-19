@@ -1838,15 +1838,73 @@ export const es = {
                     data_success: "Estado de Datos Móviles cambiado",
                     data_error: "Error al cambiar datos móviles",
                     airplane_success: "Modo Avión cambiado",
-                    airplane_error: "Error al cambiar Modo Avión"
+                    airplane_error: "Error al cambiar Modo Avión",
+                    dark_mode: "Modo Oscuro",
+                    dark_mode_success: "Modo oscuro cambiado",
+                    dark_mode_error: "Error al cambiar modo oscuro",
+                    keep_awake: "Mantener Pantalla Encendida",
+                    keep_awake_success: "Mantener pantalla encendida cambiado",
+                    keep_awake_error: "Error al cambiar pantalla encendida",
+                    dnd: "No Molestar",
+                    dnd_success: "No Molestar cambiado",
+                    dnd_error: "Error al cambiar No Molestar",
+                    mute: "Silenciar Medios",
+                    volume_success: "Silencio cambiado",
+                    volume_error: "Error al silenciar",
+                    rotation: "Rotación de Pantalla",
+                    rotation_success: "Rotación actualizada",
+                    rotation_error: "Error al actualizar rotación",
+                    portrait: "Retrato",
+                    landscape: "Paisaje",
+                    rev_portrait: "Retrato Inv.",
+                    rev_landscape: "Paisaje Inv."
                 },
                 broadcast: {
-                    title: "Broadcasts del Sistema",
+                title: "Broadcasts del Sistema",
                     intent_action: "Acción (Intent Action)",
                     extras: "Extras (Opcional)",
                     send: "Enviar Broadcast",
                     success: "Broadcast enviado",
                     error: "Error al enviar broadcast"
+                },
+                input: {
+                    title: "Entrada y Navegación",
+                    text_placeholder: "Ingrese texto para inyectar...",
+                    send_text: "Enviar Texto",
+                    text_success: "Texto enviado",
+                    text_error: "Error al enviar texto",
+                    key_success: "Evento de tecla enviado",
+                    key_error: "Error al enviar evento de tecla",
+                    home: "Inicio",
+                    back: "Atrás",
+                    recents: "Recientes",
+                    power: "Encender/Apagar",
+                    volume_up: "Subir Volumen",
+                    volume_down: "Bajar Volumen"
+                },
+                deeplink: {
+                    title: "Probador de Deep Link",
+                    uri: "URI de Destino",
+                    send: "Lanzar Deep Link",
+                    success: "Deep Link enviado",
+                    error: "Error al enviar Deep Link"
+                },
+                permission: {
+                    title: "Permisos",
+                    success: "Permiso actualizado",
+                    error: "Error al actualizar permiso",
+                    camera: "Cámara",
+                    location: "Ubicación",
+                    notifications: "Notificaciones",
+                    storage: "Almacenamiento",
+                    grant: "Conceder",
+                    revoke: "Revocar"
+                },
+                locale: {
+                    title: "Anulación de Configuración Regional",
+                    apply: "Aplicar",
+                    success: "Configuración regional actualizada (Reiniciar app para aplicar)",
+                    error: "Error al actualizar la configuración regional"
                 }
             },
             checkup: {
