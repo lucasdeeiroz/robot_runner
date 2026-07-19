@@ -732,20 +732,25 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
                                                     </div>
 
                                                     {batteryAuditData.apps.length > 0 ? (
-                                                        batteryAuditData.apps.map((app, i) => (
-                                                            <div key={i} className="flex flex-col p-3 rounded-lg border border-outline-variant/20 hover:border-primary/30 hover:bg-surface-variant/20 transition-all">
-                                                                <div className="flex items-center justify-between">
-                                                                    <span className="font-semibold text-sm truncate pr-2 text-on-surface-variant/90">{app.name}</span>
-                                                                    <span className="font-mono text-xs text-tertiary font-medium whitespace-nowrap">{app.usage.toFixed(4)} mAh</span>
-                                                                </div>
-                                                                {app.uid !== app.name && <span className="text-[10px] text-on-surface-variant/50 font-mono mt-0.5">{app.uid}</span>}
-                                                                {app.details && (
-                                                                    <span className="text-[10px] text-on-surface-variant/70 mt-1.5 break-words font-mono opacity-80 leading-tight">
-                                                                        {app.details}
-                                                                    </span>
+                                                        <div className="h-[400px] w-full">
+                                                            <Virtuoso
+                                                                data={batteryAuditData.apps}
+                                                                itemContent={(i, app) => (
+                                                                    <div key={i} className="flex flex-col p-3 rounded-lg border border-outline-variant/20 hover:border-primary/30 hover:bg-surface-variant/20 transition-all mb-2">
+                                                                        <div className="flex items-center justify-between">
+                                                                            <span className="font-semibold text-sm truncate pr-2 text-on-surface-variant/90">{app.name}</span>
+                                                                            <span className="font-mono text-xs text-tertiary font-medium whitespace-nowrap">{app.usage.toFixed(4)} mAh</span>
+                                                                        </div>
+                                                                        {app.uid !== app.name && <span className="text-[10px] text-on-surface-variant/50 font-mono mt-0.5">{app.uid}</span>}
+                                                                        {app.details && (
+                                                                            <span className="text-[10px] text-on-surface-variant/70 mt-1.5 break-words font-mono opacity-80 leading-tight">
+                                                                                {app.details}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
                                                                 )}
-                                                            </div>
-                                                        ))
+                                                            />
+                                                        </div>
                                                     ) : (
                                                         <div className="p-8 text-center text-sm text-on-surface-variant/60">{t('performance.no_app_data', 'No app specific data available.')}</div>
                                                     )}
