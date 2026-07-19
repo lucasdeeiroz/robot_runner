@@ -65,9 +65,10 @@ pub async fn call_claude_code_cli(
     }
     
     if !project_root.is_empty() {
-        let path = std::path::Path::new(&project_root);
+        let expanded = crate::cmd_utils::expand_env_vars(&project_root);
+        let path = std::path::Path::new(&expanded);
         if path.exists() && path.is_dir() {
-            command.current_dir(project_root);
+            command.current_dir(expanded);
         }
     }
 
@@ -299,7 +300,8 @@ pub async fn call_antigravity_cli(
     }
 
     if !project_root.is_empty() {
-        command.current_dir(&project_root);
+        let expanded = crate::cmd_utils::expand_env_vars(&project_root);
+        command.current_dir(&expanded);
     }
 
     command.stdout(Stdio::piped());

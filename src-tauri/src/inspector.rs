@@ -457,6 +457,8 @@ pub async fn stop_web_recording(output_path: String) -> Result<(), String> {
 
     let frames_pattern = frames_dir.join("frame_%06d.jpg");
 
+    let expanded_out = crate::cmd_utils::expand_env_vars(&output_path);
+
     let ffmpeg_output = new_tokio_command("ffmpeg")
         .args([
             "-y",
@@ -466,7 +468,7 @@ pub async fn stop_web_recording(output_path: String) -> Result<(), String> {
             "-pix_fmt", "yuv420p",
             "-preset", "fast",
             "-crf", "23",
-            &output_path,
+            &expanded_out,
         ])
         .output()
         .await
