@@ -5,9 +5,10 @@ import { feedback } from '@/lib/feedback';
 import { Button } from '@/components/atoms/Button';
 import { Input } from '@/components/atoms/Input';
 import { Switch } from '@/components/atoms/Switch';
-import { Battery, BatteryWarning, Wifi, Send, Plane, Signal } from 'lucide-react';
+import { Select } from '@/components/atoms/Select';
+import { Battery, BatteryWarning, Wifi, Send, Plane, Signal, Moon, BellOff, VolumeX, Smartphone, Monitor, Keyboard, Link2, Shield, Globe2, Home, ArrowLeft, Square, Power, Volume2, Volume1, Camera, Locate, Bell, HardDrive } from 'lucide-react';
 import { Section } from '@/components/organisms/Section';
-
+import { useSettings } from '@/lib/settings';
 interface HardwareSubTabProps {
     selectedDevice: string | null;
     isTestRunning: boolean;
@@ -16,12 +17,26 @@ interface HardwareSubTabProps {
 
 export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuringTest }: HardwareSubTabProps) {
     const { t } = useTranslation();
+    const { settings } = useSettings();
     const disabled = !selectedDevice || (isTestRunning && !allowActionsDuringTest);
+
+    const appPackages = settings.tools.appPackage.split(',').map(s => s.trim()).filter(Boolean);
+    const [targetPackage, setTargetPackage] = useState(appPackages[0] || '');
+
+    const [textInput, setTextInput] = useState('');
+    const [deepLinkUri, setDeepLinkUri] = useState('');
+    const [localeInput, setLocaleInput] = useState('en-US');
 
     const [batteryLevel, setBatteryLevel] = useState<number>(100);
     const [wifiEnabled, setWifiEnabled] = useState(true);
     const [dataEnabled, setDataEnabled] = useState(true);
     const [airplaneMode, setAirplaneMode] = useState(false);
+    const [dndEnabled, setDndEnabled] = useState(false);
+    const [darkMode, setDarkMode] = useState(false);
+    const [autoRotate, setAutoRotate] = useState(true);
+    const [rotation, setRotation] = useState("0");
+    const [keepAwake, setKeepAwake] = useState(false);
+    const [volumeMuted, setVolumeMuted] = useState(false);
 
     const [intentAction, setIntentAction] = useState('');
     const [intentExtras, setIntentExtras] = useState('');
@@ -89,6 +104,112 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
         }
     };
 
+    const toggleDnd = async (enable: boolean) => {
+        if (disabled) return;
+        try {
+            await invoke('adb_hardware_dnd', { device: selectedDevice, enable });
+            setDndEnabled(enable);
+            feedback.toast.success(t('toolbox.hardware.device_controls.dnd_success', 'Do Not Disturb toggled', { enable }));
+        } catch (e) {
+            feedback.toast.error(t('toolbox.hardware.device_controls.dnd_error', "Failed to toggle DND"), e);
+        }
+    };
+
+    const toggleDarkMode = async (enable: boolean) => {
+        if (disabled) return;
+        try {
+            await invoke('adb_hardware_dark_mode', { device: selectedDevice, enable });
+            setDarkMode(enable);
+            feedback.toast.success(t('toolbox.hardware.device_controls.dark_mode_success', 'Dark Mode toggled', { enable }));
+        } catch (e) {
+            feedback.toast.error(t('toolbox.hardware.device_controls.dark_mode_error', "Failed to toggle Dark Mode"), e);
+        }
+    };
+
+    const handleRotationChange = async (auto: boolean, rot: string) => {
+        if (disabled) return;
+        try {
+            await invoke('adb_hardware_screen_rotation', { device: selectedDevice, autoRotate: auto, rotation: parseInt(rot) });
+            setAutoRotate(auto);
+            setRotation(rot);
+            feedback.toast.success(t('toolbox.hardware.device_controls.rotation_success', 'Screen rotation updated'));
+        } catch (e) {
+            feedback.toast.error(t('toolbox.hardware.device_controls.rotation_error', "Failed to update screen rotation"), e);
+        }
+    };
+
+    const toggleKeepAwake = async (enable: boolean) => {
+        if (disabled) return;
+        try {
+            await invoke('adb_hardware_keep_awake', { device: selectedDevice, enable });
+            setKeepAwake(enable);
+            feedback.toast.success(t('toolbox.hardware.device_controls.keep_awake_success', 'Keep Awake toggled', { enable }));
+        } catch (e) {
+            feedback.toast.error(t('toolbox.hardware.device_controls.keep_awake_error', "Failed to toggle Keep Awake"), e);
+        }
+    };
+
+    const toggleVolumeMute = async (mute: boolean) => {
+        if (disabled) return;
+        try {
+            await invoke('adb_hardware_volume_mute', { device: selectedDevice, mute });
+            setVolumeMuted(mute);
+            feedback.toast.success(t('toolbox.hardware.device_controls.volume_success', 'Volume mute toggled', { mute }));
+        } catch (e) {
+            feedback.toast.error(t('toolbox.hardware.device_controls.volume_error', "Failed to toggle Volume Mute"), e);
+        }
+    };
+
+    const sendText = async () => {
+        if (disabled || !textInput) return;
+        try {
+            await invoke('adb_input_text', { device: selectedDevice, text: textInput });
+            feedback.toast.success(t('toolbox.hardware.input.text_success', 'Text sent'));
+        } catch (e) {
+            feedback.toast.error(t('toolbox.hardware.input.text_error', "Failed to send text"), e);
+        }
+    };
+
+    const sendKeyEvent = async (keycode: string) => {
+        if (disabled) return;
+        try {
+            await invoke('adb_input_keyevent', { device: selectedDevice, keycode });
+            feedback.toast.success(t('toolbox.hardware.input.key_success', 'Key event sent'));
+        } catch (e) {
+            feedback.toast.error(t('toolbox.hardware.input.key_error', "Failed to send key event"), e);
+        }
+    };
+
+    const sendDeepLink = async () => {
+        if (disabled || !deepLinkUri) return;
+        try {
+            await invoke('adb_hardware_deep_link', { device: selectedDevice, uri: deepLinkUri, package: targetPackage });
+            feedback.toast.success(t('toolbox.hardware.deeplink.success', 'Deep Link sent'));
+        } catch (e) {
+            feedback.toast.error(t('toolbox.hardware.deeplink.error', "Failed to send Deep Link"), e);
+        }
+    };
+
+    const togglePermission = async (permission: string, grant: boolean) => {
+        if (disabled || !targetPackage) return;
+        try {
+            await invoke('adb_hardware_permission', { device: selectedDevice, package: targetPackage, permission, grant });
+            feedback.toast.success(t('toolbox.hardware.permission.success', 'Permission updated'));
+        } catch (e) {
+            feedback.toast.error(t('toolbox.hardware.permission.error', "Failed to update permission"), e);
+        }
+    };
+
+    const applyLocale = async () => {
+        if (disabled || !localeInput) return;
+        try {
+            await invoke('adb_hardware_locale', { device: selectedDevice, locale: localeInput });
+            feedback.toast.success(t('toolbox.hardware.locale.success', 'Locale updated (Restart app to apply)'));
+        } catch (e) {
+            feedback.toast.error(t('toolbox.hardware.locale.error', "Failed to update locale"), e);
+        }
+    };
+
     const sendBroadcast = async () => {
         if (disabled || !intentAction) return;
         try {
@@ -145,6 +266,60 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
                             </div>
                             <Switch checked={airplaneMode} onCheckedChange={toggleAirplaneMode} disabled={disabled} />
                         </div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Moon size={16} className="text-on-surface-variant" />
+                                <span className="text-sm font-medium">{t('toolbox.hardware.device_controls.dark_mode', 'Dark Mode')}</span>
+                            </div>
+                            <Switch checked={darkMode} onCheckedChange={toggleDarkMode} disabled={disabled} />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Monitor size={16} className="text-on-surface-variant" />
+                                <span className="text-sm font-medium">{t('toolbox.hardware.device_controls.keep_awake', 'Keep Awake (Stay On)')}</span>
+                            </div>
+                            <Switch checked={keepAwake} onCheckedChange={toggleKeepAwake} disabled={disabled} />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <BellOff size={16} className="text-on-surface-variant" />
+                                <span className="text-sm font-medium">{t('toolbox.hardware.device_controls.dnd', 'Do Not Disturb')}</span>
+                            </div>
+                            <Switch checked={dndEnabled} onCheckedChange={toggleDnd} disabled={disabled} />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <VolumeX size={16} className="text-on-surface-variant" />
+                                <span className="text-sm font-medium">{t('toolbox.hardware.device_controls.mute', 'Mute Media Volume')}</span>
+                            </div>
+                            <Switch checked={volumeMuted} onCheckedChange={toggleVolumeMute} disabled={disabled} />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-2">
+                                    <Smartphone size={16} className="text-on-surface-variant" />
+                                    <span className="text-sm font-medium">{t('toolbox.hardware.device_controls.rotation', 'Screen Rotation')}</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-on-surface-variant">Auto</span>
+                                    <Switch checked={autoRotate} onCheckedChange={(val) => handleRotationChange(val, rotation)} disabled={disabled} />
+                                </div>
+                                <Select
+                                    value={rotation}
+                                    onChange={(e) => handleRotationChange(autoRotate, e.target.value)}
+                                    disabled={disabled || autoRotate}
+                                    className="w-32 py-1.5 text-xs"
+                                    options={[
+                                        { label: t('toolbox.hardware.device_controls.portrait', 'Portrait'), value: '0' },
+                                        { label: t('toolbox.hardware.device_controls.landscape', 'Landscape'), value: '1' },
+                                        { label: t('toolbox.hardware.device_controls.rev_portrait', 'Rev. Portrait'), value: '2' },
+                                        { label: t('toolbox.hardware.device_controls.rev_landscape', 'Rev. Landscape'), value: '3' }
+                                    ]}
+                                />
+                            </div>
+                        </div>
                         <div className='flex items-center justify-between'>
                             <div className='flex items-center gap-2'>
                                 <Battery size={16} className="text-on-surface-variant" />
@@ -169,38 +344,158 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
                     </div>
                 </Section>
 
-                {/* Broadcasts & Intents */}
+                <div className="grid grid-cols-1 gap-4">
+                    {/* Broadcasts & Intents */}
+                    <Section
+                        title={t('toolbox.hardware.broadcast.title', 'System Broadcasts')}
+                        icon={Send}
+                        actions={
+                            <Button
+                                variant="primary"
+                                onClick={sendBroadcast}
+                                disabled={disabled || !intentAction.trim()}
+                                leftIcon={<Send size={16} />}
+                                data-tooltip="adb shell am broadcast -a <action> <extras>"
+                                data-position="left"
+                            >
+                                {t('toolbox.hardware.broadcast.send', 'Send Broadcast')}
+                            </Button>
+                        }
+                    >
+                        <div className="flex flex-col gap-3">
+                            <Input
+                                placeholder="e.g. android.intent.action.BOOT_COMPLETED"
+                                value={intentAction}
+                                onChange={(e) => setIntentAction(e.target.value)}
+                                disabled={disabled}
+                                label={t('toolbox.hardware.broadcast.intent_action', 'Intent Action')}
+                            />
+                            <Input
+                                placeholder="e.g. --es key value --ez boolean true"
+                                value={intentExtras}
+                                onChange={(e) => setIntentExtras(e.target.value)}
+                                disabled={disabled}
+                                label={t('toolbox.hardware.broadcast.extras', 'Extras (Optional)')}
+                            />
+                        </div>
+                    </Section>
+
+                    {/* Deep Link Tester */}
+                    <Section
+                        title={t('toolbox.hardware.deeplink.title', 'Deep Link Tester')}
+                        icon={Link2}
+                    >
+                        <div className="flex flex-col gap-3">
+                            <Select
+                                value={targetPackage}
+                                onChange={(e) => setTargetPackage(e.target.value)}
+                                disabled={disabled || appPackages.length === 0}
+                                options={appPackages.map(pkg => ({ label: pkg, value: pkg }))}
+                            />
+                            <Input
+                                placeholder="app://feature/123"
+                                value={deepLinkUri}
+                                onChange={(e) => setDeepLinkUri(e.target.value)}
+                                disabled={disabled}
+                                label={t('toolbox.hardware.deeplink.uri', 'Target URI')}
+                            />
+                            <Button variant="primary" onClick={sendDeepLink} disabled={disabled || !deepLinkUri}>
+                                {t('toolbox.hardware.deeplink.send', 'Launch Deep Link')}
+                            </Button>
+                        </div>
+                    </Section>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                    {/* Input & Navigation */}
+                    <Section
+                        title={t('toolbox.hardware.input.title', 'Input & Navigation')}
+                        icon={Keyboard}
+                    >
+                        <div className="flex flex-col gap-4">
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder={t('toolbox.hardware.input.text_placeholder', 'Enter text to inject...')}
+                                    value={textInput}
+                                    onChange={(e) => setTextInput(e.target.value)}
+                                    disabled={disabled}
+                                    className="flex-1"
+                                />
+                                <Button variant="primary" onClick={sendText} disabled={disabled || !textInput} leftIcon={<Send size={16} />}>
+                                    {t('toolbox.hardware.input.send_text', 'Send Text')}
+                                </Button>
+                            </div>
+                            <div className="grid grid-cols-6 gap-2">
+                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('3')} disabled={disabled} title="Home"><Home size={16} /></Button>
+                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('4')} disabled={disabled} title="Back"><ArrowLeft size={16} /></Button>
+                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('187')} disabled={disabled} title="Recents"><Square size={16} /></Button>
+                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('26')} disabled={disabled} title="Power"><Power size={16} /></Button>
+                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('24')} disabled={disabled} title="Volume Up"><Volume2 size={16} /></Button>
+                                <Button variant="secondary" size="icon" onClick={() => sendKeyEvent('25')} disabled={disabled} title="Volume Down"><Volume1 size={16} /></Button>
+                            </div>
+                        </div>
+                    </Section>
+
+                    {/* Locale Override */}
+                    <Section
+                        title={t('toolbox.hardware.locale.title', 'Locale Override')}
+                        icon={Globe2}
+                    >
+                        <div className="flex gap-2">
+                            <Select
+                                value={localeInput}
+                                onChange={(e) => setLocaleInput(e.target.value)}
+                                disabled={disabled}
+                                className="flex-1"
+                                options={[
+                                    { label: 'English (US)', value: 'en-US' },
+                                    { label: 'Portuguese (BR)', value: 'pt-BR' },
+                                    { label: 'Spanish (ES)', value: 'es-ES' },
+                                    { label: 'French (FR)', value: 'fr-FR' },
+                                    { label: 'German (DE)', value: 'de-DE' }
+                                ]}
+                            />
+                            <Button variant="primary" onClick={applyLocale} disabled={disabled}>
+                                {t('toolbox.hardware.locale.apply', 'Apply')}
+                            </Button>
+                        </div>
+                    </Section>
+                </div>
+
+                {/* Permissions Toggles */}
                 <Section
-                    title={t('toolbox.hardware.broadcast.title', 'System Broadcasts')}
-                    icon={Send}
-                    actions={
-                        <Button
-                            variant="primary"
-                            onClick={sendBroadcast}
-                            disabled={disabled || !intentAction.trim()}
-                            leftIcon={<Send size={16} />}
-                            data-tooltip="adb shell am broadcast -a <action> <extras>"
-                            data-position="left"
-                        >
-                            {t('toolbox.hardware.broadcast.send', 'Send Broadcast')}
-                        </Button>
-                    }
+                    title={t('toolbox.hardware.permission.title', 'Permissions')}
+                    icon={Shield}
                 >
-                    <div className="flex flex-col gap-3">
-                        <Input
-                            placeholder="e.g. android.intent.action.BOOT_COMPLETED"
-                            value={intentAction}
-                            onChange={(e) => setIntentAction(e.target.value)}
-                            disabled={disabled}
-                            label={t('toolbox.hardware.broadcast.intent_action', 'Intent Action')}
+                    <div className="flex flex-col gap-4">
+                        <Select
+                            value={targetPackage}
+                            onChange={(e) => setTargetPackage(e.target.value)}
+                            disabled={disabled || appPackages.length === 0}
+                            options={appPackages.map(pkg => ({ label: pkg, value: pkg }))}
                         />
-                        <Input
-                            placeholder="e.g. --es key value --ez boolean true"
-                            value={intentExtras}
-                            onChange={(e) => setIntentExtras(e.target.value)}
-                            disabled={disabled}
-                            label={t('toolbox.hardware.broadcast.extras', 'Extras (Optional)')}
-                        />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="flex items-center gap-2"><Camera size={16} /> {t('toolbox.hardware.permission.camera', 'Camera')}</div>
+                            <div className="flex gap-2 justify-end">
+                                <Button variant="secondary" onClick={() => togglePermission('android.permission.CAMERA', true)} disabled={disabled}>{t('toolbox.hardware.permission.grant', 'Grant')}</Button>
+                                <Button variant="outline" onClick={() => togglePermission('android.permission.CAMERA', false)} disabled={disabled}>{t('toolbox.hardware.permission.revoke', 'Revoke')}</Button>
+                            </div>
+                            <div className="flex items-center gap-2"><Locate size={16} /> {t('toolbox.hardware.permission.location', 'Location')}</div>
+                            <div className="flex gap-2 justify-end">
+                                <Button variant="secondary" onClick={() => togglePermission('android.permission.ACCESS_FINE_LOCATION', true)} disabled={disabled}>{t('toolbox.hardware.permission.grant', 'Grant')}</Button>
+                                <Button variant="outline" onClick={() => togglePermission('android.permission.ACCESS_FINE_LOCATION', false)} disabled={disabled}>{t('toolbox.hardware.permission.revoke', 'Revoke')}</Button>
+                            </div>
+                            <div className="flex items-center gap-2"><Bell size={16} /> {t('toolbox.hardware.permission.notifications', 'Notifications')}</div>
+                            <div className="flex gap-2 justify-end">
+                                <Button variant="secondary" onClick={() => togglePermission('android.permission.POST_NOTIFICATIONS', true)} disabled={disabled}>{t('toolbox.hardware.permission.grant', 'Grant')}</Button>
+                                <Button variant="outline" onClick={() => togglePermission('android.permission.POST_NOTIFICATIONS', false)} disabled={disabled}>{t('toolbox.hardware.permission.revoke', 'Revoke')}</Button>
+                            </div>
+                            <div className="flex items-center gap-2"><HardDrive size={16} /> {t('toolbox.hardware.permission.storage', 'Storage')}</div>
+                            <div className="flex gap-2 justify-end">
+                                <Button variant="secondary" onClick={() => togglePermission('android.permission.READ_EXTERNAL_STORAGE', true)} disabled={disabled}>{t('toolbox.hardware.permission.grant', 'Grant')}</Button>
+                                <Button variant="outline" onClick={() => togglePermission('android.permission.READ_EXTERNAL_STORAGE', false)} disabled={disabled}>{t('toolbox.hardware.permission.revoke', 'Revoke')}</Button>
+                            </div>
+                        </div>
                     </div>
                 </Section>
             </div>

@@ -1829,7 +1829,26 @@ export const pt = {
                     data_success: "Status de Dados Móveis alterado",
                     data_error: "Falha ao alternar dados móveis",
                     airplane_success: "Modo avião alterado",
-                    airplane_error: "Falha ao alternar modo avião"
+                    airplane_error: "Falha ao alternar modo avião",
+                    dark_mode: "Modo Escuro",
+                    dark_mode_success: "Modo escuro alternado",
+                    dark_mode_error: "Falha ao alternar modo escuro",
+                    keep_awake: "Manter Tela Acesa",
+                    keep_awake_success: "Manter tela acesa alternado",
+                    keep_awake_error: "Falha ao alternar tela acesa",
+                    dnd: "Não Perturbe",
+                    dnd_success: "Não Perturbe alternado",
+                    dnd_error: "Falha ao alternar Não Perturbe",
+                    mute: "Silenciar Mídia",
+                    volume_success: "Volume silenciado alternado",
+                    volume_error: "Falha ao alternar volume",
+                    rotation: "Rotação de Tela",
+                    rotation_success: "Rotação de tela atualizada",
+                    rotation_error: "Falha ao atualizar rotação",
+                    portrait: "Retrato",
+                    landscape: "Paisagem",
+                    rev_portrait: "Retrato Inv.",
+                    rev_landscape: "Paisagem Inv."
                 },
                 broadcast: {
                     title: "Broadcasts do Sistema",
@@ -1838,6 +1857,39 @@ export const pt = {
                     send: "Enviar Broadcast",
                     success: "Broadcast enviado",
                     error: "Falha ao enviar broadcast"
+                },
+                input: {
+                    title: "Entrada e Navegação",
+                    text_placeholder: "Digite o texto para injetar...",
+                    send_text: "Enviar Texto",
+                    text_success: "Texto enviado",
+                    text_error: "Falha ao enviar texto",
+                    key_success: "Evento de tecla enviado",
+                    key_error: "Falha ao enviar evento de tecla"
+                },
+                deeplink: {
+                    title: "Testador de Deep Link",
+                    uri: "URI de Destino",
+                    send: "Iniciar Deep Link",
+                    success: "Deep Link enviado",
+                    error: "Falha ao enviar Deep Link"
+                },
+                permission: {
+                    title: "Permissões",
+                    success: "Permissão atualizada",
+                    error: "Falha ao atualizar permissão",
+                    camera: "Câmera",
+                    location: "Localização",
+                    notifications: "Notificações",
+                    storage: "Armazenamento",
+                    grant: "Conceder",
+                    revoke: "Revogar"
+                },
+                locale: {
+                    title: "Substituição de Localidade",
+                    apply: "Aplicar",
+                    success: "Localidade atualizada (Reinicie o app para aplicar)",
+                    error: "Falha ao atualizar localidade"
                 }
             },
             checkup: {

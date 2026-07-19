@@ -86,3 +86,114 @@ pub async fn adb_hardware_send_broadcast(app: AppHandle, device: String, action:
     ).await?;
     Ok(())
 }
+
+#[command]
+pub async fn adb_hardware_dnd(app: AppHandle, device: String, enable: bool) -> AppResult<()> {
+    let _output = execute_adb_with_recovery(
+        &app,
+        Some(&device),
+        vec!["shell".to_string(), "cmd".to_string(), "notification".to_string(), "set_dnd".to_string(), if enable { "on".to_string() } else { "off".to_string() }]
+    ).await?;
+    let _output_zen = execute_adb_with_recovery(
+        &app,
+        Some(&device),
+        vec!["shell".to_string(), "settings".to_string(), "put".to_string(), "global".to_string(), "zen_mode".to_string(), if enable { "2".to_string() } else { "0".to_string() }]
+    ).await?;
+    Ok(())
+}
+
+#[command]
+pub async fn adb_hardware_dark_mode(app: AppHandle, device: String, enable: bool) -> AppResult<()> {
+    let val = if enable { "yes" } else { "no" };
+    let _output = execute_adb_with_recovery(
+        &app,
+        Some(&device),
+        vec!["shell".to_string(), "cmd".to_string(), "uimode".to_string(), "night".to_string(), val.to_string()]
+    ).await?;
+    Ok(())
+}
+
+#[command]
+pub async fn adb_hardware_screen_rotation(app: AppHandle, device: String, auto_rotate: bool, rotation: i32) -> AppResult<()> {
+    let accel_val = if auto_rotate { "1" } else { "0" };
+    let _output_accel = execute_adb_with_recovery(
+        &app,
+        Some(&device),
+        vec!["shell".to_string(), "settings".to_string(), "put".to_string(), "system".to_string(), "accelerometer_rotation".to_string(), accel_val.to_string()]
+    ).await?;
+    
+    if !auto_rotate {
+        let _output_rot = execute_adb_with_recovery(
+            &app,
+            Some(&device),
+            vec!["shell".to_string(), "settings".to_string(), "put".to_string(), "system".to_string(), "user_rotation".to_string(), rotation.to_string()]
+        ).await?;
+    }
+    
+    Ok(())
+}
+
+#[command]
+pub async fn adb_hardware_keep_awake(app: AppHandle, device: String, enable: bool) -> AppResult<()> {
+    let val = if enable { "true" } else { "false" };
+    let _output = execute_adb_with_recovery(
+        &app,
+        Some(&device),
+        vec!["shell".to_string(), "svc".to_string(), "power".to_string(), "stayon".to_string(), val.to_string()]
+    ).await?;
+    Ok(())
+}
+
+#[command]
+pub async fn adb_hardware_volume_mute(app: AppHandle, device: String, mute: bool) -> AppResult<()> {
+    let vol_val = if mute { "0" } else { "10" };
+    let _output = execute_adb_with_recovery(
+        &app,
+        Some(&device),
+        vec!["shell".to_string(), "media".to_string(), "volume".to_string(), "--stream".to_string(), "3".to_string(), "--set".to_string(), vol_val.to_string()]
+    ).await?;
+    Ok(())
+}
+
+#[command]
+pub async fn adb_hardware_deep_link(app: AppHandle, device: String, uri: String, package: String) -> AppResult<()> {
+    let mut args = vec!["shell".to_string(), "am".to_string(), "start".to_string(), "-W".to_string(), "-a".to_string(), "android.intent.action.VIEW".to_string(), "-d".to_string(), uri];
+    if !package.is_empty() {
+        args.push(package);
+    }
+    let _output = execute_adb_with_recovery(
+        &app,
+        Some(&device),
+        args
+    ).await?;
+    Ok(())
+}
+
+#[command]
+pub async fn adb_hardware_permission(app: AppHandle, device: String, package: String, permission: String, grant: bool) -> AppResult<()> {
+    let action = if grant { "grant" } else { "revoke" };
+    let _output = execute_adb_with_recovery(
+        &app,
+        Some(&device),
+        vec!["shell".to_string(), "pm".to_string(), action.to_string(), package, permission]
+    ).await?;
+    Ok(())
+}
+
+#[command]
+pub async fn adb_hardware_locale(app: AppHandle, device: String, locale: String) -> AppResult<()> {
+    let _output = execute_adb_with_recovery(
+        &app,
+        Some(&device),
+        vec!["shell".to_string(), "setprop".to_string(), "persist.sys.locale".to_string(), locale.clone()]
+    ).await?;
+    
+    let parts: Vec<&str> = locale.split('-').collect();
+    if parts.len() == 2 {
+        let _ = execute_adb_with_recovery(&app, Some(&device), vec!["shell".to_string(), "setprop".to_string(), "persist.sys.language".to_string(), parts[0].to_string()]).await;
+        let _ = execute_adb_with_recovery(&app, Some(&device), vec!["shell".to_string(), "setprop".to_string(), "persist.sys.country".to_string(), parts[1].to_string()]).await;
+    }
+
+    Ok(())
+}
+
