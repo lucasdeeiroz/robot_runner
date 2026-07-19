@@ -9,8 +9,8 @@ As an agentic AI, you have direct access to tools (terminal, file viewer, grep, 
 *   **Research First**: Always use `grep_search` and `view_file` to thoroughly map out dependencies and the impact of changes BEFORE using your file editing tools.
 *   **Targeted Edits**: Use `multi_replace_file_content` or `replace_file_content` to surgically modify code. Never replace an entire file if only a few lines changed.
 *   **Respect Ignore Files**: When exploring or modifying the project, you MUST strictly respect and ignore files/directories listed in `.gitignore`, `.claudeignore`, and `.geminiignore`.
-*   **Proactive Verification**: After editing Rust code (`src-tauri/**/*.rs`), proactively use the `run_command` tool to execute `cargo check` or `cargo test` in the `src-tauri` directory. Do not wait for the user to ask you to verify compilation.
-*   **UI Regressions**: After editing React components (`src/**/*.tsx`), be cautious of breaking existing UI layouts (especially `absolute` positioning, `framer-motion` animations, and `twMerge` behaviors in Tailwind). If needed, run `npm run tauri dev` or check the logs.
+*   **Proactive Verification**: After editing Rust code (`src-tauri/**/*.rs`), proactively use the `run_command` tool to execute `cargo check` or `cargo test` in the `src-tauri` directory. Do not wait for the user to ask you to verify compilation. You have express permission to run these commands whenever you deem necessary, with no need to ask for permission to do so.
+*   **UI Regressions**: After editing React components (`src/**/*.tsx`), be cautious of breaking existing UI layouts (especially `absolute` positioning, `framer-motion` animations, and `twMerge` behaviors in Tailwind). If needed, run `npm run tauri dev` or check the logs. You have express permission to run these commands whenever you deem necessary, with no need to ask for permission to do so.
 *   **Planning Mode**: For complex features, use your `implementation_plan.md` artifact to present a detailed architecture to the user before editing code. Use `task.md` to track your progress autonomously.
 
 ## 2. Technical Stack Context
@@ -41,3 +41,8 @@ At the end of every task requested by the user, you MUST self-evaluate what was 
 
 ## 6. Suggesting Better Solutions
 If the user proposes a task that you believe can be solved more efficiently or effectively with a different approach, you are encouraged to propose this alternative solution to the user. This is especially relevant for tasks that involve complex logic, potential performance issues, or the use of specialized tools or libraries. Always present your suggestion in a clear, concise manner, explaining the benefits of the alternative approach and how it addresses the user's underlying goal.
+
+## 7. Rule Awareness and Context Matching
+When receiving a prompt from the USER, you MUST actively analyze it to identify any relationship with the established `@rules` in your context (e.g., `ai-engineering.md`, `atomic-design.md`, `debugging-logging.md`, `desktop-dev.md`, `exploration-engine.md`, `qa-automation-specialist.md`, `react-frontend.md`, `robot-appium-testing.md`, `rust-backend.md`, `ui-ux-design.md`). 
+*   **Proactive Planning**: Before taking action, verify if the task touches upon domains covered by these rules (e.g., if editing a React component, apply `react-frontend.md` and `ui-ux-design.md` rules). 
+*   **Pre-established Instructions**: Ensure your implementation plans and code modifications strictly adhere to the guidelines set in these rules without needing explicit reminders from the user.

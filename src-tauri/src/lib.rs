@@ -16,6 +16,7 @@ mod xml_parser;
 mod image_utils;
 mod security;
 mod git;
+pub mod env_setup;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -74,6 +75,7 @@ pub fn run() {
         .manage(ngrok::NgrokState(Mutex::new(None)))
         .manage(adb::logcat::LogcatState(Mutex::new(HashMap::new())))
         .manage(adb::dmesg::DmesgState(Mutex::new(HashMap::new())))
+        .manage(adb::stats::PerformanceState(Mutex::new(HashMap::new())))
         .manage(system::WakelockState(std::sync::Mutex::new(None)))
         .setup(|app| {
             monitor::start_heartbeat_monitor(app.handle().clone());

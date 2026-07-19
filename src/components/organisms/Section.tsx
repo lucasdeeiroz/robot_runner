@@ -7,6 +7,7 @@ import { Heading } from '@/components/atoms/Typography';
 export interface SectionProps {
     title: string;
     description?: string;
+    warning?: React.ReactNode;
     icon?: LucideIcon;
     status?: React.ReactNode;
     menus?: React.ReactNode;
@@ -20,6 +21,7 @@ export interface SectionProps {
 export const Section = ({
     title,
     description,
+    warning,
     icon,
     status,
     menus,
@@ -47,6 +49,9 @@ export const Section = ({
                         <Heading level={4} className={!icon ? "ml-1" : ""}>{title}</Heading>
                         {description && (
                             <p className="text-sm text-on-surface/80 font-normal mt-0.5">{description}</p>
+                        )}
+                        {warning && (
+                            <p className="text-sm text-error/80 font-medium mt-1">{warning}</p>
                         )}
                     </div>
                 </div>

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
-import { Star, Eye, EyeOff, Terminal, X, FolderOpen, Bot, Play, Pause, RefreshCw } from "lucide-react";
+import { Star, Eye, EyeOff, Terminal, X, FolderOpen, Bot, Play, Pause, RefreshCw, Columns2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { parseXmlBackground, invalidateCache } from "@/lib/xmlParseCache";
 import { parseHeuristicLogs } from "@/lib/heuristicParser";
@@ -12,6 +12,7 @@ import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { AiButton } from "@/components/atoms/AiButton";
 import { AiResponse } from "@/components/molecules/AiResponse";
+import { DropdownMenu } from "@/components/molecules/DropdownMenu";
 import { useSettings } from "@/lib/settings";
 import * as gemini from "@/lib/dashboard/gemini";
 import * as openai from "@/lib/dashboard/openai";
@@ -26,6 +27,7 @@ interface RunConsoleProps {
     logs: string[];
     isSessionRunning?: boolean;
     testPath?: string;
+    onPairWithTool?: (tool: any) => void;
 }
 
 function parseCommandArgs(command: string): string[] {
@@ -78,7 +80,7 @@ function parseCommandArgs(command: string): string[] {
     return args;
 }
 
-export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath }: RunConsoleProps) {
+export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath, onPairWithTool }: RunConsoleProps) {
     const { t, i18n } = useTranslation();
     const { sessions, setSessionTree, addSessionLog, markSessionFinished } = useTestSessions();
     const session = sessions.find(s => s.runId === runId);
@@ -522,6 +524,25 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath 
             <div className="flex items-center justify-between p-2 border-b border-outline-variant/30 bg-surface/80 backdrop-blur shrink-0 z-20">
                 <span className="text-xs text-on-surface-variant/80 font-mono truncate px-2" title={testPath}>{testPath}</span>
                 <div className="flex items-center gap-1">
+                    {onPairWithTool && (
+                        <DropdownMenu
+                            trigger={
+                                <Button
+                                    variant="ghost" size="icon"
+                                    className="w-8 h-8 rounded-full text-on-surface-variant/80 hover:text-primary"
+                                    data-tooltip={t('common.pair_with', 'Pair with...')}
+                                    data-position="left"
+                                >
+                                    <Columns2 size={14} />
+                                </Button>
+                            }
+                            items={[
+                                { label: t('toolbox.tabs.logcat', 'Logcat'), onClick: () => onPairWithTool('logcat') },
+                                { label: t('toolbox.tabs.performance', 'Performance'), onClick: () => onPairWithTool('performance') },
+                                { label: t('toolbox.tabs.stopwatch', 'Stopwatch'), onClick: () => onPairWithTool('stopwatch') }
+                            ]}
+                        />
+                    )}
                     <Button
                         variant="ghost" size="icon"
                         onClick={() => setIsRawMode(!isRawMode)}

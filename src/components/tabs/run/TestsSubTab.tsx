@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
-import { Play, FolderOpen, FileText, FileCode, History, ChartNoAxesGantt, X, Settings2, Info, Settings } from "lucide-react";
+import { Play, FolderOpen, FileText, FileCode, History, ChartNoAxesGantt, X, Settings2, Info, Settings, Terminal } from "lucide-react";
 import { useSettings } from "@/lib/settings";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { Device } from "@/lib/types";
@@ -13,7 +13,8 @@ import { TabBar } from "@/components/organisms/TabBar";
 import { WarningModal } from "@/components/organisms/WarningModal";
 import { feedback } from "@/lib/feedback";
 import { Button } from "@/components/atoms/Button";
-import { AiButton } from "@/components/atoms/AiButton";
+import { SplitButton } from "@/components/molecules/SplitButton";
+import { Sparkles } from "lucide-react";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { useSelection, SelectionItem } from "@/lib/selectionStore";
 import { SelectionCounter } from "@/components/molecules/SelectionCounter";
@@ -62,6 +63,14 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         if (provider === 'claude-code' || provider === 'antigravity-cli') return true;
         return false;
     }, [settings.aiProvider, settings.geminiApiKey, settings.claudeApiKey, settings.openaiApiKey]);
+
+    const [hasRequirements, setHasRequirements] = useState(false);
+    useEffect(() => {
+        if (!settings.paths.automationRoot) return;
+        invoke("check_environment", { projectPath: settings.paths.automationRoot })
+            .then((result: any) => setHasRequirements(result.has_requirements))
+            .catch(console.error);
+    }, [settings.paths.automationRoot]);
 
     const remoteConfig = useRemoteConfig() as {
         isFeatureEnabled?: (featureKey: string) => boolean;
@@ -682,48 +691,47 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     menus={
                         <>
                             <SelectionCounter />
-                            <div className="mt-6 border-t border-outline-variant/30" />
+                            {hasRequirements && (
+                                <Button 
+                                    variant="outline" 
+                                    className="w-full text-xs font-bold border-primary/50 text-primary hover:bg-primary/10" 
+                                    onClick={() => window.dispatchEvent(new CustomEvent('open-env-manager'))}
+                                    title={t("env_setup.title", "Configurar Dependências (.venv)")}
+                                >
+                                    <Terminal size={14} className="mr-2" />
+                                    {isNarrow ? "" : t("env_setup.badge", "Dependências")}
+                                </Button>
+                            )}
+                            <div className="w-full h-px bg-outline-variant/30 my-2" />
                         </>
                     }
                     actions={
-                        <>
-                            {hasApiKey && isAiEnabled && isAiTestModeEnabled && (
-                                <AiButton
-                                    id="run_ai"
-                                    label={isLaunching ? launchStatus : (items.length === 0 ? t('tests.run_ai_prompt') : t('tests.run_ai'))}
-                                    onClick={(_e, prompt) => handleRun(true, prompt)}
-                                    disabled={selectedDevices.length === 0 || isLaunching}
-                                    variant="secondary"
-                                    className="w-full mt-4"
-                                    alwaysOpenModal
-                                    showTextAlways
-                                    allowCustomPrompt={false}
-                                    requireCustomPrompt={items.length === 0}
-                                />
-                            )}
-                            <Button
-                                variant="secondary"
-                                onClick={() => updateSetting('saveLogs', !settings.saveLogs)}
-                                className={clsx("w-full justify-start py-6", settings.saveLogs && "bg-warning-container text-on-warning-container/50")}
-                                leftIcon={<History size={18} />}
-                                title={t('tests.options.dont_overwrite')}
-                            >
-                                {!isNarrow && <span>{t('tests.options.dont_overwrite')}</span>}
-                            </Button>
-
-                            <Button
-                                variant="primary"
-                                onClick={() => handleRun()}
-                                disabled={selectedDevices.length === 0 || items.length === 0 || isLaunching}
-                                title={t('tests.run_selected')}
-                                className="w-full py-6 font-bold"
-                                leftIcon={!isLaunching ? <Play size={18} fill="currentColor" /> : <ExpressiveLoading size="sm" variant="circular" />}
-                            >
-                                {!isNarrow && (
-                                    <span>{isLaunching ? launchStatus : (items.length === 0 ? t('tests.no_selection') : t('tests.run_selected'))}</span>
-                                )}
-                            </Button>
-                        </>
+                        <SplitButton
+                            variant="primary"
+                            className="w-full h-14"
+                            placement="top"
+                            primaryAction={{
+                                label: isLaunching ? launchStatus : (items.length === 0 ? t('tests.no_selection') : t('tests.run_selected')),
+                                icon: !isLaunching ? <Play size={18} fill="currentColor" /> : <ExpressiveLoading size="sm" variant="circular" />,
+                                onClick: () => handleRun(),
+                                disabled: selectedDevices.length === 0 || items.length === 0 || isLaunching
+                            }}
+                            secondaryActions={[
+                                {
+                                    label: t('tests.options.dont_overwrite'),
+                                    icon: <History size={16} />,
+                                    type: 'checkbox',
+                                    checked: settings.saveLogs,
+                                    onClick: () => updateSetting('saveLogs', !settings.saveLogs)
+                                },
+                                ...(hasApiKey && isAiEnabled && isAiTestModeEnabled ? [{
+                                    label: items.length === 0 ? t('tests.run_ai_prompt') : t('tests.run_ai'),
+                                    icon: <Sparkles size={16} />,
+                                    disabled: selectedDevices.length === 0 || isLaunching,
+                                    onClick: () => handleRun(true)
+                                }] : [])
+                            ]}
+                        />
                     }
                 />
             </div>

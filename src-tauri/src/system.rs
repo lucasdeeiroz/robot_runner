@@ -12,9 +12,10 @@ use std::os::windows::process::CommandExt;
 
 #[command]
 pub async fn get_folder_size(path: String) -> AppResult<u64> {
+    let expanded = crate::cmd_utils::expand_env_vars(&path);
     tokio::task::spawn_blocking(move || {
         let mut total_size = 0;
-        for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+        for entry in WalkDir::new(expanded).into_iter().filter_map(|e| e.ok()) {
             if entry.file_type().is_file() {
                 total_size += entry.metadata().map(|m| m.len()).unwrap_or(0);
             }

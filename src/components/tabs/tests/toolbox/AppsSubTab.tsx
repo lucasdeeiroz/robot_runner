@@ -1,11 +1,10 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
-import { Search, Smartphone, Package, Trash2, Snowflake, PlayCircle, Eraser, Upload, ArrowDownAZ, RefreshCw, Rocket, Download } from "lucide-react";
+import { Search, Smartphone, Package, Trash2, Snowflake, PlayCircle, Eraser, Upload, ArrowDownAZ, RefreshCw, Rocket, Download, OctagonX } from "lucide-react";
 import clsx from "clsx";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { toast } from "sonner";
 import { Virtuoso } from "react-virtuoso";
 
 import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
@@ -19,6 +18,7 @@ import { SplitButton } from "@/components/molecules/SplitButton";
 interface PackageInfo {
     name: String;
     path: String;
+    version: String;
     is_system: boolean;
     is_disabled: boolean;
 }
@@ -152,20 +152,20 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
         try {
             if (type === 'uninstall') {
                 await invoke("uninstall_package", { device: activeDevice, package: pkg });
-                toast.success(t('apps.success.uninstalled', { pkg }));
+                feedback.toast.raw.success(t('apps.success.uninstalled', { pkg, defaultValue: `Uninstalled ${pkg}` }));
             } else if (type === 'disable') {
                 await invoke("disable_package", { device: activeDevice, package: pkg });
-                toast.success(t('apps.success.disabled', { pkg }));
+                feedback.toast.raw.success(t('apps.success.disabled', { pkg, defaultValue: `Disabled ${pkg}` }));
             } else if (type === 'enable') {
                 await invoke("enable_package", { device: activeDevice, package: pkg });
-                toast.success(t('apps.success.enabled', { pkg }));
+                feedback.toast.raw.success(t('apps.success.enabled', { pkg, defaultValue: `Enabled ${pkg}` }));
             } else if (type === 'clear') {
                 await invoke("clear_package", { device: activeDevice, package: pkg });
-                toast.success(t('apps.success.cleared', { pkg }));
+                feedback.toast.raw.success(t('apps.success.cleared', { pkg, defaultValue: `Cleared data for ${pkg}` }));
             }
             fetchPackages();
         } catch (e) {
-            toast.error(String(e));
+            feedback.toast.raw.error(t('apps.error.action_failed', { defaultValue: 'Action failed' }), e);
         } finally {
             closeConfirmation();
         }
@@ -181,7 +181,7 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                 filters: [{ name: 'APK', extensions: ['apk'] }]
             });
             if (selected) {
-                toastId = toast.loading(t('apps.status.installing', "Installing APK..."));
+                toastId = feedback.toast.raw.loading(t('apps.status.installing', "Installing APK..."));
                 await invoke("install_package", {
                     device: activeDevice,
                     path: selected,
@@ -190,14 +190,14 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                     allow_test: allowTest,
                     install_sdcard: installSdcard,
                 });
-                toast.success(t('apps.success.installed', "APK installed successfully"));
+                feedback.toast.raw.success(t('apps.success.installed', "APK installed successfully"));
                 fetchPackages();
             }
         } catch (e) {
             feedback.toast.error("apps.install_error", e);
         } finally {
             if (toastId !== null) {
-                toast.dismiss(toastId);
+                feedback.toast.dismiss(toastId);
             }
         }
     };
@@ -205,9 +205,18 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
     const handleLaunch = async (pkg: string) => {
         try {
             await invoke("launch_package", { device: activeDevice, package: pkg });
-            toast.success(t('apps.success.launched', { pkg, defaultValue: `Launched ${pkg}` }));
+            feedback.toast.raw.success(t('apps.success.launched', { pkg, defaultValue: `Launched ${pkg}` }));
         } catch (e) {
-            toast.error(String(e));
+            feedback.toast.raw.error(t('apps.error.launch_failed', { defaultValue: 'Failed to launch app' }), e);
+        }
+    };
+
+    const handleForceStop = async (pkg: string) => {
+        try {
+            await invoke("force_stop_package", { device: activeDevice, package: pkg });
+            feedback.toast.raw.success(t('apps.success.force_stopped', { pkg, defaultValue: `Force stopped ${pkg}` }));
+        } catch (e) {
+            feedback.toast.raw.error(t('apps.error.force_stop_failed', { defaultValue: 'Failed to force stop app' }), e);
         }
     };
 
@@ -218,16 +227,18 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                 defaultPath: `${pkg.name}.apk`
             });
             if (destination) {
-                const toastId = toast.loading(t('apps.status.downloading', { pkg: pkg.name, defaultValue: `Downloading ${pkg.name}...` }));
+                const toastId = feedback.toast.raw.loading(t('apps.status.downloading', { pkg: pkg.name, defaultValue: `Downloading ${pkg.name}...` }));
                 try {
                     await invoke("pull_apk", { device: activeDevice, path: pkg.path, destination });
-                    toast.success(t('apps.success.downloaded', { pkg: pkg.name, defaultValue: `Downloaded ${pkg.name}` }), { id: toastId });
+                    feedback.toast.dismiss(toastId);
+                    feedback.toast.raw.success(t('apps.success.downloaded', { pkg: pkg.name, defaultValue: `Downloaded ${pkg.name}` }));
                 } catch (err) {
-                    toast.error(String(err), { id: toastId });
+                    feedback.toast.dismiss(toastId);
+                    feedback.toast.raw.error(t('apps.error.download_failed', { defaultValue: 'Failed to download APK' }), err);
                 }
             }
         } catch (e) {
-            toast.error(String(e));
+            feedback.toast.raw.error(t('apps.error.download_failed', { defaultValue: 'Failed to download APK' }), e);
         }
     };
 
@@ -384,38 +395,48 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                                         )}
                                     </div>
                                     <div className="text-xs text-on-surface-variant/80 truncate font-mono opacity-70 flex items-center gap-2">
-                                        <span>{pkg.name}</span>
-                                        <span className="text-outline-variant px-1">•</span>
-                                        <span data-tooltip={String(pkg.path)} data-position="left" className="truncate max-w-[150px] cursor-help hover:text-on-surface/80 transition-colors">
+                                        <span className="shrink-0 truncate max-w-[40%]">{pkg.name}</span>
+                                        {pkg.version && (
+                                            <>
+                                                <span className="text-outline-variant px-1 shrink-0">•</span>
+                                                <span className="shrink-0 text-primary">v{pkg.version}</span>
+                                            </>
+                                        )}
+                                        <span className="text-outline-variant px-1 shrink-0">•</span>
+                                        <span data-tooltip={String(pkg.path)} data-position="left" className="truncate cursor-help hover:text-on-surface/80 transition-colors">
                                             {pkg.path}
                                         </span>
                                     </div>
                                 </div>
 
                                 <div className="flex items-center gap-1 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button size="icon" variant="ghost" onClick={() => handleLaunch(String(pkg.name))} className="h-7 w-7 hover:bg-success/10 text-success/80 rounded" data-tooltip={t('apps.actions.launch', "Launch")} data-position="left">
+                                    <Button size="icon" variant="ghost" onClick={() => handleLaunch(String(pkg.name))} className="h-7 w-7 hover:bg-success/10 text-success/80 rounded" data-tooltip={`${t('apps.actions.launch', "Launch")} (adb shell monkey)`} data-position="left">
                                         <Rocket size={14} />
                                     </Button>
 
-                                    <Button size="icon" variant="ghost" onClick={() => handleDownload(pkg)} className="h-7 w-7 hover:bg-primary/10 text-primary/80 rounded" data-tooltip={t('apps.actions.download', "Download APK")} data-position="left">
+                                    <Button size="icon" variant="ghost" onClick={() => handleDownload(pkg)} className="h-7 w-7 hover:bg-primary/10 text-primary/80 rounded" data-tooltip={`${t('apps.actions.download', "Download APK")} (adb pull)`} data-position="left">
                                         <Download size={14} />
                                     </Button>
 
                                     {pkg.is_disabled ? (
-                                        <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), false)} className="h-7 w-7 hover:bg-primary/10 text-info-container/80 rounded" data-tooltip={t('apps.actions.enable', "Enable")} data-position="left">
+                                        <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), false)} className="h-7 w-7 hover:bg-primary/10 text-info-container/80 rounded" data-tooltip={`${t('apps.actions.enable', "Enable")} (adb shell pm enable)`} data-position="left">
                                             <PlayCircle size={14} />
                                         </Button>
                                     ) : (
-                                        <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), true)} className="h-7 w-7 hover:bg-sky-500/10 text-sky-400 rounded" data-tooltip={t('apps.actions.disable', "Freeze")} data-position="left">
+                                        <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), true)} className="h-7 w-7 hover:bg-sky-500/10 text-sky-400 rounded" data-tooltip={`${t('apps.actions.disable', "Freeze")} (adb shell pm disable-user)`} data-position="left">
                                             <Snowflake size={14} />
                                         </Button>
                                     )}
 
-                                    <Button size="icon" variant="ghost" onClick={() => confirmClear(String(pkg.name))} className="h-7 w-7 hover:bg-warning/10 text-warning-container/40 rounded" data-tooltip={t('apps.actions.clear', "Clear Data")} data-position="left">
+                                    <Button size="icon" variant="ghost" onClick={() => handleForceStop(String(pkg.name))} className="h-7 w-7 hover:bg-error/10 text-error/80 rounded" data-tooltip={`${t('apps.actions.force_stop', "Force Stop")} (adb shell am force-stop)`} data-position="left">
+                                        <OctagonX size={14} />
+                                    </Button>
+
+                                    <Button size="icon" variant="ghost" onClick={() => confirmClear(String(pkg.name))} className="h-7 w-7 hover:bg-warning/10 text-warning-container/40 rounded" data-tooltip={`${t('apps.actions.clear', "Clear Data")} (adb shell pm clear)`} data-position="left">
                                         <Eraser size={14} />
                                     </Button>
 
-                                    <Button size="icon" variant="ghost" onClick={() => confirmUninstall(String(pkg.name))} className="h-7 w-7 hover:bg-error/10 text-error-container/60 rounded" data-tooltip={t('apps.actions.uninstall', "Uninstall")} data-position="left">
+                                    <Button size="icon" variant="ghost" onClick={() => confirmUninstall(String(pkg.name))} className="h-7 w-7 hover:bg-error/10 text-error-container/60 rounded" data-tooltip={`${t('apps.actions.uninstall', "Uninstall")} (adb uninstall)`} data-position="left">
                                         <Trash2 size={14} />
                                     </Button>
                                 </div>

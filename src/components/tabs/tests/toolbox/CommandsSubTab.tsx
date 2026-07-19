@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Terminal, Send, Trash2, Power, Wifi, Smartphone, Battery, Save, Star, X, Square } from "lucide-react";
+import { Terminal, Send, Trash2, Power, Wifi, Smartphone, Battery, Save, Star, X, Square, Globe, Activity, Clock, Package, PackageSearch, Cpu, LayoutTemplate, Maximize, Grid } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
@@ -8,6 +8,7 @@ import { feedback } from "@/lib/feedback";
 import { Section } from "@/components/organisms/Section";
 import { Button } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
+import { DropdownMenu } from "@/components/molecules/DropdownMenu";
 
 interface CommandsSubTabProps {
     selectedDevice: string;
@@ -167,13 +168,84 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false, allowAct
         }
     };
 
-    const quickActions = [
-        { label: t('commands.actions.ip_address'), icon: <Wifi size={14} />, cmd: "shell ip addr show wlan0 | grep inet" },
-        { label: t('commands.actions.list_packages'), icon: <Smartphone size={14} />, cmd: "shell pm list packages -3" },
-        { label: t('commands.actions.battery'), icon: <Battery size={14} />, cmd: "shell dumpsys battery" },
-        { label: t('commands.actions.reboot'), icon: <Power size={14} />, cmd: "reboot" },
-    ];
+    const handleConnectWifi = async () => {
+        setIsExecuting(true);
+        setHistory(prev => [...prev, `> Connecting over Wi-Fi...`]);
+        try {
+            // 1. Fetch IP Address
+            const output = await invoke<string>('run_adb_command', { 
+                device: selectedDevice, 
+                args: ['shell', 'ip', 'addr', 'show', 'wlan0'] 
+            });
+            const ipMatch = output.match(/inet\s+(\d+\.\d+\.\d+\.\d+)/);
+            
+            if (ipMatch && ipMatch[1]) {
+                const ip = ipMatch[1];
+                setHistory(prev => [...prev, `> Device IP found: ${ip}`]);
+                
+                // 2. Restart ADB in tcpip mode
+                setHistory(prev => [...prev, `> tcpip 5555`]);
+                await invoke("start_adb_command", {
+                    id: `cmd_tcpip_${Date.now()}`,
+                    device: selectedDevice,
+                    command: "tcpip 5555"
+                });
 
+                // 3. Wait for daemon restart
+                await new Promise(r => setTimeout(r, 3000));
+
+                // 4. Connect
+                setHistory(prev => [...prev, `> adb connect ${ip}:5555`]);
+                const result = await invoke<string>('adb_connect', { target: `${ip}:5555` });
+                setHistory(prev => [...prev, result]);
+                feedback.toast.success(t('common.connect_wifi_success', 'Wi-Fi connection established'));
+            } else {
+                setHistory(prev => [...prev, `> Failed to find device IP address on wlan0`]);
+                feedback.toast.error("Could not find Wi-Fi IP address");
+            }
+        } catch (e) {
+            setHistory(prev => [...prev, `> Error: ${String(e)}`]);
+            feedback.toast.error("Wi-Fi connection error", e);
+        } finally {
+            setIsExecuting(false);
+        }
+    };
+
+    const quickActionCategories = [
+        {
+            name: t('commands.categories.network', 'Network'),
+            actions: [
+                { label: t('commands.actions.ip_address', 'IP Address'), icon: <Wifi size={12} />, cmd: "shell ip addr show wlan0 | grep inet" },
+                { label: t('commands.actions.ping_google', 'Ping Google'), icon: <Globe size={12} />, cmd: "shell ping -c 4 google.com" },
+                { label: t('commands.actions.netstat', 'Netstat'), icon: <Activity size={12} />, cmd: "shell netstat" },
+            ]
+        },
+        {
+            name: t('commands.categories.device', 'Device & OS'),
+            actions: [
+                { label: t('commands.actions.battery', 'Battery Status'), icon: <Battery size={12} />, cmd: "shell dumpsys battery" },
+                { label: t('commands.actions.reboot', 'Reboot'), icon: <Power size={12} />, cmd: "reboot" },
+                { label: t('commands.actions.uptime', 'Uptime'), icon: <Clock size={12} />, cmd: "shell uptime" },
+                { label: t('commands.actions.device_info', 'Device Info'), icon: <Smartphone size={12} />, cmd: "shell getprop ro.product.model" },
+            ]
+        },
+        {
+            name: t('commands.categories.apps', 'Apps & Packages'),
+            actions: [
+                { label: t('commands.actions.list_packages', '3rd Party Apps'), icon: <Package size={12} />, cmd: "shell pm list packages -3" },
+                { label: t('commands.actions.list_all_packages', 'All Apps'), icon: <PackageSearch size={12} />, cmd: "shell pm list packages" },
+                { label: t('commands.actions.top', 'Top Processes'), icon: <Cpu size={12} />, cmd: "shell top -n 1" },
+            ]
+        },
+        {
+            name: t('commands.categories.ui', 'UI & Display'),
+            actions: [
+                { label: t('commands.actions.dump_ui', 'Dump UI Hierarchy'), icon: <LayoutTemplate size={12} />, cmd: "shell uiautomator dump" },
+                { label: t('commands.actions.screen_size', 'Screen Res'), icon: <Maximize size={12} />, cmd: "shell wm size" },
+                { label: t('commands.actions.screen_density', 'Screen Density'), icon: <Grid size={12} />, cmd: "shell wm density" },
+            ]
+        }
+    ];
     if (!selectedDevice) {
         return (
             <div className="h-full flex flex-col items-center justify-center text-on-surface/80">
@@ -198,16 +270,29 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false, allowAct
                 // menus={!isNarrow ? null : null} // Placeholder removed
 
                 actions={
-                    <Button
-                        onClick={() => setHistory([])}
-                        variant="ghost"
-                        size="icon"
-                        className="p-1 hover:text-error text-on-surface-variant/80"
-                        data-tooltip={t('commands.clear')}
-                        data-position="left"
-                    >
-                        <Trash2 size={16} />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                        <Button
+                            onClick={handleConnectWifi}
+                            variant="ghost"
+                            size="icon"
+                            className="p-1 hover:text-primary text-on-surface-variant/80"
+                            data-tooltip={t('common.connect_wifi', 'Connect via Wi-Fi')}
+                            data-position="left"
+                            disabled={isExecuting || (isTestRunning && !allowActionsDuringTest)}
+                        >
+                            <Wifi size={16} />
+                        </Button>
+                        <Button
+                            onClick={() => setHistory([])}
+                            variant="ghost"
+                            size="icon"
+                            className="p-1 hover:text-error text-on-surface-variant/80"
+                            data-tooltip={t('commands.clear')}
+                            data-position="left"
+                        >
+                            <Trash2 size={16} />
+                        </Button>
+                    </div>
                 }
             />
 
@@ -231,20 +316,29 @@ export function CommandsSubTab({ selectedDevice, isTestRunning = false, allowAct
 
             {/* Actions Area */}
             <div className="space-y-2 p-2">
-                {/* Quick Actions */}
-                <div className="flex gap-2 flex-wrap">
-                    <span className="text-xs font-semibold text-on-surface/80 self-center mr-2">{t('commands.quick')}:</span>
-                    {quickActions.map(action => (
-                        <Button
-                            key={action.label}
-                            onClick={() => executeCommand(action.cmd, action.label)}
-                            disabled={isExecuting || (isTestRunning && !allowActionsDuringTest)}
-                            variant="outline"
-                            className="bg-surface-variant/30 hover:bg-outline-variant text-xs font-medium border-outline-variant/30 h-auto py-1.5 px-3"
-                            leftIcon={action.icon}
-                        >
-                            {action.label}
-                        </Button>
+                {/* Quick Actions (Single line) */}
+                <div className="flex gap-2 p-1 overflow-x-auto custom-scrollbar items-center">
+                    {quickActionCategories.map((category) => (
+                        <DropdownMenu
+                            key={category.name}
+                            direction="up"
+                            align="left"
+                            useAnchor={true}
+                            trigger={
+                                <Button
+                                    variant="outline"
+                                    className="bg-surface-variant/20 hover:bg-surface-variant text-[11px] font-bold border-outline-variant/30 py-1.5 px-3 whitespace-nowrap rounded-lg"
+                                >
+                                    {category.name}
+                                </Button>
+                            }
+                            items={category.actions.map(action => ({
+                                label: action.label,
+                                icon: action.icon,
+                                onClick: () => executeCommand(action.cmd, action.label),
+                                disabled: isExecuting || (isTestRunning && !allowActionsDuringTest)
+                            }))}
+                        />
                     ))}
                 </div>
 

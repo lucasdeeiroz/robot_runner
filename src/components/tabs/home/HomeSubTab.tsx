@@ -49,15 +49,21 @@ export function HomeSubTab({ onNavigate }: HomeSubTabProps) {
     useEffect(() => {
         const checkStatus = async () => {
             try {
-                const adb = await invoke<boolean>('is_adb_server_running');
-                setAdbRunning(adb);
+                const [adbResult, appiumResult] = await Promise.allSettled([
+                    invoke<boolean>('is_adb_server_running'),
+                    invoke<{ running: boolean }>('get_appium_status', {
+                        host: settings.appiumHost,
+                        port: settings.appiumPort,
+                        basePath: settings.appiumBasePath
+                    })
+                ]);
 
-                const appiumStatus = await invoke<{ running: boolean }>('get_appium_status', {
-                    host: settings.appiumHost,
-                    port: settings.appiumPort,
-                    basePath: settings.appiumBasePath
-                });
-                setAppiumRunning(appiumStatus.running);
+                if (adbResult.status === 'fulfilled') {
+                    setAdbRunning(adbResult.value);
+                }
+                if (appiumResult.status === 'fulfilled') {
+                    setAppiumRunning(appiumResult.value.running);
+                }
             } catch (e) {
                 console.error('Failed to check server status', e);
             }

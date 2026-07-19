@@ -1,5 +1,14 @@
-use crate::cmd_utils::new_std_command;
+use std::path::Path;
+use crate::cmd_utils::{new_std_command, expand_env_vars};
 use serde::Serialize;
+
+fn check_repo_path(repo_path: &str) -> Result<String, String> {
+    let expanded = expand_env_vars(repo_path);
+    if !Path::new(&expanded).is_dir() {
+        return Err(format!("The directory '{}' is invalid or does not exist. Please check your Automation Root in Settings.", repo_path));
+    }
+    Ok(expanded)
+}
 
 #[derive(Serialize)]
 pub struct GitStatusEntry {
@@ -9,6 +18,7 @@ pub struct GitStatusEntry {
 
 #[tauri::command]
 pub async fn get_git_status(repo_path: String) -> Result<Vec<GitStatusEntry>, String> {
+    let repo_path = check_repo_path(&repo_path)?;
     let mut cmd = new_std_command("git");
     cmd.arg("status").arg("--porcelain").current_dir(&repo_path);
 
@@ -53,6 +63,7 @@ pub async fn get_git_status(repo_path: String) -> Result<Vec<GitStatusEntry>, St
 
 #[tauri::command]
 pub async fn git_stage_file(repo_path: String, file_path: String) -> Result<(), String> {
+    let repo_path = check_repo_path(&repo_path)?;
     let mut cmd = new_std_command("git");
     cmd.arg("add").arg(&file_path).current_dir(&repo_path);
 
@@ -68,6 +79,7 @@ pub async fn git_stage_file(repo_path: String, file_path: String) -> Result<(), 
 
 #[tauri::command]
 pub async fn git_commit(repo_path: String, message: String) -> Result<(), String> {
+    let repo_path = check_repo_path(&repo_path)?;
     let mut cmd = new_std_command("git");
     cmd.arg("commit").arg("-m").arg(&message).current_dir(&repo_path);
 
@@ -83,6 +95,7 @@ pub async fn git_commit(repo_path: String, message: String) -> Result<(), String
 
 #[tauri::command]
 pub async fn git_push(repo_path: String) -> Result<(), String> {
+    let repo_path = check_repo_path(&repo_path)?;
     let mut cmd = new_std_command("git");
     cmd.arg("push").current_dir(&repo_path);
 
@@ -98,6 +111,7 @@ pub async fn git_push(repo_path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn git_unstage_file(repo_path: String, file_path: String) -> Result<(), String> {
+    let repo_path = check_repo_path(&repo_path)?;
     let mut cmd = new_std_command("git");
     cmd.arg("restore").arg("--staged").arg(&file_path).current_dir(&repo_path);
 
@@ -113,6 +127,7 @@ pub async fn git_unstage_file(repo_path: String, file_path: String) -> Result<()
 
 #[tauri::command]
 pub async fn git_fetch(repo_path: String) -> Result<(), String> {
+    let repo_path = check_repo_path(&repo_path)?;
     let mut cmd = new_std_command("git");
     cmd.arg("fetch").current_dir(&repo_path);
 
@@ -128,6 +143,7 @@ pub async fn git_fetch(repo_path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn git_pull(repo_path: String) -> Result<(), String> {
+    let repo_path = check_repo_path(&repo_path)?;
     let mut cmd = new_std_command("git");
     cmd.arg("pull").current_dir(&repo_path);
 

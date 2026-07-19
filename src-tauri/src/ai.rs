@@ -14,9 +14,9 @@ pub async fn call_claude_code_cli(
 ) -> AppResult<String> {
     #[cfg(target_os = "windows")]
     let mut command = {
-        let mut cmd = crate::cmd_utils::new_tokio_command("cmd");
-        cmd.args(&["/C", "claude.cmd"]);
-        cmd
+        let mut c = crate::cmd_utils::new_tokio_command("cmd");
+        c.arg("/c").arg("claude");
+        c
     };
     #[cfg(not(target_os = "windows"))]
     let mut command = crate::cmd_utils::new_tokio_command("claude");
@@ -65,7 +65,11 @@ pub async fn call_claude_code_cli(
     }
     
     if !project_root.is_empty() {
-        command.current_dir(project_root);
+        let expanded = crate::cmd_utils::expand_env_vars(&project_root);
+        let path = std::path::Path::new(&expanded);
+        if path.exists() && path.is_dir() {
+            command.current_dir(expanded);
+        }
     }
 
     command.stdin(Stdio::piped());
@@ -296,7 +300,8 @@ pub async fn call_antigravity_cli(
     }
 
     if !project_root.is_empty() {
-        command.current_dir(&project_root);
+        let expanded = crate::cmd_utils::expand_env_vars(&project_root);
+        command.current_dir(&expanded);
     }
 
     command.stdout(Stdio::piped());

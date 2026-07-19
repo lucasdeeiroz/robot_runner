@@ -53,6 +53,7 @@ pub async fn get_ai_context(
 
 fn get_history_analysis_context(params: AiContextParams) -> Result<AiContextResponse, String> {
     let db_path = params.db_path.ok_or("Missing db_path")?;
+    let db_path = crate::cmd_utils::expand_env_vars(&db_path);
     let db = LogDb::new(&db_path).map_err(|e| e.to_string())?;
 
     let limit = params.failures_limit.unwrap_or(20);
@@ -146,6 +147,7 @@ fn get_history_analysis_context(params: AiContextParams) -> Result<AiContextResp
         context.push_str("### SYSTEM LOGS (TAIL)\n\n");
         let mut log_count = 0;
         for path in log_paths {
+            let path = crate::cmd_utils::expand_env_vars(&path);
             let extension = Path::new(&path)
                 .extension()
                 .and_then(|s| s.to_str())
@@ -194,7 +196,8 @@ fn get_history_analysis_context(params: AiContextParams) -> Result<AiContextResp
     });
 
     if let Some(root) = params.automation_root {
-        append_project_index(&mut context, &root);
+        let expanded = crate::cmd_utils::expand_env_vars(&root);
+        append_project_index(&mut context, &expanded);
     }
 
     Ok(AiContextResponse {
@@ -291,7 +294,8 @@ fn get_exploration_context(params: AiContextParams) -> Result<AiContextResponse,
 
     // Automation Context: Inject file index to help the IA explore if it needs files
     if let Some(root) = params.automation_root {
-        append_project_index(&mut context, &root);
+        let expanded = crate::cmd_utils::expand_env_vars(&root);
+        append_project_index(&mut context, &expanded);
     }
 
     Ok(AiContextResponse { context, metadata })
@@ -344,7 +348,8 @@ fn get_artifact_generation_context(
     // Resolve base path for screen maps
     let maps_path = if let Some(ref custom_dir) = params.custom_mappings_dir {
         if !custom_dir.trim().is_empty() {
-            Path::new(custom_dir).to_path_buf()
+            let expanded = crate::cmd_utils::expand_env_vars(custom_dir);
+            Path::new(&expanded).to_path_buf()
         } else {
             let base_path = app_handle
                 .path()
@@ -465,7 +470,8 @@ fn get_flowchart_layout_context(
     // Resolve base path for screen maps
     let maps_path = if let Some(ref custom_dir) = params.custom_mappings_dir {
         if !custom_dir.trim().is_empty() {
-            Path::new(custom_dir).to_path_buf()
+            let expanded = crate::cmd_utils::expand_env_vars(custom_dir);
+            Path::new(&expanded).to_path_buf()
         } else {
             let base_path = app_handle
                 .path()
@@ -555,7 +561,8 @@ fn get_flowchart_layout_context(
     }
 
     if let Some(root) = params.automation_root {
-        append_project_index(&mut context, &root);
+        let expanded = crate::cmd_utils::expand_env_vars(&root);
+        append_project_index(&mut context, &expanded);
     }
 
     Ok(AiContextResponse {

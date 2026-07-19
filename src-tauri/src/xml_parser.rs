@@ -145,6 +145,7 @@ pub struct ParseResult {
 
 #[tauri::command]
 pub async fn parse_robot_xml(app: tauri::AppHandle, xml_path: String) -> AppResult<ParseResult> {
+    let xml_path = crate::cmd_utils::expand_env_vars(&xml_path);
     tokio::task::spawn_blocking(move || parse_robot_xml_blocking(&app, &xml_path))
         .await
         .map_err(|e| AppError::ProcessError(format!("Task join error: {}", e)))?
@@ -156,6 +157,7 @@ pub async fn save_node_ai_analysis(
     node_id: String,
     analysis: String,
 ) -> AppResult<()> {
+    let db_path = crate::cmd_utils::expand_env_vars(&db_path);
     tokio::task::spawn_blocking(move || {
         let db = LogDb::new(&db_path)
             .map_err(|e| AppError::DbError(format!("Failed to open DB: {}", e)))?;
@@ -168,6 +170,7 @@ pub async fn save_node_ai_analysis(
 
 #[tauri::command]
 pub async fn get_node_ai_analysis(db_path: String, node_id: String) -> AppResult<Option<String>> {
+    let db_path = crate::cmd_utils::expand_env_vars(&db_path);
     tokio::task::spawn_blocking(move || {
         let db = LogDb::new(&db_path)
             .map_err(|e| AppError::DbError(format!("Failed to open DB: {}", e)))?;
@@ -180,6 +183,7 @@ pub async fn get_node_ai_analysis(db_path: String, node_id: String) -> AppResult
 
 #[tauri::command]
 pub async fn get_node_children(db_path: String, parent_id: String) -> AppResult<Vec<LogNode>> {
+    let db_path = crate::cmd_utils::expand_env_vars(&db_path);
     tokio::task::spawn_blocking(move || {
         use rayon::prelude::*;
 
@@ -240,6 +244,7 @@ pub async fn get_node_children(db_path: String, parent_id: String) -> AppResult<
 
 #[tauri::command]
 pub async fn get_execution_failures(db_path: String) -> AppResult<Vec<serde_json::Value>> {
+    let db_path = crate::cmd_utils::expand_env_vars(&db_path);
     tokio::task::spawn_blocking(move || {
         use rayon::prelude::*;
 

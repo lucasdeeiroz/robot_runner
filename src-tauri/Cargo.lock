@@ -4032,7 +4032,7 @@ dependencies = [
 
 [[package]]
 name = "robot_runner"
-version = "2.3.1-stable3"
+version = "2.3.2-beta5"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
@@ -4065,8 +4065,10 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "tracing",
  "url",
  "walkdir",
+ "which",
  "zstd",
 ]
 
@@ -6043,6 +6045,15 @@ name = "weezl"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a28ac98ddc8b9274cb41bb4d9d4d5c425b6020c50c46f25559911905610b4a88"
+
+[[package]]
+name = "which"
+version = "8.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f3ef584124b911bcc3875c2f1472e80f24361ceb789bd1c62b3e9a3df9ff43c"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "winapi"

@@ -29,18 +29,19 @@ export interface SystemVersions {
 const store = new LazyStore('settings.json');
 
 export interface AppSettings {
-    theme: 'dark' | 'light';
     language: string;
+    zoomFactor: number;
+    theme: 'dark' | 'light';
     primaryColor: string;
-    customLogoLight?: string;
-    customLogoDark?: string;
+    presentationEnabled: boolean;
+    customAdbPath?: string;
+    usageMode?: 'explorer' | 'automator';
+    explorerPlatform?: 'mobile' | 'web';
+    automationFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium';
+    updateChannel?: 'stable' | 'beta' | 'alpha';
     recycleDeviceViews: boolean; // New setting
     allowActionsDuringTest: boolean; // Control whether actions are allowed during test
     saveLogs: boolean; // Persist log saving preference
-    usageMode?: 'explorer' | 'automator';
-    automationFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium';
-    explorerPlatform?: 'mobile' | 'web';
-    customAdbPath?: string;
     noAppiumForRobot?: boolean;
 
     // Appium
@@ -60,6 +61,11 @@ export interface AppSettings {
         automationRoot: string;
         mappings?: string;
     };
+    logcatKeywords?: string[];
+    logcatLevel?: string;
+    logcatExtraTags?: string;
+    logcatSelectedPackage?: string;
+    stopwatchSelectedPackage?: string;
 
     // Tools
     tools: {
@@ -77,20 +83,19 @@ export interface AppSettings {
     // AI
     aiProvider: 'gemini' | 'claude' | 'openai' | 'claude-code' | 'antigravity-cli';
     geminiApiKey?: string;
-    antigravityApiKey?: string;
     geminiModel: string;
     claudeApiKey?: string;
     claudeModel: string;
     openaiApiKey?: string;
     openaiModel: string;
-    maxExplorationSteps?: number;
-    presentationEnabled: boolean;
-    zoomFactor: number;
+    antigravityApiKey?: string;
     claudeCodeToken?: string;
+    aiSessionId?: string;
     aiChatEnabled: boolean;
     aiTestModeEnabled: boolean;
-    aiSessionId?: string;
-    updateChannel?: 'stable' | 'beta' | 'alpha';
+    maxExplorationSteps?: number;
+
+    // Integrations
     azureDevOps?: {
         org: string;
         project: string;
@@ -120,24 +125,25 @@ export interface AppSettings {
         notifyOnPass: boolean;
         notifyOnFail: boolean;
     };
+
+    // Custom Logos
+    customLogoLight?: string;
+    customLogoDark?: string;
 }
 
 const getDefaultSettings = (): AppSettings => ({
-    theme: 'dark',
     language: 'en_US',
+    zoomFactor: 1.0,
+    theme: 'dark',
     primaryColor: 'blue',
-    aiProvider: 'gemini',
-    geminiApiKey: '',
-    antigravityApiKey: '',
-    geminiModel: getRemoteString('default_gemini_model') || 'gemini-3.1-flash-lite',
-    claudeApiKey: '',
-    claudeModel: getRemoteString('default_claude_model') || 'claude-3-5-sonnet-20240620',
-    openaiApiKey: '',
-    openaiModel: getRemoteString('default_openai_model') || 'gpt-4o',
+    presentationEnabled: false,
+    customAdbPath: '',
+    explorerPlatform: 'mobile',
+    updateChannel: 'stable',
     recycleDeviceViews: false, // Default to false
     allowActionsDuringTest: false, // Default to false (blocking)
     saveLogs: false, // Default to false
-    explorerPlatform: 'mobile',
+    noAppiumForRobot: false,
     appiumHost: '127.0.0.1',
     appiumPort: 4723,
     appiumBasePath: '/',
@@ -152,6 +158,10 @@ const getDefaultSettings = (): AppSettings => ({
         recordings: '',
         mappings: '',
     },
+    logcatKeywords: [],
+    logcatLevel: 'E',
+    logcatExtraTags: '',
+    stopwatchSelectedPackage: '',
     tools: {
         appiumArgs: getRemoteString('default_appium_args') || '--relaxed-security',
         scrcpyArgs: getRemoteString('default_scrcpy_args') || '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake',
@@ -163,16 +173,19 @@ const getDefaultSettings = (): AppSettings => ({
         cypressArgs: '',
         seleniumArgs: ''
     },
-    maxExplorationSteps: 30,
-    presentationEnabled: false,
-    zoomFactor: 1.0,
+    aiProvider: 'gemini',
+    geminiApiKey: '',
+    geminiModel: getRemoteString('default_gemini_model') || 'gemini-3.1-flash-lite',
+    claudeApiKey: '',
+    claudeModel: getRemoteString('default_claude_model') || 'claude-3-5-sonnet-20240620',
+    openaiApiKey: '',
+    openaiModel: getRemoteString('default_openai_model') || 'gpt-4o',
+    antigravityApiKey: '',
     claudeCodeToken: '',
+    aiSessionId: undefined,
     aiChatEnabled: false,
     aiTestModeEnabled: false,
-    aiSessionId: undefined,
-    updateChannel: 'stable',
-    customAdbPath: '',
-    noAppiumForRobot: false,
+    maxExplorationSteps: 30,
     azureDevOps: {
         org: '',
         project: '',
@@ -217,9 +230,9 @@ interface SettingsStoreData {
 
 const SECRET_PATHS = [
     ['geminiApiKey'],
-    ['antigravityApiKey'],
     ['claudeApiKey'],
     ['openaiApiKey'],
+    ['antigravityApiKey'],
     ['claudeCodeToken'],
     ['tools', 'ngrokToken'],
     ['azureDevOps', 'pat'],
@@ -321,7 +334,9 @@ interface SettingsContextType {
     activeProfileId: string;
     profiles: Profile[];
     updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
-    createProfile: (name: string) => void;
+    setMultipleSettings: (newSettings: Partial<AppSettings>) => void;
+    createProfile: (name: string, initialSettings?: Partial<AppSettings>) => void;
+    importSettingsStore: (importedData: any) => void;
     switchProfile: (id: string) => void;
     renameProfile: (id: string, name: string) => void;
     deleteProfile: (id: string) => void;
@@ -424,7 +439,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                         migrated.profiles[pid].settings = deepMerge(getDefaultSettings(), migrated.profiles[pid].settings);
                         migrated.profiles[pid].settings.aiChatEnabled = false;
                         migrated.profiles[pid].settings.aiTestModeEnabled = false;
-                        
+
                         // Active Migration for Remote Config overrides
                         const s = migrated.profiles[pid].settings;
                         const ds = getDefaultSettings();
@@ -455,7 +470,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                     const migratedSettings = deepMerge(getDefaultSettings(), decryptedSaved as unknown as Partial<AppSettings>);
                     migratedSettings.aiChatEnabled = false;
                     migratedSettings.aiTestModeEnabled = false;
-                    
+
                     // Active Migration for old flat format
                     const ds = getDefaultSettings();
                     if (migratedSettings.geminiModel === 'gemini-1.5-flash' || migratedSettings.geminiModel === 'gemini-3.1-flash-lite') migratedSettings.geminiModel = ds.geminiModel;
@@ -545,12 +560,45 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         });
     };
 
-    const createProfile = (name: string) => {
+    const setMultipleSettings = (newSettings: Partial<AppSettings>) => {
+        setStoreData((currentStoreData) => {
+            const activeId = currentStoreData.activeProfileId;
+            const currentProfile = currentStoreData.profiles[activeId];
+
+            if (!currentProfile) {
+                feedback.toast.error("settings.profile_not_found");
+                return currentStoreData;
+            }
+
+            const updatedSettings = deepMerge(currentProfile.settings, newSettings);
+            const updatedProfile = { ...currentProfile, settings: updatedSettings };
+
+            const newData = {
+                ...currentStoreData,
+                profiles: {
+                    ...currentStoreData.profiles,
+                    [activeId]: updatedProfile
+                }
+            };
+
+            // Fire and forget save to disk
+            saveStore(newData);
+
+            // Sync permissions if paths changed
+            if (newSettings.paths) {
+                syncWorkspaces(newSettings.paths as Record<string, string>);
+            }
+
+            return newData;
+        });
+    };
+
+    const createProfile = (name: string, initialSettings?: Partial<AppSettings>) => {
         const id = uuidv4();
         const newProfile: Profile = {
             id,
             name,
-            settings: getDefaultSettings()
+            settings: deepMerge(getDefaultSettings(), initialSettings ?? {})
         };
         const newData = {
             ...storeData,
@@ -559,6 +607,65 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         };
         setStoreData(newData);
         saveStore(newData);
+    };
+
+    const importSettingsStore = (importedData: any) => {
+        try {
+            if (!importedData || typeof importedData !== 'object') {
+                throw new Error("Invalid settings data.");
+            }
+
+            let actualData = importedData;
+            // Unwrap tauri store 'app_config' key if it exists
+            if (importedData && importedData.app_config) {
+                actualData = importedData.app_config;
+            }
+
+            let migrated: SettingsStoreData;
+
+            if (actualData.profiles && actualData.activeProfileId) {
+                migrated = { ...actualData };
+            } else {
+                const migratedSettings = deepMerge(getDefaultSettings(), actualData as Partial<AppSettings>);
+                migratedSettings.aiChatEnabled = false;
+                migratedSettings.aiTestModeEnabled = false;
+                migrated = {
+                    activeProfileId: 'default',
+                    profiles: {
+                        'default': { id: 'default', name: 'Default', settings: migratedSettings }
+                    }
+                };
+            }
+
+            Object.keys(migrated.profiles).forEach(pid => {
+                migrated.profiles[pid].settings = deepMerge(getDefaultSettings(), migrated.profiles[pid].settings);
+                migrated.profiles[pid].settings.aiChatEnabled = false;
+                migrated.profiles[pid].settings.aiTestModeEnabled = false;
+            });
+
+            if (!migrated.profiles[migrated.activeProfileId]) {
+                const availableIds = Object.keys(migrated.profiles);
+                if (availableIds.length > 0) {
+                    migrated.activeProfileId = availableIds[0];
+                } else {
+                    migrated.profiles = { 'default': { id: 'default', name: 'Default', settings: getDefaultSettings() } };
+                    migrated.activeProfileId = 'default';
+                }
+            }
+
+            setStoreData(migrated);
+            saveStore(migrated);
+
+            const activeId = migrated.activeProfileId;
+            const paths = migrated.profiles[activeId]?.settings?.paths;
+            if (paths) {
+                syncWorkspaces(paths as Record<string, string>);
+            }
+
+        } catch (e: any) {
+            feedback.toast.error("Failed to import settings", e);
+            throw e;
+        }
     };
 
     const switchProfile = (id: string) => {
@@ -701,7 +808,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         };
 
         const cacheKey = `cached_system_versions_${mode}_${framework}_${isNgrokEnabled}`;
-        
+
         if (!silent) {
             const cached = localStorage.getItem(cacheKey);
             if (cached) {
@@ -768,7 +875,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             activeProfileId: storeData.activeProfileId,
             profiles: Object.values(storeData.profiles),
             updateSetting,
+            setMultipleSettings,
             createProfile,
+            importSettingsStore,
             switchProfile,
             renameProfile,
             deleteProfile,

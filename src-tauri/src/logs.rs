@@ -82,7 +82,8 @@ fn get_test_history_blocking(
 
     if let Some(path) = custom_path {
         if !path.is_empty() {
-            candidates.push(PathBuf::from(path));
+            let expanded = crate::cmd_utils::expand_env_vars(&path);
+            candidates.push(PathBuf::from(expanded));
         }
     }
 
@@ -473,7 +474,8 @@ pub async fn save_test_summary(
 
         if let Some(path) = custom_path {
             if !path.is_empty() {
-                candidates.push(PathBuf::from(path));
+                let expanded = crate::cmd_utils::expand_env_vars(&path);
+                candidates.push(PathBuf::from(expanded));
             }
         }
 
@@ -677,9 +679,10 @@ pub fn open_log_folder(path: String) -> Result<(), String> {
 
 #[command]
 pub fn open_path(path: String) -> Result<(), String> {
+    let expanded = crate::cmd_utils::expand_env_vars(&path);
     #[cfg(target_os = "windows")]
     {
-        let clean_path = path.replace("/", "\\");
+        let clean_path = expanded.replace("/", "\\");
         Command::new("explorer")
             .arg(clean_path)
             .spawn()
@@ -688,14 +691,14 @@ pub fn open_path(path: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         Command::new("open")
-            .arg(path)
+            .arg(&expanded)
             .spawn()
             .map_err(|e| format!("Failed to open finder: {}", e))?;
     }
     #[cfg(target_os = "linux")]
     {
         Command::new("xdg-open")
-            .arg(path)
+            .arg(&expanded)
             .spawn()
             .map_err(|e| format!("Failed to open xdg-open: {}", e))?;
     }

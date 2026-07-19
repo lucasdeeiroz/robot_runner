@@ -49,6 +49,12 @@ macro_rules! generate_robot_runner_handler {
             crate::adb::logcat::get_logcat_details,
             crate::adb::logcat::check_ui_change,
             crate::adb::stats::get_device_stats,
+            crate::adb::stats::start_performance_stream,
+            crate::adb::stats::stop_performance_stream,
+            crate::adb::stats::start_process_monitor_stream,
+            crate::adb::stats::stop_process_monitor_stream,
+            crate::adb::stats::get_battery_audit,
+            crate::adb::stats::reset_battery_stats,
             crate::adb::scrcpy::open_scrcpy,
             crate::adb::media::save_screenshot,
             crate::adb::media::start_screen_recording,
@@ -78,6 +84,7 @@ macro_rules! generate_robot_runner_handler {
             crate::adb::packages::install_package,
             crate::adb::packages::get_focused_package,
             crate::adb::packages::launch_package,
+            crate::adb::packages::force_stop_package,
             crate::adb::packages::pull_apk,
             crate::adb::packages::set_stay_on,
             crate::runner::get_robot_test_cases,
@@ -121,7 +128,10 @@ macro_rules! generate_robot_runner_handler {
             crate::adb::dmesg::stop_dmesg,
             crate::adb::dmesg::is_dmesg_active,
             crate::adb::dmesg::get_dmesg_details,
-            crate::adb::dmesg::fetch_dmesg_buffer
+            crate::adb::dmesg::fetch_dmesg_buffer,
+            crate::env_setup::check_environment,
+            crate::env_setup::create_venv,
+            crate::env_setup::install_requirements
         ]
     };
 }

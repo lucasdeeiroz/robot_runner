@@ -353,8 +353,14 @@ export function TestsPage({ onNavigate }: TestsPageProps) {
                 {isGridView ? (
                     <div
                         ref={gridContainerRef}
-                        className="h-full flex-1 min-h-0 overflow-y-auto grid gap-4 pb-4 content-start"
-                        style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gridAutoRows: '520px' }}
+                        className={clsx(
+                            "h-full flex-1 min-h-0 overflow-y-auto grid gap-4 pb-4",
+                            visibleSessions.length >= 4 ? "content-start" : ""
+                        )}
+                        style={{ 
+                            gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, 
+                            gridAutoRows: visibleSessions.length >= 4 ? '520px' : 'minmax(0, 1fr)' 
+                        }}
                     >
                         {/* Session Grid Items */}
                         {visibleSessions.map((s) => {

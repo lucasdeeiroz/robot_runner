@@ -766,21 +766,25 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
             // 1. Capture Current State
             explorer.addLog(t('mapper.exploration.capturing_screen'), 'transition');
             setExplorationLogs([...explorer.getLogs()]);
-            // Re-fetch using refreshAll logic isn't ideal here due to async nature,
-            // but we can reuse the logic in the explorer
-            const xml = await invoke<string>('get_xml_dump', { deviceId: selectedDevice });
+            const xmlPromise = invoke<string>('get_xml_dump', { deviceId: selectedDevice });
+            const screenshotPromise = invoke<string>('get_compressed_screenshot', { deviceId: selectedDevice, maxWidth: 1024, maxHeight: 1024 });
+
+            const [xmlResult, screenshotResult] = await Promise.allSettled([xmlPromise, screenshotPromise]);
+
+            if (xmlResult.status === 'rejected') {
+                throw xmlResult.reason;
+            }
+            const xml = xmlResult.value;
 
             let screenshot: string | undefined = undefined;
-            try {
-                const freshScreenshotBase64 = await invoke<string>('get_compressed_screenshot', { deviceId: selectedDevice, maxWidth: 1024, maxHeight: 1024 });
-                if (freshScreenshotBase64) {
-                    const prefix = 'data:image/jpeg;base64,';
-                    const fullScreenshot = freshScreenshotBase64.startsWith('data:') ? freshScreenshotBase64 : `${prefix}${freshScreenshotBase64}`;
-                    setScreenshot(fullScreenshot);
-                    screenshot = fullScreenshot;
-                }
-            } catch (screenshotError) {
-                console.warn("Screenshot capture failed, proceeding with XML only:", screenshotError);
+            if (screenshotResult.status === 'fulfilled' && screenshotResult.value) {
+                const freshScreenshotBase64 = screenshotResult.value;
+                const prefix = 'data:image/jpeg;base64,';
+                const fullScreenshot = freshScreenshotBase64.startsWith('data:') ? freshScreenshotBase64 : `${prefix}${freshScreenshotBase64}`;
+                setScreenshot(fullScreenshot);
+                screenshot = fullScreenshot;
+            } else if (screenshotResult.status === 'rejected') {
+                console.warn("Screenshot capture failed, proceeding with XML only:", screenshotResult.reason);
                 if (explorer.getState().currentStep === 1) {
                     explorer.addLog("Warning: Screenshot capture failed (secured screen or OS restrictions). Proceeding with XML layout only.", "warning");
                 }

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import clsx from "clsx";
+import { twMerge } from "tailwind-merge";
 import { createPortal } from "react-dom";
 
 import { AnimatePresence, motion } from "framer-motion";
@@ -21,9 +22,10 @@ interface SplitButtonProps {
     className?: string;
     disabled?: boolean;
     variant?: 'primary' | 'danger' | 'secondary';
+    placement?: 'top' | 'bottom';
 }
 
-export function SplitButton({ primaryAction, secondaryActions, className, disabled, variant = 'primary' }: SplitButtonProps) {
+export function SplitButton({ primaryAction, secondaryActions, className, disabled, variant = 'primary', placement = 'bottom' }: SplitButtonProps) {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
@@ -46,11 +48,19 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
             document.addEventListener("mousedown", handleClickOutside);
             if (buttonRef.current) {
                 const rect = buttonRef.current.getBoundingClientRect();
-                setDropdownStyle({
-                    top: rect.bottom + 4,
-                    right: window.innerWidth - rect.right,
-                    minWidth: Math.max(containerRef.current?.offsetWidth || 0, 140)
-                });
+                if (placement === 'top') {
+                    setDropdownStyle({
+                        bottom: window.innerHeight - rect.top + 4,
+                        right: window.innerWidth - rect.right,
+                        minWidth: Math.max(containerRef.current?.offsetWidth || 0, 140)
+                    });
+                } else {
+                    setDropdownStyle({
+                        top: rect.bottom + 4,
+                        right: window.innerWidth - rect.right,
+                        minWidth: Math.max(containerRef.current?.offsetWidth || 0, 140)
+                    });
+                }
             }
         }
         return () => {
@@ -86,13 +96,14 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
     const showDropdown = effectiveSecondaries.length > 0;
 
     return (
-        <div ref={containerRef} className={clsx("relative inline-flex h-9", className)}>
+        <div ref={containerRef} className={twMerge("relative inline-flex h-9", className)}>
             <div className={clsx(
                 "flex items-center rounded-2xl shadow-sm transition-all duration-200",
                 "group focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-1",
                 variant === 'primary' && "bg-primary text-on-primary hover:shadow-md",
                 variant === 'danger' && "bg-error text-on-error hover:shadow-md",
-                variant === 'secondary' && "bg-surface-variant/50 text-on-surface hover:bg-surface-variant border border-outline-variant/30"
+                variant === 'secondary' && "bg-surface-variant/50 text-on-surface hover:bg-surface-variant border border-outline-variant/30",
+                "h-full w-full"
             )}>
                 <Button
                     type="button"
@@ -134,9 +145,9 @@ export function SplitButton({ primaryAction, secondaryActions, className, disabl
                     {isOpen && (
                         <motion.div
                             ref={dropdownRef}
-                            initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                            initial={{ opacity: 0, y: placement === 'top' ? 8 : -8, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                            exit={{ opacity: 0, y: placement === 'top' ? 4 : -4, scale: 0.98 }}
                             transition={{ duration: 0.15, ease: "easeOut" }}
                             className="fixed z-[200000] bg-surface border border-outline-variant/30 rounded-2xl shadow-lg py-1.5 overflow-hidden"
                             style={dropdownStyle}

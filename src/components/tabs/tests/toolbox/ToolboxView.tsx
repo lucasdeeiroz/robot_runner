@@ -1,16 +1,18 @@
 import { useState, useEffect, useRef } from "react";
-import { AlignLeft, Terminal, Cpu, Cast, FileText, StopCircle, RefreshCcw, Camera, Video, Square, LayoutGrid, Minimize2, Maximize2, Package, Globe } from "lucide-react";
+import { AlignLeft, Terminal, Cpu, Cast, FileText, StopCircle, RefreshCcw, Camera, Video, Square, LayoutGrid, Minimize2, Maximize2, Package, Globe, Activity, Timer, ShieldCheck } from "lucide-react";
 import clsx from "clsx";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettings } from "@/lib/settings";
 import { logEvent } from "@/lib/analytics";
 import { LogcatSubTab } from "./LogcatSubTab";
-import { DmesgSubTab } from "./DmesgSubTab";
+// import { DmesgSubTab } from "./DmesgSubTab";
 import { AppsSubTab } from "./AppsSubTab";
 import { useTranslation } from "react-i18next";
 import { CommandsSubTab } from "./CommandsSubTab";
 import { PerformanceSubTab } from "./PerformanceSubTab";
+import { StopwatchSubTab } from "./StopwatchSubTab";
 import { HardwareSubTab } from "./HardwareSubTab";
+import { CheckupSubTab } from "./CheckupSubTab";
 import { RunConsole } from "@/components/organisms/RunConsole";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { TestSession, useTestSessions } from "@/lib/testSessionStore";
@@ -30,7 +32,7 @@ interface ToolboxViewProps {
     onNavigate?: (page: string) => void;
 }
 
-type ToolTab = 'console' | 'logcat' | 'dmesg' | 'performance' | 'commands' | 'apps' | 'webview' | 'hardware';
+type ToolTab = 'console' | 'logcat' | 'performance' | 'stopwatch' | 'commands' | 'apps' | 'webview' | 'hardware' | 'checkup';
 
 export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxViewProps) {
     const { stopSession, rerunSession, setSessionActiveTool } = useTestSessions();
@@ -44,7 +46,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
     );
     const [isGridView, setIsGridView] = useState(false);
     const [visibleToolsInGrid, setVisibleToolsInGrid] = useState<Set<ToolTab>>(
-        isWebMode ? new Set(['console', 'webview']) : new Set(['console', 'logcat', 'dmesg', 'performance', 'hardware'])
+        isWebMode ? new Set(['console', 'webview']) : new Set(['console', 'logcat', 'performance', 'hardware', 'checkup'])
     );
 
     // Responsive State
@@ -208,6 +210,11 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
         }
     };
 
+    const handlePairWithConsole = (tool: ToolTab) => {
+        setVisibleToolsInGrid(new Set(['console', tool]));
+        setIsGridView(true);
+    };
+
     // Auto-disable grid if only 1 tool left
     useEffect(() => {
         if (!isGridView) return;
@@ -224,7 +231,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                 setActiveTool(tool);
             }
             // Reset grid visibility
-            setVisibleToolsInGrid(isWebMode ? new Set(['console', 'webview']) : new Set(['console', 'logcat', 'dmesg', 'commands', 'performance', 'hardware']));
+setVisibleToolsInGrid(isWebMode ? new Set(['console', 'webview']) : new Set(['console', 'logcat', 'commands', 'performance', 'hardware', 'checkup']));
         }
     }, [isGridView, visibleToolsInGrid.size, session.type, isWebMode]);
 
@@ -324,18 +331,18 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                         tooltip: (isCompact || isNarrow) ? t('toolbox.tabs.logcat') : undefined
                     },
                     {
-                        id: 'dmesg',
-                        label: (!isCompact && !isNarrow) ? "Kernel Logs" : "",
-                        icon: Terminal,
-                        selected: isGridView ? visibleToolsInGrid.has('dmesg') : activeTool === 'dmesg',
-                        tooltip: (isCompact || isNarrow) ? "Kernel Logs" : undefined
-                    },
-                    {
                         id: 'performance',
                         label: (!isCompact && !isNarrow) ? t('toolbox.tabs.performance') : "",
-                        icon: Cpu,
+                        icon: Activity,
                         selected: isGridView ? visibleToolsInGrid.has('performance') : activeTool === 'performance',
                         tooltip: (isCompact || isNarrow) ? t('toolbox.tabs.performance') : undefined
+                    },
+                    {
+                        id: 'stopwatch',
+                        label: (!isCompact && !isNarrow) ? t('toolbox.tabs.stopwatch', 'Stopwatch') : "",
+                        icon: Timer,
+                        selected: isGridView ? visibleToolsInGrid.has('stopwatch') : activeTool === 'stopwatch',
+                        tooltip: (isCompact || isNarrow) ? t('toolbox.tabs.stopwatch', 'Stopwatch') : undefined
                     },
                     {
                         id: 'commands',
@@ -357,6 +364,13 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                         icon: Cpu, // We'll change to something else if needed, like Battery or Server
                         selected: isGridView ? visibleToolsInGrid.has('hardware') : activeTool === 'hardware',
                         tooltip: (isCompact || isNarrow) ? "Hardware" : undefined
+                    },
+                    {
+                        id: 'checkup',
+                        label: (!isCompact && !isNarrow) ? t('toolbox.tabs.checkup', 'Checkup') : "",
+                        icon: ShieldCheck,
+                        selected: isGridView ? visibleToolsInGrid.has('checkup') : activeTool === 'checkup',
+                        tooltip: (isCompact || isNarrow) ? t('toolbox.tabs.checkup', 'Checkup') : undefined
                     }
                 ]}
                 activeId={activeTool}
@@ -372,7 +386,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                 if (!isGridView) {
                                     const defaults: ToolTab[] = isWebMode
                                         ? ['console', 'webview']
-                                        : ['console', 'logcat', 'dmesg', 'performance'];
+                                        : ['console', 'logcat', 'performance'];
                                     setVisibleToolsInGrid(new Set([...defaults, activeTool]));
                                 }
                                 setIsGridView(!isGridView);
@@ -395,7 +409,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                         {/* Session Controls */}
                         <div className="flex bg-surface p-1 rounded-2xl border border-outline-variant/30 items-center">
                             {isWebMode ? (
-                                <div className="flex items-center gap-1.5 shrink-0"/>
+                                <div className="flex items-center gap-1.5 shrink-0" />
                             ) : (
                                 <>
                                     <Button
@@ -473,7 +487,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                             }}
                                             secondaryActions={(() => {
                                                 if (session.status !== 'finished') return [];
-                                                
+
                                                 // Find if there were any failures in the logs
                                                 const hasFailures = session.logs.some(l => {
                                                     const clean = l.replace(/\x1b\[[0-9;]*m/g, '').trim();
@@ -520,50 +534,115 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
             />
 
             {/* Tool Content */}
-            {isGridView ? (
-                <div className="h-full flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 gap-4 pb-2 auto-rows-fr overflow-hidden">
-                    {(() => {
-                        const allTools: ToolTab[] = isWebMode
-                            ? ['console', 'webview']
-                            : ['console', 'logcat', 'dmesg', 'performance', 'commands', 'apps', 'hardware'];
-                        const visibleTools = allTools.filter(t =>
-                            visibleToolsInGrid.has(t) && (t !== 'console' || session.type === 'test')
-                        );
+            {(() => {
+                const allTools: ToolTab[] = isWebMode
+                    ? ['console', 'webview']
+                    : ['console', 'logcat', 'performance', 'stopwatch', 'commands', 'apps', 'hardware', 'checkup'];
 
-                        return visibleTools.map((tool, index) => {
-                            const isLast = index === visibleTools.length - 1;
-                            const isOddIn2Col = (visibleTools.length % 2 !== 0) && isLast;
+                const visibleToolsInGridArray = allTools.filter(t =>
+                    visibleToolsInGrid.has(t) && (t !== 'console' || session.type === 'test')
+                );
 
+                const useAutoRows = visibleToolsInGridArray.length <= 3;
+                // Use 3 columns for exactly 3 items. Otherwise default to 2 columns (or 1 on small screens).
+                const isThreeCols = visibleToolsInGridArray.length === 3;
+
+                return (
+                    <div 
+                        className={clsx(
+                            "h-full flex-1 min-h-0",
+                            isGridView
+                                ? clsx(
+                                    "grid gap-4 pb-2",
+                                    isThreeCols ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 md:grid-cols-2",
+                                    useAutoRows ? "auto-rows-fr overflow-hidden" : "content-start overflow-y-auto"
+                                )
+                                : "bg-surface border border-outline-variant/30 rounded-2xl relative overflow-hidden"
+                        )}
+                        style={isGridView && !useAutoRows ? { gridAutoRows: '400px' } : undefined}
+                    >
+                        {(() => {
                             const titleMap: Record<string, string> = {
-                                'console': t('toolbox.tabs.console'),
-                                'logcat': t('toolbox.tabs.logcat'),
-                                'dmesg': "Kernel Logs",
-                                'commands': t('toolbox.tabs.commands'),
-                                'performance': t('toolbox.tabs.performance'),
-                                'apps': t('toolbox.tabs.apps'),
-                                'hardware': "Hardware",
-                                'webview': t('toolbox.tabs.webview', 'Webview')
-                            };
+                        'console': t('toolbox.tabs.console'),
+                        'logcat': t('toolbox.tabs.logcat'),
+                        'dmesg': "Kernel Logs",
+                        'commands': t('toolbox.tabs.commands'),
+                        'performance': t('toolbox.tabs.performance'),
+                        'stopwatch': t('toolbox.tabs.stopwatch', 'Stopwatch'),
+                        'apps': t('toolbox.tabs.apps'),
+                        'hardware': "Hardware",
+                        'webview': t('toolbox.tabs.webview', 'Webview'),
+                        'checkup': t('toolbox.tabs.checkup', 'Checkup')
+                    };
 
-                            return (
-                                <GridToolItem
-                                    key={tool}
-                                    id={tool}
-                                    title={titleMap[tool]}
-                                    className={clsx(isOddIn2Col && "md:col-span-2")}
-                                    onHide={() => handleToolClick(tool)}
-                                    minimizeLabel={t('common.minimize')}
-                                    onMaximize={() => {
-                                        setIsGridView(false);
-                                        setActiveTool(tool);
-                                    }}
-                                    maximizeLabel={t('common.maximize')}
-                                >
+                    return allTools.map((tool) => {
+                        const isVisibleInGrid = isGridView && visibleToolsInGrid.has(tool) && (tool !== 'console' || session.type === 'test');
+                        const isVisibleSingle = !isGridView && activeTool === tool;
+                        const isVisible = isVisibleInGrid || isVisibleSingle;
+
+                        const isOddIn2Col = isGridView && !isThreeCols && (visibleToolsInGridArray.length % 2 !== 0) && (visibleToolsInGridArray[visibleToolsInGridArray.length - 1] === tool);
+
+                        return (
+                            <div
+                                key={tool}
+                                className={clsx(
+                                    !isVisible && "hidden",
+                                    isGridView && isVisibleInGrid && clsx(
+                                        "flex flex-col border border-outline-variant/30 rounded-2xl bg-surface overflow-hidden shadow-sm transition-all duration-300 min-h-0",
+                                        isOddIn2Col && "md:col-span-2"
+                                    ),
+                                    !isGridView && isVisibleSingle && "h-full flex-1 min-h-0 flex flex-col relative"
+                                )}
+                            >
+                                {/* Grid Header */}
+                                {isGridView && isVisibleInGrid && (
+                                    <div className="flex items-center justify-between px-3 py-2 bg-surface/50 border-b border-outline-variant/30 shrink-0">
+                                        <span className="text-sm font-semibold text-on-surface-variant/80 flex items-center gap-2">
+                                            {titleMap[tool]}
+                                        </span>
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setIsGridView(false);
+                                                    setActiveTool(tool);
+                                                }}
+                                                className="p-1 h-6 w-6 text-on-surface/80 hover:text-on-surface-variant/80 rounded"
+                                                title={t('common.maximize', 'Maximize')}
+                                            >
+                                                <Maximize2 size={14} />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleToolClick(tool)}
+                                                className="p-1 h-6 w-6 text-on-surface/80 hover:text-on-surface-variant/80 rounded"
+                                                title={t('common.minimize', 'Minimize')}
+                                            >
+                                                <Minimize2 size={14} />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Content Wrapper */}
+                                <div className={clsx(
+                                    "flex-1 min-h-0 relative",
+                                    !isGridView && "h-full flex flex-col",
+                                    !isGridView && tool === 'webview' && "bg-surface-variant/10 p-4 overflow-hidden"
+                                )}>
                                     {tool === 'console' && (
-                                        <RunConsole key={`console-${session.runId}-${session.sessionEpoch}`} runId={session.runId} logs={session.logs} isSessionRunning={session.status === 'running' || session.status === 'stopping'} testPath={session.testPath} />
+                                        <RunConsole 
+                                            key={`console-${session.runId}-${session.sessionEpoch}`} 
+                                            runId={session.runId} 
+                                            logs={session.logs} 
+                                            isSessionRunning={session.status === 'running' || session.status === 'stopping'} 
+                                            testPath={session.testPath} 
+                                            onPairWithTool={(tool) => handlePairWithConsole(tool)}
+                                        />
                                     )}
-                                    {tool === 'logcat' && <LogcatSubTab key={`logcat-${session.deviceUdid}`} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} onNavigate={onNavigate} />}
-                                    {tool === 'dmesg' && <DmesgSubTab key={`dmesg-${session.deviceUdid}`} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} onNavigate={onNavigate} />}
+                                    {tool === 'logcat' && <LogcatSubTab key={`logcat-${session.deviceUdid}`} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} onNavigate={onNavigate} onPairWithConsole={session.type === 'test' ? () => handlePairWithConsole('logcat') : undefined} />}
                                     {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
                                     {tool === 'performance' && (
                                         <PerformanceSubTab
@@ -575,12 +654,22 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                             forceEnable={performanceState.forceEnable}
                                             setForceEnable={performanceState.setForceEnable}
                                             onNavigate={onNavigate}
+                                            onPairWithConsole={session.type === 'test' ? () => handlePairWithConsole('performance') : undefined}
+                                        />
+                                    )}
+                                    {tool === 'stopwatch' && (
+                                        <StopwatchSubTab
+                                            selectedDevice={session.deviceUdid}
+                                            isTestRunning={isTestRunning}
+                                            allowActionsDuringTest={settings.allowActionsDuringTest}
+                                            onPairWithConsole={session.type === 'test' ? () => handlePairWithConsole('stopwatch') : undefined}
                                         />
                                     )}
                                     {tool === 'apps' && <AppsSubTab isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
                                     {tool === 'hardware' && <HardwareSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
+                                    {tool === 'checkup' && <CheckupSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
                                     {tool === 'webview' && (
-                                        <div className="h-full w-full flex flex-col p-2 overflow-hidden bg-surface-variant/10 min-h-0">
+                                        <div className={clsx("h-full w-full flex flex-col overflow-hidden min-h-0", isGridView && "bg-surface-variant/10 p-2")}>
                                             <DeviceViewport
                                                 screenshot={webViewport.screenshot}
                                                 loading={webViewport.loading}
@@ -607,121 +696,15 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                             />
                                         </div>
                                     )}
-                                </GridToolItem>
-                            );
-                        });
-                    })()}
-                </div>
-            ) : (
-                <div className="h-full flex-1 min-h-0 bg-surface border border-outline-variant/30 rounded-2xl overflow-hidden relative">
-                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col overflow-hidden", activeTool === 'console' && session.type === 'test' ? "flex" : "hidden")}>
-                        <RunConsole key={`console-${session.runId}-${session.sessionEpoch}`} runId={session.runId} logs={session.logs} isSessionRunning={session.status === 'running' || session.status === 'stopping'} testPath={session.testPath} />
+                                </div>
+                            </div>
+                        );
+                    });
+                })()}
                     </div>
-
-                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'logcat' ? "flex" : "hidden")}>
-                        <LogcatSubTab key={`logcat-${session.deviceUdid}`} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} onNavigate={onNavigate} />
-                    </div>
-
-                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'dmesg' ? "flex" : "hidden")}>
-                        <DmesgSubTab key={`dmesg-${session.deviceUdid}`} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} onNavigate={onNavigate} />
-                    </div>
-
-                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'commands' ? "flex" : "hidden")}>
-                        <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />
-                    </div>
-
-                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'performance' ? "flex" : "hidden")}>
-                        <PerformanceSubTab
-                            selectedDevice={session.deviceUdid}
-                            {...performanceState}
-                            onRefresh={performanceState.fetchStats}
-                            isTestRunning={isTestRunning}
-                            allowActionsDuringTest={settings.allowActionsDuringTest}
-                            forceEnable={performanceState.forceEnable}
-                            setForceEnable={performanceState.setForceEnable}
-                            onNavigate={onNavigate}
-                        />
-                    </div>
-
-                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'apps' ? "flex" : "hidden")}>
-                        <AppsSubTab isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />
-                    </div>
-
-                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col", activeTool === 'hardware' ? "flex" : "hidden")}>
-                        <HardwareSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />
-                    </div>
-
-                    <div className={clsx("h-full flex-1 min-h-0 flex flex-col overflow-hidden bg-surface-variant/10 p-4", activeTool === 'webview' ? "flex" : "hidden")}>
-                        <DeviceViewport
-                            screenshot={webViewport.screenshot}
-                            loading={webViewport.loading}
-                            imgRef={webViewport.imgRef}
-                            imgLayout={webViewport.imgLayout}
-                            onImgLoad={(e) => {
-                                const img = e.currentTarget;
-                                webViewport.setImgLayout({
-                                    width: img.clientWidth,
-                                    height: img.clientHeight,
-                                    naturalWidth: img.naturalWidth,
-                                    naturalHeight: img.naturalHeight
-                                });
-                            }}
-                            hoveredNode={webViewport.hoveredNode}
-                            selectedNode={webViewport.selectedNode}
-                            taps={webViewport.taps}
-                            swipes={webViewport.swipes}
-                            onRefresh={(forceClear, targetWebUrl) => webViewport.refreshAll(true, forceClear, targetWebUrl)}
-                            handlers={webViewport.handlers}
-                            isWeb={true}
-                            maxHeight="100%"
-                            className="w-full h-full flex flex-col"
-                        />
-                    </div>
-                </div>
-            )}
+                );
+            })()}
         </div>
     );
 }
 
-
-function GridToolItem({ title, children, className, onHide, minimizeLabel, onMaximize, maximizeLabel }: { id: string, title: React.ReactNode, children: React.ReactNode, className?: string, onHide?: () => void, minimizeLabel?: string, onMaximize?: () => void, maximizeLabel?: string }) {
-    return (
-        <div className={clsx(
-            "flex flex-col border border-outline-variant/30 rounded-2xl bg-surface overflow-hidden shadow-sm transition-all duration-300 min-h-0",
-            className
-        )}>
-            <div className="flex items-center justify-between px-3 py-2 bg-surface/50 border-b border-outline-variant/30 shrink-0">
-                <span className="text-sm font-semibold text-on-surface-variant/80 flex items-center gap-2">
-                    {title}
-                </span>
-                <div className="flex items-center gap-1">
-                    {onMaximize && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={onMaximize}
-                            className="p-1 h-6 w-6 text-on-surface/80 hover:text-on-surface-variant/80 rounded"
-                            title={maximizeLabel || "Maximize"}
-                        >
-                            <Maximize2 size={14} />
-                        </Button>
-                    )}
-                    {onHide && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={onHide}
-                            className="p-1 h-6 w-6 text-on-surface/80 hover:text-on-surface-variant/80 rounded"
-                            title={minimizeLabel || "Minimize"}
-                        >
-                            <Minimize2 size={14} />
-                        </Button>
-                    )}
-                </div>
-            </div>
-            <div className="flex-1 min-h-0 relative">
-                {children}
-            </div>
-        </div>
-    );
-}
