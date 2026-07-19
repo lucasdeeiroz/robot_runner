@@ -128,7 +128,10 @@ macro_rules! generate_robot_runner_handler {
             crate::adb::dmesg::stop_dmesg,
             crate::adb::dmesg::is_dmesg_active,
             crate::adb::dmesg::get_dmesg_details,
-            crate::adb::dmesg::fetch_dmesg_buffer
+            crate::adb::dmesg::fetch_dmesg_buffer,
+            crate::env_setup::check_environment,
+            crate::env_setup::create_venv,
+            crate::env_setup::install_requirements
         ]
     };
 }

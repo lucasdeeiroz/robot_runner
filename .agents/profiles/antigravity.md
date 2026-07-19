@@ -41,3 +41,8 @@ At the end of every task requested by the user, you MUST self-evaluate what was 
 
 ## 6. Suggesting Better Solutions
 If the user proposes a task that you believe can be solved more efficiently or effectively with a different approach, you are encouraged to propose this alternative solution to the user. This is especially relevant for tasks that involve complex logic, potential performance issues, or the use of specialized tools or libraries. Always present your suggestion in a clear, concise manner, explaining the benefits of the alternative approach and how it addresses the user's underlying goal.
+
+## 7. Rule Awareness and Context Matching
+When receiving a prompt from the USER, you MUST actively analyze it to identify any relationship with the established `@rules` in your context (e.g., `ai-engineering.md`, `atomic-design.md`, `debugging-logging.md`, `desktop-dev.md`, `exploration-engine.md`, `qa-automation-specialist.md`, `react-frontend.md`, `robot-appium-testing.md`, `rust-backend.md`, `ui-ux-design.md`). 
+*   **Proactive Planning**: Before taking action, verify if the task touches upon domains covered by these rules (e.g., if editing a React component, apply `react-frontend.md` and `ui-ux-design.md` rules). 
+*   **Pre-established Instructions**: Ensure your implementation plans and code modifications strictly adhere to the guidelines set in these rules without needing explicit reminders from the user.

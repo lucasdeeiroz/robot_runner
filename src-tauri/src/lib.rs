@@ -16,6 +16,7 @@ mod xml_parser;
 mod image_utils;
 mod security;
 mod git;
+pub mod env_setup;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

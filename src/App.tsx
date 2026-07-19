@@ -12,6 +12,7 @@ import { Toaster } from "sonner";
 import "sonner/dist/styles.css";
 import { useSettings } from "./lib/settings";
 import { SystemCheckOverlay } from "./components/organisms/SystemCheckOverlay";
+import { EnvironmentManager } from "./components/organisms/EnvironmentManager";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Onboarding } from "./components/organisms/Onboarding";
 import "./App.css";
@@ -280,6 +281,7 @@ function AppContent() {
       <DeviceProvider>
         <SelectionProvider>
           <AnimatePresence>
+            <EnvironmentManager />
             {!settings.usageMode && (
               <Onboarding key="onboarding-flow" onComplete={() => {
                 // Trigger a manual check version after onboarding is complete

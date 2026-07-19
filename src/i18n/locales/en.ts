@@ -272,6 +272,8 @@ export const en = {
             }
         },
         common: {
+            skip: "Skip",
+            done: "Done",
             keep: "Keep",
             keep_all: "Keep All",
             clear_all: "Clear All",
@@ -330,7 +332,6 @@ export const en = {
             edit: "Edit",
             go_to_settings: "Go to Settings",
             ok: "OK",
-            done: "Done",
             search: "Search...",
             please_wait: "Please wait...",
             select: "Select...",
@@ -2128,6 +2129,16 @@ export const en = {
             logout_error: "Failed to sign out.",
             config_missing: "Cloud features are disabled or missing configuration (Check .env or GitHub Secrets).",
             terms_and_privacy: "By signing in, you agree to our Terms of Service and Privacy Policy."
+        },
+        env_setup: {
+            title: "Environment Setup",
+            missing_venv: "Virtual Environment Missing",
+            prompt_desc: "We detected requirements files in your project but no isolated virtual environment (.venv). Would you like to create one and install dependencies?",
+            install: "Create & Install",
+            logs: "Installation Logs",
+            success: "Environment setup completed successfully.",
+            failed: "Environment Setup Failed",
+            badge: "Dependencies"
         }
     }
 };

@@ -270,6 +270,8 @@ export const es = {
             }
         },
         common: {
+            skip: "Omitir",
+            done: "Hecho",
             keep: "Mantener",
             keep_all: "Mantener Todos",
             clear_all: "Borrar Todos",
@@ -327,7 +329,6 @@ export const es = {
             edit: "Editar",
             go_to_settings: "Ir a Configuración",
             ok: "Aceptar",
-            done: "Hecho",
             search: "Buscar...",
             loading: "Cargando...",
             please_wait: "Por favor, espere...",
@@ -2138,6 +2139,16 @@ export const es = {
             logout_error: "Error al cerrar sesión.",
             config_missing: "Funciones de nube deshabilitadas o falta configuración (Verifique .env o GitHub Secrets).",
             terms_and_privacy: "Al iniciar sesión, aceptas nuestros Términos de Servicio y Política de Privacidad."
+        },
+        env_setup: {
+            title: "Configuración del Entorno",
+            missing_venv: "Entorno Virtual Ausente",
+            prompt_desc: "Detectamos archivos de requirements en tu proyecto, pero no un entorno virtual aislado (.venv). ¿Deseas crear uno e instalar las dependencias?",
+            install: "Crear e Instalar",
+            logs: "Registros de Instalación",
+            success: "Entorno configurado exitosamente.",
+            failed: "Error en la Configuración del Entorno",
+            badge: "Dependencias"
         }
     }
 };

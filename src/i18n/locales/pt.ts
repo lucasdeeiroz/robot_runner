@@ -272,6 +272,8 @@ export const pt = {
             }
         },
         common: {
+            skip: "Pular",
+            done: "Concluído",
             keep: "Manter",
             keep_all: "Manter Todos",
             clear_all: "Limpar Todos",
@@ -330,7 +332,6 @@ export const pt = {
             edit: "Editar",
             go_to_settings: "Ir para Configurações",
             ok: "OK",
-            done: "Concluído",
             search: "Buscar...",
             loading: "Carregando...",
             please_wait: "Por favor, aguarde...",
@@ -2130,6 +2131,16 @@ export const pt = {
             logout_error: "Falha ao encerrar sessão.",
             config_missing: "Recursos de nuvem desabilitados ou configuração ausente (Verifique .env ou GitHub Secrets).",
             terms_and_privacy: "Ao entrar, você concorda com nossos Termos de Serviço e Política de Privacidade."
+        },
+        env_setup: {
+            title: "Configuração do Ambiente",
+            missing_venv: "Ambiente Virtual Ausente",
+            prompt_desc: "Detectamos arquivos de requirements no seu projeto, mas nenhum ambiente virtual isolado (.venv). Deseja criar um e instalar as dependências?",
+            install: "Criar & Instalar",
+            logs: "Logs de Instalação",
+            success: "Ambiente configurado com sucesso.",
+            failed: "Falha na Configuração do Ambiente",
+            badge: "Dependências"
         }
     }
 };

@@ -305,7 +305,14 @@ t.start()
         let _ = std::fs::write(metadata_path, json);
     }
 
-    let mut cmd = new_tokio_command("python");
+    let python_bin = if let Some(ref wd) = working_dir {
+        crate::env_setup::get_venv_python_path(std::path::Path::new(wd))
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| "python".to_string())
+    } else {
+        "python".to_string()
+    };
+    let mut cmd = new_tokio_command(&python_bin);
     
     // Inject the custom ADB path into the PATH environment variable so that 
     // Appium and other child processes use the configured ADB executable.
