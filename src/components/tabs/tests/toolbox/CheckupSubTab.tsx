@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { useSettings } from '@/lib/settings';
@@ -1269,6 +1269,41 @@ ${html}`;
         }
     };
 
+    const [leftPaneWidth, setLeftPaneWidth] = useState<number>(50);
+    const [isDragging, setIsDragging] = useState<boolean>(false);
+    
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const handlePointerDown = useCallback((e: React.PointerEvent) => {
+        setIsDragging(true);
+        e.preventDefault(); // prevent text selection while dragging
+    }, []);
+
+    useEffect(() => {
+        if (!isDragging) return;
+
+        const handlePointerMove = (e: PointerEvent) => {
+            if (!containerRef.current) return;
+            const containerRect = containerRef.current.getBoundingClientRect();
+            let newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+            // Clamping the width between 25% and 75%
+            newWidth = Math.max(25, Math.min(newWidth, 75));
+            setLeftPaneWidth(newWidth);
+        };
+
+        const handlePointerUp = () => {
+            setIsDragging(false);
+        };
+
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', handlePointerUp);
+
+        return () => {
+            window.removeEventListener('pointermove', handlePointerMove);
+            window.removeEventListener('pointerup', handlePointerUp);
+        };
+    }, [isDragging]);
+
     return (
         <div className="flex flex-col h-full overflow-hidden bg-surface p-4 gap-4">
 
@@ -1336,13 +1371,13 @@ ${html}`;
                         </div>
                     }
                 >
-                    <div className="flex-1 flex flex-col md:flex-row gap-4 w-full h-full min-h-[400px]">
+                    <div ref={containerRef} className={clsx("flex-1 flex flex-col md:flex-row gap-4 w-full h-full min-h-[400px]", isDragging && "select-none cursor-col-resize")} style={{ '--left-width': `${leftPaneWidth}%` } as React.CSSProperties}>
 
                         {/* Props Comparison Panel */}
                         <Section
                             title={t('toolbox.checkup.prop_compare', '.prop Compare')}
                             icon={FileText}
-                            className="flex-[2] min-w-[350px] flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
+                            className="flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden shrink-0 w-full md:w-[var(--left-width)]"
                             contentClassName="flex-1 flex flex-col min-h-0 pr-2"
                             actions={
                                 <>
@@ -1465,11 +1500,17 @@ ${html}`;
                             </div>
                         </Section>
 
+                        {/* Splitter Divider */}
+                        <div 
+                            className="hidden md:flex w-1 bg-outline-variant/30 hover:bg-primary/60 cursor-col-resize shrink-0 transition-colors z-10 shadow-[0_0_0_2px_transparent] hover:shadow-[0_0_0_2px_rgba(var(--color-primary),0.2)] self-stretch"
+                            onPointerDown={handlePointerDown}
+                        />
+
                         {/* Standard Checks Panel */}
                         <Section
                             title={t('toolbox.checkup.standard_checks', 'Standard Checklist')}
                             icon={ShieldCheck}
-                            className="flex-1 min-w-[280px] flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
+                            className="flex-1 flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
                             contentClassName="flex-1 overflow-y-auto pr-2 space-y-3 min-h-0"
                             actions={
                                 <Button
@@ -1533,7 +1574,7 @@ ${html}`;
                         <Section
                             title={t('toolbox.checkup.additional_checks', 'Additional Checks')}
                             icon={ListPlus}
-                            className="flex-1 min-w-[280px] flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
+                            className="flex-1 flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
                             contentClassName="flex-1 overflow-y-auto pr-2 space-y-3 min-h-0"
                             actions={
                                 <Button

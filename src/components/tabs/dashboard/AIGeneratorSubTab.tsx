@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Wand2, Eraser, FileDown, FileText, Copy, Trash2, AlertCircle, CheckCircle2, Settings, Briefcase, Server
@@ -419,10 +419,48 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
         { value: 'bug', label: t('dashboard.generator.types.bug', "Bug Report") },
     ];
 
+    const [leftPaneWidth, setLeftPaneWidth] = useState<number>(50);
+    const [isDragging, setIsDragging] = useState<boolean>(false);
+    
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const handlePointerDown = useCallback((e: React.PointerEvent) => {
+        setIsDragging(true);
+        e.preventDefault();
+    }, []);
+
+    useEffect(() => {
+        if (!isDragging) return;
+
+        const handlePointerMove = (e: PointerEvent) => {
+            if (!containerRef.current) return;
+            const containerRect = containerRef.current.getBoundingClientRect();
+            let newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+            newWidth = Math.max(25, Math.min(newWidth, 75));
+            setLeftPaneWidth(newWidth);
+        };
+
+        const handlePointerUp = () => {
+            setIsDragging(false);
+        };
+
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', handlePointerUp);
+
+        return () => {
+            window.removeEventListener('pointermove', handlePointerMove);
+            window.removeEventListener('pointerup', handlePointerUp);
+        };
+    }, [isDragging]);
+
     return (
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div 
+            ref={containerRef}
+            className={clsx("flex-1 min-h-0 flex flex-col lg:flex-row gap-4", isDragging && "select-none cursor-col-resize")}
+            style={{ '--left-width': `${leftPaneWidth}%` } as React.CSSProperties}
+        >
             {/* Input Panel */}
-            <div className="bg-surface-variant/10 rounded-2xl p-4 border border-outline-variant/30 flex flex-col min-h-0">
+            <div className="bg-surface-variant/10 rounded-2xl p-4 border border-outline-variant/30 flex flex-col min-h-0 shrink-0 w-full lg:w-[var(--left-width)]">
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider flex items-center gap-2">
                         <Wand2 size={16} />
@@ -517,8 +555,14 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
                 </div>
             </div>
 
+            {/* Splitter Divider */}
+            <div 
+                className="hidden lg:flex w-1 bg-outline-variant/30 hover:bg-primary/60 cursor-col-resize shrink-0 transition-colors z-10 shadow-[0_0_0_2px_transparent] hover:shadow-[0_0_0_2px_rgba(var(--color-primary),0.2)] self-stretch rounded-full"
+                onPointerDown={handlePointerDown}
+            />
+
             {/* Editor/Output Panel */}
-            <div className="bg-surface-variant/10 rounded-2xl p-4 border border-outline-variant/30 flex flex-col min-h-0">
+            <div className="bg-surface-variant/10 rounded-2xl p-4 border border-outline-variant/30 flex-1 flex flex-col min-h-0">
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider flex items-center gap-2">
                         <CheckCircle2 size={16} className={generatedContent ? "text-primary" : "text-on-surface-variant/30"} />

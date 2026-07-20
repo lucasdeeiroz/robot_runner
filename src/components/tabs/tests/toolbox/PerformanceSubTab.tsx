@@ -280,11 +280,13 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
     }
 
     return (
-        <div ref={containerRef} className="h-full flex-1 min-h-0 flex flex-col p-4 overflow-y-auto">
+        <div ref={containerRef} className="h-full flex-1 min-h-0 flex flex-col p-4 overflow-y-auto custom-scrollbar">
             <Section
                 title={t('performance.title')}
                 icon={Activity}
                 variant="transparent"
+                className="flex flex-col flex-1 min-h-0"
+                contentClassName="flex flex-col flex-1 min-h-0"
                 status={
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
@@ -434,7 +436,7 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
                         <p>{t('performance.loading')}</p>
                     </div>
                 ) : (
-                    <div className="space-y-6">
+                    <div className="flex flex-col flex-1 min-h-0 space-y-4">
                         {/* System Stats Section */}
                         <div>
                             <button
@@ -590,7 +592,7 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
                                 <span className="ml-1">{t('performance.battery_audit', 'Battery Audit')}</span>
                             </button>
                         </div>
-                        <div className={clsx("grid grid-cols-1 gap-4 animate-in fade-in duration-500", showProcessMonitor && showBatteryAudit && "lg:grid-cols-2")} >
+                        <div className={clsx("grid grid-cols-1 gap-4 animate-in fade-in duration-500 flex-1 min-h-0", showProcessMonitor && showBatteryAudit && "lg:grid-cols-2")} >
                             {/* Process Monitor */}
                             <div>
 

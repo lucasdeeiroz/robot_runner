@@ -1,6 +1,6 @@
 import { useSettings } from "@/lib/settings";
 import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles, FileJson, RefreshCcw, GitBranch, Link2, Briefcase, ChevronDown, FilePlus, Copy } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const Slack = ({ size = 18 }: { size?: number }) => (
@@ -253,6 +253,40 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
         observer.observe(containerRef.current);
         return () => observer.disconnect();
     }, []);
+
+    // Splitter state
+    const [leftPaneWidth, setLeftPaneWidth] = useState<number>(50);
+    const [isDragging, setIsDragging] = useState<boolean>(false);
+    const splitContainerRef = useRef<HTMLDivElement>(null);
+
+    const handlePointerDown = useCallback((e: React.PointerEvent) => {
+        setIsDragging(true);
+        e.preventDefault();
+    }, []);
+
+    useEffect(() => {
+        if (!isDragging) return;
+
+        const handlePointerMove = (e: PointerEvent) => {
+            if (!splitContainerRef.current) return;
+            const containerRect = splitContainerRef.current.getBoundingClientRect();
+            let newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+            newWidth = Math.max(25, Math.min(newWidth, 75));
+            setLeftPaneWidth(newWidth);
+        };
+
+        const handlePointerUp = () => {
+            setIsDragging(false);
+        };
+
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', handlePointerUp);
+
+        return () => {
+            window.removeEventListener('pointermove', handlePointerMove);
+            window.removeEventListener('pointerup', handlePointerUp);
+        };
+    }, [isDragging]);
 
     // Clear available models when provider changes
     useEffect(() => {
@@ -1312,10 +1346,15 @@ const parsed = JSON.parse(fileContent);
             </Modal>
 
             <div className="grid gap-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div 
+                    ref={splitContainerRef}
+                    className={clsx("flex flex-col md:flex-row gap-6", isDragging && "select-none cursor-col-resize")}
+                    style={{ '--left-width': `${leftPaneWidth}%` } as React.CSSProperties}
+                >
                     {/* Appium Server Config & Control */}
                     {showAppiumSection && (
-                        <Section
+                        <div className="shrink-0 w-full md:w-[var(--left-width)] flex flex-col min-h-0">
+                            <Section
                             title={t('settings.appium.title')}
                             icon={Server}
                             status={
@@ -1470,13 +1509,21 @@ const parsed = JSON.parse(fileContent);
                                 </div>
                             )}
                         </Section>
+                        </div>
+                    )}
+
+                    {showAppiumSection && (
+                        <div 
+                            className="hidden md:flex w-1 bg-outline-variant/30 hover:bg-primary/60 cursor-col-resize shrink-0 transition-colors z-10 shadow-[0_0_0_2px_transparent] hover:shadow-[0_0_0_2px_rgba(var(--color-primary),0.2)] self-stretch rounded-full"
+                            onPointerDown={handlePointerDown}
+                        />
                     )}
 
                     {/* Tool Options */}
-                    <Section
-                        title={t('settings.tools')}
-                        icon={Wrench}
-                        className={clsx(!showAppiumSection && "col-span-full")}
+                    <div className={clsx("flex flex-col min-h-0", !showAppiumSection ? "w-full" : "flex-1")}>
+                        <Section
+                            title={t('settings.tools')}
+                            icon={Wrench}
                         menus={
                             is_test_mode !== 'web' ? (
                                 <Button
@@ -1562,6 +1609,7 @@ const parsed = JSON.parse(fileContent);
                             )}
                         </div>
                     </Section>
+                    </div>
                 </div>
 
 

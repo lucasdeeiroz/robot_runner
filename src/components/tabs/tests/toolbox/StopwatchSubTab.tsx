@@ -280,13 +280,13 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
                                             className="flex-1"
                                         />
                                     </div>
-                                    <div className="flex-1 bg-white rounded-xl border border-outline-variant/30 flex flex-col relative min-h-[150px] overflow-hidden">
-                                        <div className="absolute top-2 left-2 text-[10px] text-black/40 font-mono select-none z-10 pointer-events-none">
+                                    <div className="bg-white rounded-xl border border-outline-variant/30 flex flex-col relative min-h-[150px] shrink-0 p-8 pt-12 items-center justify-start overflow-visible shadow-sm">
+                                        <div className="absolute top-2 left-2 text-[10px] text-black/40 font-mono select-none z-[100] pointer-events-none">
                                             {t('performance.stopwatch.scanner_visualizer', 'Virtual Code Visualizer')}
                                         </div>
-                                        <div className="absolute top-2 right-2 z-10">
-                                            <div className="flex items-center gap-1.5 bg-black/5 px-2 py-0.5 rounded-md pointer-events-auto shadow-sm">
-                                                <ZoomIn size={10} className="opacity-70" />
+                                        <div className="absolute top-2 right-2 z-[100]">
+                                            <div className="flex items-center gap-1.5 bg-black/10 hover:bg-black/20 transition-colors px-2 py-1 rounded-md pointer-events-auto shadow-sm backdrop-blur-md border border-black/10">
+                                                <ZoomIn size={12} className="text-black/70" />
                                                 <input 
                                                     type="range" 
                                                     min="0.5" max="3" step="0.1" 
@@ -296,21 +296,17 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
                                                 />
                                             </div>
                                         </div>
-                                        <div className="flex-1 overflow-auto custom-scrollbar p-8 pt-12">
-                                            <div className="min-w-full min-h-full flex items-center justify-center">
-                                                <div className="transition-all duration-100 ease-out">
-                                                    <BarcodeErrorBoundary>
-                                                        {symbology === 'QR' ? (
-                                                            <QRCodeSVG value={payload || ' '} size={160 * barcodeScale} />
-                                                        ) : (
-                                                            <Barcode value={payload || ' '} format={symbology as any} width={2 * barcodeScale} height={80 * barcodeScale} displayValue={true} background="#ffffff" lineColor="#000000" />
-                                                        )}
-                                                    </BarcodeErrorBoundary>
-                                                </div>
-                                            </div>
+                                        <div className="transition-all duration-100 ease-out z-10 flex justify-center w-full overflow-visible">
+                                            <BarcodeErrorBoundary>
+                                                {symbology === 'QR' ? (
+                                                    <QRCodeSVG value={payload || ' '} size={160 * barcodeScale} />
+                                                ) : (
+                                                    <Barcode value={payload || ' '} format={symbology as any} width={2 * barcodeScale} height={80 * barcodeScale} displayValue={true} background="#ffffff" lineColor="#000000" />
+                                                )}
+                                            </BarcodeErrorBoundary>
                                         </div>
                                     </div>
-                                    <div className="text-xs text-on-surface-variant/60 bg-surface-variant/10 p-3 rounded-lg border border-outline-variant/20 shrink-0">
+                                    <div className="text-xs text-on-surface-variant/60 bg-surface-variant/10 p-3 rounded-lg border border-outline-variant/20 shrink-0 mt-4">
                                         <p className="mb-2"><strong>{t('common.tip', 'Tip')}:</strong> {t('performance.stopwatch.scanner_tip1', 'Point the POS device at the screen. Make sure the stopwatch is running and the correct keywords are set in the right panel.')}</p>
                                         <p>{t('performance.stopwatch.scanner_tip2', 'The first captured keyword starts the timer (0ms). The next matches will show the exact hardware delta (<= 300ms GS1 requirement).')}</p>
                                     </div>
