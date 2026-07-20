@@ -1147,7 +1147,13 @@ export const es = {
                 clear: "Limpiar",
                 tip_keywords: "Usa las palabras clave para marcar eventos importantes en el Logcat.",
                 tip_delta: "El cronómetro calculará automáticamente el tiempo (Delta) entre el clic en el botón \"Iniciar\" y la aparición de cada palabra clave registrada en la lista de registros.",
-                saved: "¡Resultados del cronómetro guardados!"
+                saved: "¡Resultados del cronómetro guardados!",
+                standard_mode: "Estándar",
+                scanner_mode: "Validación de Escáner",
+                scanner_payload: "Contenido del código de barras...",
+                scanner_visualizer: "Visualizador de Código Virtual",
+                scanner_tip1: "Apunta el dispositivo POS hacia la pantalla. Asegúrate de que el cronómetro esté en marcha y que las palabras clave correctas estén configuradas en el panel derecho.",
+                scanner_tip2: "La primera palabra clave capturada inicia el temporizador (0ms). Las siguientes coincidencias mostrarán el delta de hardware exacto (<= 300ms requisito GS1)."
             },
             auto: "Auto",
             na: "N/D",

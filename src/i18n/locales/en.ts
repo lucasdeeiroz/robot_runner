@@ -1143,7 +1143,13 @@ export const en = {
                 clear: "Clear",
                 tip_keywords: "Use keywords to mark important events in Logcat.",
                 tip_delta: "The stopwatch will automatically calculate the time (Delta) between clicking the \"Start\" button and the appearance of each registered keyword in the log list.",
-                saved: "Stopwatch results saved!"
+                saved: "Stopwatch results saved!",
+                standard_mode: "Standard",
+                scanner_mode: "Scanner Validation",
+                scanner_payload: "Barcode content...",
+                scanner_visualizer: "Virtual Code Visualizer",
+                scanner_tip1: "Point the POS device at the screen. Make sure the stopwatch is running and the correct keywords are set in the right panel.",
+                scanner_tip2: "The first captured keyword starts the timer (0ms). The next matches will show the exact hardware delta (<= 300ms GS1 requirement)."
             },
             auto: "Auto",
             na: "N/A",
