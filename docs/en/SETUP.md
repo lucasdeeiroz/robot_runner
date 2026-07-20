@@ -34,7 +34,7 @@ After launching Robot Runner, navigate to the **Settings** tab to finalize your 
 - **Automation Root**: The "Root" of your project. This is critical for resolving relative paths in your suites (e.g., `Resource  ../resources/common.resource`).
 - **Reports Directory**: Where you want the test execution logs and reports to be saved.
 
-### 2. AI Providers (Optional)
+### 2. AI Providers (Optional but Highly Recommended)
 To use the AI Mapping and Generator features, you must provide an API Key for one of the following:
 - **Google Gemini**: [Get API Key](https://aistudio.google.com/app/apikey)
 - **OpenAI**: [Get API Key](https://platform.openai.com/api-keys)
