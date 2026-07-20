@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import Barcode from 'react-barcode';
 import { QRCodeSVG } from 'qrcode.react';
-import { Play, Square, Zap, Trash2, Timer, PackageIcon, Save, Download, Columns2, X, ScanLine } from "lucide-react";
+import { Play, Square, Zap, Trash2, Timer, PackageIcon, Save, Download, Columns2, X, ScanLine, ZoomIn } from "lucide-react";
+import clsx from "clsx";
 import { feedback } from "@/lib/feedback";
 import { useLogcatStopwatch } from "@/hooks/useLogcatStopwatch";
 import { Button } from "@/components/atoms/Button";
@@ -68,6 +69,42 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
     const [mode, setMode] = useState<'standard' | 'scanner'>('standard');
     const [symbology, setSymbology] = useState<string>('EAN13');
     const [payload, setPayload] = useState<string>('7891000315507');
+
+    const [barcodeScale, setBarcodeScale] = useState<number>(1.0);
+    const [leftPaneWidth, setLeftPaneWidth] = useState<number>(50);
+    const [isDragging, setIsDragging] = useState<boolean>(false);
+    
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const handlePointerDown = useCallback((e: React.PointerEvent) => {
+        setIsDragging(true);
+        e.preventDefault(); // prevent text selection while dragging
+    }, []);
+
+    useEffect(() => {
+        if (!isDragging) return;
+
+        const handlePointerMove = (e: PointerEvent) => {
+            if (!containerRef.current) return;
+            const containerRect = containerRef.current.getBoundingClientRect();
+            let newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+            // Clamping the width between 25% and 75%
+            newWidth = Math.max(25, Math.min(newWidth, 75));
+            setLeftPaneWidth(newWidth);
+        };
+
+        const handlePointerUp = () => {
+            setIsDragging(false);
+        };
+
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', handlePointerUp);
+
+        return () => {
+            window.removeEventListener('pointermove', handlePointerMove);
+            window.removeEventListener('pointerup', handlePointerUp);
+        };
+    }, [isDragging]);
 
 
     const {
@@ -197,63 +234,98 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
                     {t('performance.stopwatch.description', 'Record timestamp deltas for specific logcat events.')}
                 </div> */}
                 <div className="flex-1 min-h-0 bg-surface text-on-surface/80 font-mono text-xs relative border border-outline-variant/30 rounded-2xl">
-                    <div className="p-4 grid grid-cols-1 grid-rows-[auto_minmax(0,1fr)] xl:grid-cols-2 xl:grid-rows-1 gap-4 w-full h-full min-h-0">
-                        {mode === 'standard' ? (
-                            <div className="space-y-4">
-                                <TagInput
-                                    label={t('performance.stopwatch.keywords', 'Keywords')}
-                                    tags={keywords}
-                                    onChange={(newTags) => updateSetting('logcatKeywords', newTags)}
-                                    placeholder={t('performance.stopwatch.placeholder', 'Add logcat keyword (e.g. ActivityResume)')}
-                                    disabled={isActionDisabled}
-                                />
-                                <div className="text-xs text-on-surface-variant/60 bg-surface-variant/10 p-3 rounded-lg border border-outline-variant/20 mt-4">
-                                    <p className="mb-2"><strong>{t('common.tip', 'Tip')}:</strong> {t('performance.stopwatch.tip_keywords', 'Use keywords to mark important events in Logcat.')}</p>
-                                    <p>{t('performance.stopwatch.tip_delta', 'The stopwatch will automatically calculate the time (Delta) between clicking the "Start" button and the appearance of each registered keyword in the log list.')}</p>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="space-y-4 flex flex-col h-full min-h-0">
-                                <div className="flex gap-2">
-                                    <Select 
-                                        options={[
-                                            { label: 'EAN-13', value: 'EAN13' },
-                                            { label: 'EAN-8', value: 'EAN8' },
-                                            { label: 'ITF-14', value: 'ITF14' },
-                                            { label: 'CODE128', value: 'CODE128' },
-                                            { label: 'QR Code', value: 'QR' }
-                                        ]}
-                                        value={symbology}
-                                        onChange={(e) => setSymbology(e.target.value)}
-                                        containerClassName="w-32"
-                                    />
-                                    <Input 
-                                        value={payload}
-                                        onChange={(e) => setPayload(e.target.value)}
-                                        placeholder={t('performance.stopwatch.scanner_payload', 'Barcode content...')}
-                                        className="flex-1"
-                                    />
-                                </div>
-                                <div className="flex-1 bg-white rounded-xl border border-outline-variant/30 flex items-center justify-center p-8 overflow-hidden relative min-h-[150px]">
-                                    <div className="absolute top-2 left-2 text-[10px] text-black/40 font-mono select-none">
-                                        {t('performance.stopwatch.scanner_visualizer', 'Virtual Code Visualizer')}
-                                    </div>
-                                    <BarcodeErrorBoundary>
-                                        {symbology === 'QR' ? (
-                                            <QRCodeSVG value={payload || ' '} size={160} />
-                                        ) : (
-                                            <Barcode value={payload || ' '} format={symbology as any} width={2} height={80} displayValue={true} background="#ffffff" lineColor="#000000" />
-                                        )}
-                                    </BarcodeErrorBoundary>
-                                </div>
-                                <div className="text-xs text-on-surface-variant/60 bg-surface-variant/10 p-3 rounded-lg border border-outline-variant/20 shrink-0">
-                                    <p className="mb-2"><strong>{t('common.tip', 'Tip')}:</strong> {t('performance.stopwatch.scanner_tip1', 'Point the POS device at the screen. Make sure the stopwatch is running and the correct keywords are set in the right panel.')}</p>
-                                    <p>{t('performance.stopwatch.scanner_tip2', 'The first captured keyword starts the timer (0ms). The next matches will show the exact hardware delta (<= 300ms GS1 requirement).')}</p>
-                                </div>
-                            </div>
+                    <div 
+                        ref={containerRef}
+                        className={clsx(
+                            "flex flex-col xl:flex-row w-full h-full min-h-0 overflow-hidden",
+                            isDragging && "select-none cursor-col-resize"
                         )}
+                        style={{ '--left-width': `${leftPaneWidth}%` } as React.CSSProperties}
+                    >
+                        {/* Left Pane */}
+                        <div className="p-4 flex flex-col min-h-0 w-full xl:w-[var(--left-width)] shrink-0 overflow-y-auto custom-scrollbar">
+                            {mode === 'standard' ? (
+                                <div className="space-y-4">
+                                    <TagInput
+                                        label={t('performance.stopwatch.keywords', 'Keywords')}
+                                        tags={keywords}
+                                        onChange={(newTags) => updateSetting('logcatKeywords', newTags)}
+                                        placeholder={t('performance.stopwatch.placeholder', 'Add logcat keyword (e.g. ActivityResume)')}
+                                        disabled={isActionDisabled}
+                                    />
+                                    <div className="text-xs text-on-surface-variant/60 bg-surface-variant/10 p-3 rounded-lg border border-outline-variant/20 mt-4">
+                                        <p className="mb-2"><strong>{t('common.tip', 'Tip')}:</strong> {t('performance.stopwatch.tip_keywords', 'Use keywords to mark important events in Logcat.')}</p>
+                                        <p>{t('performance.stopwatch.tip_delta', 'The stopwatch will automatically calculate the time (Delta) between clicking the "Start" button and the appearance of each registered keyword in the log list.')}</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-4 flex flex-col h-full min-h-0">
+                                    <div className="flex gap-2 shrink-0">
+                                        <Select 
+                                            options={[
+                                                { label: 'EAN-13', value: 'EAN13' },
+                                                { label: 'EAN-8', value: 'EAN8' },
+                                                { label: 'ITF-14', value: 'ITF14' },
+                                                { label: 'CODE128', value: 'CODE128' },
+                                                { label: 'QR Code', value: 'QR' }
+                                            ]}
+                                            value={symbology}
+                                            onChange={(e) => setSymbology(e.target.value)}
+                                            containerClassName="w-32"
+                                        />
+                                        <Input 
+                                            value={payload}
+                                            onChange={(e) => setPayload(e.target.value)}
+                                            placeholder={t('performance.stopwatch.scanner_payload', 'Barcode content...')}
+                                            className="flex-1"
+                                        />
+                                    </div>
+                                    <div className="flex-1 bg-white rounded-xl border border-outline-variant/30 flex flex-col relative min-h-[150px] overflow-hidden">
+                                        <div className="absolute top-2 left-2 text-[10px] text-black/40 font-mono select-none z-10 pointer-events-none">
+                                            {t('performance.stopwatch.scanner_visualizer', 'Virtual Code Visualizer')}
+                                        </div>
+                                        <div className="absolute top-2 right-2 z-10">
+                                            <div className="flex items-center gap-1.5 bg-black/5 px-2 py-0.5 rounded-md pointer-events-auto shadow-sm">
+                                                <ZoomIn size={10} className="opacity-70" />
+                                                <input 
+                                                    type="range" 
+                                                    min="0.5" max="3" step="0.1" 
+                                                    value={barcodeScale} 
+                                                    onChange={(e) => setBarcodeScale(parseFloat(e.target.value))}
+                                                    className="w-16 h-1 bg-black/20 rounded-lg appearance-none cursor-pointer"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 overflow-auto custom-scrollbar p-8 pt-12">
+                                            <div className="min-w-full min-h-full flex items-center justify-center">
+                                                <div className="transition-all duration-100 ease-out">
+                                                    <BarcodeErrorBoundary>
+                                                        {symbology === 'QR' ? (
+                                                            <QRCodeSVG value={payload || ' '} size={160 * barcodeScale} />
+                                                        ) : (
+                                                            <Barcode value={payload || ' '} format={symbology as any} width={2 * barcodeScale} height={80 * barcodeScale} displayValue={true} background="#ffffff" lineColor="#000000" />
+                                                        )}
+                                                    </BarcodeErrorBoundary>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="text-xs text-on-surface-variant/60 bg-surface-variant/10 p-3 rounded-lg border border-outline-variant/20 shrink-0">
+                                        <p className="mb-2"><strong>{t('common.tip', 'Tip')}:</strong> {t('performance.stopwatch.scanner_tip1', 'Point the POS device at the screen. Make sure the stopwatch is running and the correct keywords are set in the right panel.')}</p>
+                                        <p>{t('performance.stopwatch.scanner_tip2', 'The first captured keyword starts the timer (0ms). The next matches will show the exact hardware delta (<= 300ms GS1 requirement).')}</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
 
-                        <div className="flex flex-col min-h-0 border-t xl:border-t-0 xl:border-l border-outline-variant/30 pt-6 xl:pt-0 xl:pl-4">
+                        {/* Splitter Divider */}
+                        <div 
+                            className="hidden xl:flex w-1 bg-outline-variant/30 hover:bg-primary/60 cursor-col-resize shrink-0 transition-colors z-10 shadow-[0_0_0_2px_transparent] hover:shadow-[0_0_0_2px_rgba(var(--color-primary),0.2)]"
+                            onPointerDown={handlePointerDown}
+                        />
+
+                        {/* Right Pane */}
+                        <div className="p-4 flex flex-col min-h-0 flex-1 border-t xl:border-t-0 xl:border-l xl:border-transparent border-outline-variant/30 overflow-hidden">
                             <div className="flex justify-between items-center mb-4 shrink-0">
                                 <div className="flex items-center gap-4">
                                     <span className="text-sm font-medium opacity-80 flex items-center gap-2">
