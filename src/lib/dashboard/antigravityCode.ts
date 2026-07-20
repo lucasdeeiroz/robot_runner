@@ -108,9 +108,10 @@ export async function askAntigravityCli(
 
     try {
         if (fullPrompt.length > 7000) {
-            tempFilePath = await join(projectRoot, '.rr_prompt.tmp');
+            const uniqueFilename = `.rr_context_${Date.now()}.txt`;
+            tempFilePath = await join(projectRoot, uniqueFilename);
             await invoke('fs_write_text_file', { path: tempFilePath, content: fullPrompt });
-            promptToPass = "Read the file .rr_prompt.tmp for your full instructions and history. Execute the request.";
+            promptToPass = `Please read the file at "${tempFilePath}" and fulfill the request described inside. This file contains the logs and my full instructions.`;
         }
 
         const cleanBase64 = options?.imageBase64?.includes('base64,') 

@@ -67,7 +67,7 @@ export async function askClaudeCode(
         : "\n\nIMPORTANT: Respond ONLY with the requested format. Do NOT include greetings, pleasantries, or introductory text.";
 
     let fullPrompt = systemInstruction
-        ? `SYSTEM_INSTRUCTIONS:\n${systemInstruction}${formatReminder}\n\nUSER_REQUEST:\n${prompt}`
+        ? `<role_instructions>\n${systemInstruction}${formatReminder}\n</role_instructions>\n\n<task_data>\n${prompt}\n</task_data>`
         : prompt + formatReminder;
 
     let tempFilePath: string | null = null;
@@ -75,12 +75,10 @@ export async function askClaudeCode(
 
     try {
         if (fullPrompt.length > 7000) {
-            const { tempDir } = await import('@tauri-apps/api/path');
-            const osTemp = await tempDir();
-            const uniqueFilename = `.rr_prompt_${Date.now()}.tmp`;
-            tempFilePath = await join(osTemp, uniqueFilename);
+            const uniqueFilename = `.rr_context_${Date.now()}.txt`;
+            tempFilePath = await join(projectRoot, uniqueFilename);
             await invoke('fs_write_text_file', { path: tempFilePath, content: fullPrompt });
-            promptToPass = `Read the file at absolute path "${tempFilePath}" for your full instructions and history. Execute the request.`;
+            promptToPass = `Please read the file at "${tempFilePath}" and fulfill the request described inside. This file contains the logs and my full instructions.`;
         }
 
         const cleanBase64 = options?.imageBase64?.includes('base64,') 
