@@ -454,6 +454,7 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
                                     { label: 'French (FR)', value: 'fr-FR' },
                                     { label: 'German (DE)', value: 'de-DE' }
                                 ]}
+                                dropdownPosition="top"
                             />
                             <Button variant="primary" onClick={applyLocale} disabled={disabled}>
                                 {t('toolbox.hardware.locale.apply', 'Apply')}
@@ -473,6 +474,7 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
                             onChange={(e) => setTargetPackage(e.target.value)}
                             disabled={disabled || appPackages.length === 0}
                             options={appPackages.map(pkg => ({ label: pkg, value: pkg }))}
+                            dropdownPosition="top"
                         />
                         <div className="grid grid-cols-2 gap-4">
                             <div className="flex items-center gap-2"><Camera size={16} /> {t('toolbox.hardware.permission.camera', 'Camera')}</div>

@@ -197,7 +197,7 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
                     {t('performance.stopwatch.description', 'Record timestamp deltas for specific logcat events.')}
                 </div> */}
                 <div className="flex-1 min-h-0 bg-surface text-on-surface/80 font-mono text-xs relative border border-outline-variant/30 rounded-2xl">
-                    <div className="p-4 grid grid-cols-1 xl:grid-cols-2 gap-4 w-full h-full min-h-0">
+                    <div className="p-4 grid grid-cols-1 grid-rows-[auto_minmax(0,1fr)] xl:grid-cols-2 xl:grid-rows-1 gap-4 w-full h-full min-h-0">
                         {mode === 'standard' ? (
                             <div className="space-y-4">
                                 <TagInput
