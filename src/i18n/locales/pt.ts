@@ -1150,8 +1150,8 @@ export const pt = {
                 scanner_mode: "Validação de Scanner",
                 scanner_payload: "Conteúdo do código de barras...",
                 scanner_visualizer: "Visualizador de Código Virtual",
-                scanner_tip1: "Aponte o dispositivo POS para a tela. Certifique-se de que o cronômetro esteja rodando e as keywords corretas estejam configuradas no painel lateral.",
-                scanner_tip2: "A primeira keyword capturada inicia o timer (0ms). As próximas correspondências mostrarão o delta exato de hardware (<= 300ms exigência GS1)."
+                scanner_tip1: "Aponte o dispositivo para a tela. Certifique-se de que o cronômetro esteja rodando e as keywords corretas estejam configuradas no painel lateral.",
+                scanner_tip2: "A primeira keyword capturada inicia o timer (0ms). As próximas correspondências mostrarão o delta exato de hardware."
             },
             auto: "Auto",
             na: "N/D",

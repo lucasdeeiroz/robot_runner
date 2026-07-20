@@ -1148,8 +1148,8 @@ export const en = {
                 scanner_mode: "Scanner Validation",
                 scanner_payload: "Barcode content...",
                 scanner_visualizer: "Virtual Code Visualizer",
-                scanner_tip1: "Point the POS device at the screen. Make sure the stopwatch is running and the correct keywords are set in the right panel.",
-                scanner_tip2: "The first captured keyword starts the timer (0ms). The next matches will show the exact hardware delta (<= 300ms GS1 requirement)."
+                scanner_tip1: "Point the device at the screen. Make sure the stopwatch is running and the correct keywords are set in the right panel.",
+                scanner_tip2: "The first captured keyword starts the timer (0ms). The next matches will show the exact hardware delta."
             },
             auto: "Auto",
             na: "N/A",

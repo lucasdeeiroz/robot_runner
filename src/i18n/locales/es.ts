@@ -1152,8 +1152,8 @@ export const es = {
                 scanner_mode: "Validación de Escáner",
                 scanner_payload: "Contenido del código de barras...",
                 scanner_visualizer: "Visualizador de Código Virtual",
-                scanner_tip1: "Apunta el dispositivo POS hacia la pantalla. Asegúrate de que el cronómetro esté en marcha y que las palabras clave correctas estén configuradas en el panel derecho.",
-                scanner_tip2: "La primera palabra clave capturada inicia el temporizador (0ms). Las siguientes coincidencias mostrarán el delta de hardware exacto (<= 300ms requisito GS1)."
+                scanner_tip1: "Apunta el dispositivo hacia la pantalla. Asegúrate de que el cronómetro esté en marcha y que las palabras clave correctas estén configuradas en el panel derecho.",
+                scanner_tip2: "La primera palabra clave capturada inicia el temporizador (0ms). Las siguientes coincidencias mostrarán el delta de hardware exacto."
             },
             auto: "Auto",
             na: "N/D",
@@ -1866,7 +1866,7 @@ export const es = {
                     rev_landscape: "Paisaje Inv."
                 },
                 broadcast: {
-                title: "Broadcasts del Sistema",
+                    title: "Broadcasts del Sistema",
                     intent_action: "Acción (Intent Action)",
                     extras: "Extras (Opcional)",
                     send: "Enviar Broadcast",
