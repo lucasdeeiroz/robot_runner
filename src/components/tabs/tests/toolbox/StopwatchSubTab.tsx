@@ -179,6 +179,7 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
                 icon={Timer}
                 variant="transparent"
                 className="flex-1 min-h-0 flex flex-col"
+                contentClassName="flex-1 min-h-0 flex flex-col"
                 warning={isActionDisabled ? t('common.actions_disabled_during_test') : undefined}
                 actions={
                     <div className="flex gap-2 items-center">
@@ -361,7 +362,7 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
                                     {t('performance.stopwatch.waiting', 'Waiting for keywords in Logcat... (Make sure Logcat is running)')}
                                 </div>
                             ) : (
-                                <div className="flex-1 overflow-y-auto border border-outline-variant/30 rounded-xl custom-scrollbar bg-surface-variant/5">
+                                <div className="flex-1 min-h-0 overflow-y-auto border border-outline-variant/30 rounded-xl custom-scrollbar bg-surface-variant/5">
                                     <table className="w-full text-xs text-left">
                                         <thead className="bg-surface-variant/50 sticky top-0 backdrop-blur-sm z-10">
                                             <tr>
