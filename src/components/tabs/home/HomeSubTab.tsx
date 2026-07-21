@@ -407,7 +407,7 @@ export function HomeSubTab({ onNavigate }: HomeSubTabProps) {
 
             {/* Stats/History Section */}
             <AnimatePresence>
-                {showHomeStats && (
+                {showHomeStats && settings.usageMode !== 'explorer' && (
                     <motion.section
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}

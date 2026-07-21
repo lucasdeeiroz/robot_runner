@@ -88,13 +88,13 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
     const navItems = useMemo(() => [
         { id: 'home', label: t('sidebar.home'), icon: Home },
-        { id: 'run', label: t('sidebar.run'), icon: PlayCircle },
+        ...(settings.usageMode !== 'explorer' ? [{ id: 'run', label: t('sidebar.run'), icon: PlayCircle }] : []),
         {
             id: 'tests',
             label: settings.usageMode === 'explorer' ? t('sidebar.toolbox') : t('sidebar.tests'),
             icon: settings.usageMode === 'explorer' ? Wrench : FileText
         },
-        { id: 'dashboard', label: t('sidebar.dashboard'), icon: LayoutDashboard }, // Dashboard Button
+        ...(settings.usageMode !== 'explorer' ? [{ id: 'dashboard', label: t('sidebar.dashboard'), icon: LayoutDashboard }] : []),
         { id: 'settings', label: t('sidebar.settings'), icon: Settings },
         { id: 'about', label: t('sidebar.about'), icon: Info },
     ], [t, settings.usageMode]);
