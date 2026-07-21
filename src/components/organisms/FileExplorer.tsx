@@ -31,6 +31,7 @@ interface FileExplorerProps {
     isMultiSelect?: boolean;
     fallbackType?: 'tests' | 'suites';
     onNavigate?: (page: string) => void;
+    onPathChange?: (path: string) => void;
 }
 
 export function FileExplorer({
@@ -44,13 +45,20 @@ export function FileExplorer({
     renderEntryExtra,
     isMultiSelect = true,
     fallbackType,
-    onNavigate
+    onNavigate,
+    onPathChange
 }: FileExplorerProps) {
     const { t } = useTranslation();
     const { toggleItem, isSelected: checkIsSelected } = useSelection();
     const { settings, updateSetting } = useSettings();
     const rootPath = settings.paths.automationRoot;
     const [currentPath, setCurrentPath] = useState(initialPath);
+
+    useEffect(() => {
+        if (onPathChange && currentPath) {
+            onPathChange(currentPath);
+        }
+    }, [currentPath, onPathChange]);
     const [entries, setEntries] = useState<FileEntry[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);

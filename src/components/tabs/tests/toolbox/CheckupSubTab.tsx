@@ -53,12 +53,23 @@ interface PackageInfo {
     is_disabled: boolean;
 }
 
+interface CheckupCacheEntry {
+    comparisons: PropComparison[];
+    devicePropsCache: Record<string, string>;
+    checkResults: Record<string, any>;
+    additionalCheckResults: Record<string, any>;
+    packageComparisons: PackageComparison[];
+}
+const checkupCacheMap = new Map<string, CheckupCacheEntry>();
+
 export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDuringTest }: CheckupSubTabProps) => {
     const { t } = useTranslation();
     const { settings } = useSettings();
+    const cachedCheckup = selectedDevice ? checkupCacheMap.get(selectedDevice) : undefined;
+
     const [isLoading, setIsLoading] = useState(false);
-    const [comparisons, setComparisons] = useState<PropComparison[]>([]);
-    const [devicePropsCache, setDevicePropsCache] = useState<Record<string, string>>({});
+    const [comparisons, setComparisons] = useState<PropComparison[]>(() => cachedCheckup?.comparisons ?? []);
+    const [devicePropsCache, setDevicePropsCache] = useState<Record<string, string>>(() => cachedCheckup?.devicePropsCache ?? {});
     const [filterDivergent, setFilterDivergent] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -134,10 +145,23 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     ]);
 
     // Standard checks based on POS Checklist
-    const [checkResults, setCheckResults] = useState<Record<string, { status: 'idle' | 'running' | 'correct' | 'incorrect', found?: string, goldenExpected?: string, isGoldenMatch?: boolean }>>({});
+    const [checkResults, setCheckResults] = useState<Record<string, { status: 'idle' | 'running' | 'correct' | 'incorrect', found?: string, goldenExpected?: string, isGoldenMatch?: boolean }>>(() => cachedCheckup?.checkResults ?? {});
 
-    const [additionalCheckResults, setAdditionalCheckResults] = useState<Record<string, { status: 'idle' | 'running' | 'done', found?: string, goldenExpected?: string, isGoldenMatch?: boolean }>>({});
-    const [packageComparisons, setPackageComparisons] = useState<PackageComparison[]>([]);
+    const [additionalCheckResults, setAdditionalCheckResults] = useState<Record<string, { status: 'idle' | 'running' | 'done', found?: string, goldenExpected?: string, isGoldenMatch?: boolean }>>(() => cachedCheckup?.additionalCheckResults ?? {});
+    const [packageComparisons, setPackageComparisons] = useState<PackageComparison[]>(() => cachedCheckup?.packageComparisons ?? []);
+
+    // Sync cache on change
+    useEffect(() => {
+        if (selectedDevice) {
+            checkupCacheMap.set(selectedDevice, {
+                comparisons,
+                devicePropsCache,
+                checkResults,
+                additionalCheckResults,
+                packageComparisons
+            });
+        }
+    }, [selectedDevice, comparisons, devicePropsCache, checkResults, additionalCheckResults, packageComparisons]);
 
     const standardChecksBase = useMemo(() => [
         {

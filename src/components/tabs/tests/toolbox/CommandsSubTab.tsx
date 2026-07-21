@@ -22,10 +22,20 @@ interface SavedCommand {
     cmd: string;
 }
 
+const commandsCacheMap = new Map<string, string[]>();
+
 export function CommandsSubTab({ selectedDevice, isTestRunning = false, allowActionsDuringTest = false }: CommandsSubTabProps) {
     const { t } = useTranslation();
+    const cachedHistory = selectedDevice ? commandsCacheMap.get(selectedDevice) : undefined;
     const [command, setCommand] = useState("");
-    const [history, setHistory] = useState<string[]>([]);
+    const [history, setHistory] = useState<string[]>(() => cachedHistory ?? []);
+
+    // Sync cache on history change
+    useEffect(() => {
+        if (selectedDevice) {
+            commandsCacheMap.set(selectedDevice, history);
+        }
+    }, [selectedDevice, history]);
     const [isExecuting, setIsExecuting] = useState(false);
     const [savedCommands, setSavedCommands] = useState<SavedCommand[]>([]);
     const [currentCmdId, setCurrentCmdId] = useState<string | null>(null);

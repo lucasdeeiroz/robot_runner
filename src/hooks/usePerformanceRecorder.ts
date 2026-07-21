@@ -28,6 +28,17 @@ export interface DeviceStats {
 
 
 
+interface PerformanceCacheEntry {
+    stats: DeviceStats | null;
+    history: (DeviceStats & { timestamp: number })[];
+    selectedPackage: string;
+    isRecording: boolean;
+    recordingStartTime: number | null;
+    forceEnable: boolean;
+}
+
+const performanceCacheMap = new Map<string, PerformanceCacheEntry>();
+
 export function usePerformanceRecorder(
     selectedDevice: string,
     isActive: boolean,
@@ -37,19 +48,33 @@ export function usePerformanceRecorder(
 ) {
     const { t } = useTranslation();
     const { settings, updateSetting } = useSettings();
-    const [stats, setStats] = useState<DeviceStats | null>(null);
-    const [history, setHistory] = useState<(DeviceStats & { timestamp: number })[]>([]);
+    const cached = selectedDevice ? performanceCacheMap.get(selectedDevice) : undefined;
+
+    const [stats, setStats] = useState<DeviceStats | null>(() => cached?.stats ?? null);
+    const [history, setHistory] = useState<(DeviceStats & { timestamp: number })[]>(() => cached?.history ?? []);
     const [error, setError] = useState<string | null>(null);
     const [autoRefresh, setAutoRefresh] = useState(initialAutoRefresh);
-    const [selectedPackage, setSelectedPackage] = useState<string>(settings?.logcatSelectedPackage || "");
+    const [selectedPackage, setSelectedPackage] = useState<string>(() => cached?.selectedPackage ?? (settings?.logcatSelectedPackage || ""));
     const [isLoading, setIsLoading] = useState(false);
-    const [forceEnable, setForceEnable] = useState(false);
-
-
+    const [forceEnable, setForceEnable] = useState(() => cached?.forceEnable ?? false);
 
     // Recording State
-    const [isRecording, setIsRecording] = useState(false);
-    const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
+    const [isRecording, setIsRecording] = useState(() => cached?.isRecording ?? false);
+    const [recordingStartTime, setRecordingStartTime] = useState<number | null>(() => cached?.recordingStartTime ?? null);
+
+    // Sync cache
+    useEffect(() => {
+        if (selectedDevice) {
+            performanceCacheMap.set(selectedDevice, {
+                stats,
+                history,
+                selectedPackage,
+                isRecording,
+                recordingStartTime,
+                forceEnable
+            });
+        }
+    }, [selectedDevice, stats, history, selectedPackage, isRecording, recordingStartTime, forceEnable]);
 
 
     const { saveFile, lastSavedPath: lastSaved, clearFeedback } = useFileSave({
@@ -101,7 +126,7 @@ export function usePerformanceRecorder(
             ((autoRefresh && isActive) || isRecording) &&
             (!isTestRunning || canUpdateDuringTest);
 
-        const pollInterval = (isTestRunning && forceEnable) ? 5000 : 2000;
+        const pollInterval = (isTestRunning && forceEnable) ? 5000 : 3000;
 
         if (shouldUpdate) {
             // First fetch immediately for responsive UI

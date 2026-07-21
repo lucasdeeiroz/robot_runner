@@ -34,20 +34,40 @@ interface LogEntry {
     text: string;
 }
 
+const logcatCacheMap = new Map<string, { logs: LogEntry[]; nextId: number; isStreaming: boolean; dumpFile: string | null }>();
+
 export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActionsDuringTest = false, onNavigate, onPairWithConsole }: LogcatSubTabProps) {
     const { t, i18n } = useTranslation();
-    const [isStreaming, setIsStreaming] = useState(false);
-    const [logs, setLogs] = useState<LogEntry[]>([]);
-    const nextLogId = useRef(1);
+    const cachedState = logcatCacheMap.get(selectedDevice);
+
+    const [isStreaming, setIsStreaming] = useState(() => cachedState?.isStreaming ?? false);
+    const [logs, setLogs] = useState<LogEntry[]>(() => cachedState?.logs ?? []);
+    const nextLogId = useRef(cachedState?.nextId ?? 1);
     const virtuosoRef = useRef<VirtuosoHandle>(null);
     const { settings, updateSetting } = useSettings();
-    const [currentDumpFile, setCurrentDumpFile] = useState<string | null>(null);
+    const [currentDumpFile, setCurrentDumpFile] = useState<string | null>(() => cachedState?.dumpFile ?? null);
     const [clearBeforeStart, setClearBeforeStart] = useState(false);
+    const prevDeviceRef = useRef(selectedDevice);
 
     const handleClearLogs = () => {
         setLogs([]);
         nextLogId.current = 1;
+        if (selectedDevice) {
+            logcatCacheMap.delete(selectedDevice);
+        }
     };
+
+    // Keep cache synchronized
+    useEffect(() => {
+        if (selectedDevice) {
+            logcatCacheMap.set(selectedDevice, {
+                logs,
+                nextId: nextLogId.current,
+                isStreaming,
+                dumpFile: currentDumpFile
+            });
+        }
+    }, [selectedDevice, logs, isStreaming, currentDumpFile]);
 
     const handleConfigurePath = async () => {
         const selected = await open({
@@ -86,17 +106,13 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
         return () => observer.disconnect();
     }, []);
 
+    // Check status on mount or device change
     useEffect(() => {
-        return () => {
-            if (isStreaming && selectedDevice) {
-                stopLogcat();
-            }
-        };
-    }, [selectedDevice]);
+        if (prevDeviceRef.current !== selectedDevice) {
+            prevDeviceRef.current = selectedDevice;
+            handleClearLogs();
+        }
 
-    // Check status on mount
-    useEffect(() => {
-        handleClearLogs(); // Explicitly clear logs when device changes (or mounts)
         if (selectedDevice) {
             // Restore state
             invoke<{ is_active: boolean, output_file: string | null }>('get_logcat_details', { device: selectedDevice, sessionId: "logcat_tab" })
@@ -135,15 +151,31 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
                 feedback.toast.error("logcat.errors.fetch_failed", e);
             });
 
+            let pendingBuffer: string[] = [];
+            let flushTimer: NodeJS.Timeout | null = null;
+
+            const flushLogs = () => {
+                if (pendingBuffer.length === 0) return;
+                const toFlush = pendingBuffer;
+                pendingBuffer = [];
+                setLogs(prev => {
+                    const newEntries = toFlush.map(line => ({ id: nextLogId.current++, text: line }));
+                    const updated = [...prev, ...newEntries];
+                    if (updated.length > 5000) return updated.slice(-5000);
+                    return updated;
+                });
+            };
+
             // Listen for new chunks
             listen<{ device: string, session_id: string, lines: string[] }>('logcat-data', (event) => {
                 if (event.payload.device === selectedDevice && event.payload.session_id === "logcat_tab") {
-                    setLogs(prev => {
-                        const newEntries = event.payload.lines.map(line => ({ id: nextLogId.current++, text: line }));
-                        const updated = [...prev, ...newEntries];
-                        if (updated.length > 5000) return updated.slice(-5000);
-                        return updated;
-                    });
+                    pendingBuffer.push(...event.payload.lines);
+                    if (!flushTimer) {
+                        flushTimer = setTimeout(() => {
+                            flushTimer = null;
+                            flushLogs();
+                        }, 100);
+                    }
                 }
             }).then(un => {
                 if (isSubscribed) {

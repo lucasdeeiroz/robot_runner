@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Map, Sparkles, ScanEye, Play, PlayCircle } from "lucide-react";
 import { PageHeader } from "@/components/organisms/PageHeader";
-import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import { TestsSubTab } from "@/components/tabs/run/TestsSubTab";
 import { InspectorSubTab } from "@/components/tabs/run/InspectorSubTab";
@@ -166,30 +165,36 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
 
             {/* Main Content Area */}
             <div className="flex-1 min-h-0 bg-surface p-4 relative z-10 rounded-2xl border border-outline-variant/30 flex flex-col">
-                {settings.usageMode !== 'explorer' && (
-                    <div className={clsx("h-full flex-1 min-h-0", activeTab === 'tests' ? "flex flex-col" : "hidden")}>
+                {settings.usageMode !== 'explorer' && activeTab === 'tests' && (
+                    <div className="h-full flex-1 min-h-0 flex flex-col">
                         <TestsSubTab selectedDevices={selectedDevices} devices={devices} onNavigate={onNavigate} />
                     </div>
                 )}
 
-                <div className={clsx("h-full flex-1 min-h-0", activeTab === 'inspector' ? "flex flex-col" : "hidden")}>
-                    <InspectorSubTab
-                        selectedDevice={selectedDevices[0] || ""}
-                        isActive={activeTab === 'inspector'}
-                        isTestRunning={selectedDevices[0] ? busyDeviceIds.includes(selectedDevices[0]) : false}
-                    />
-                </div>
+                {activeTab === 'inspector' && (
+                    <div className="h-full flex-1 min-h-0 flex flex-col">
+                        <InspectorSubTab
+                            selectedDevice={selectedDevices[0] || ""}
+                            isActive={true}
+                            isTestRunning={selectedDevices[0] ? busyDeviceIds.includes(selectedDevices[0]) : false}
+                        />
+                    </div>
+                )}
 
-                <div className={clsx("h-full flex-1 min-h-0", activeTab === 'mapper' ? "flex flex-col" : "hidden")}>
-                    <MapperSubTab
-                        isActive={activeTab === 'mapper'}
-                        selectedDeviceId={selectedDevices[0] || null}
-                    />
-                </div>
+                {activeTab === 'mapper' && (
+                    <div className="h-full flex-1 min-h-0 flex flex-col">
+                        <MapperSubTab
+                            isActive={true}
+                            selectedDeviceId={selectedDevices[0] || null}
+                        />
+                    </div>
+                )}
 
-                <div className={clsx("h-full flex-1 min-h-0", activeTab === 'ai_generator' ? "flex flex-col" : "hidden")}>
-                    <AIGeneratorSubTab onNavigate={onNavigate} />
-                </div>
+                {activeTab === 'ai_generator' && (
+                    <div className="h-full flex-1 min-h-0 flex flex-col">
+                        <AIGeneratorSubTab onNavigate={onNavigate} />
+                    </div>
+                )}
             </div>
         </div >
     );

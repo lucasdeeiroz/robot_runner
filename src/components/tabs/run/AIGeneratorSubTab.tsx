@@ -29,15 +29,35 @@ interface AIGeneratorSubTabProps {
     onNavigate?: (page: string) => void;
 }
 
+interface AIGeneratorCacheEntry {
+    requirements: string;
+    generatedContent: string;
+    genType: AIGenerationType;
+    useMapping: boolean;
+}
+const aiGeneratorCacheMap = new Map<string, AIGeneratorCacheEntry>();
+
 export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
     const { t, i18n } = useTranslation();
     const { settings, activeProfileId } = useSettings();
+    const cacheKey = activeProfileId || 'default';
+    const cachedAi = aiGeneratorCacheMap.get(cacheKey);
 
-    const [requirements, setRequirements] = useState('');
-    const [generatedContent, setGeneratedContent] = useState('');
-    const [genType, setGenType] = useState<AIGenerationType>('test_case');
-    const [useMapping, setUseMapping] = useState(true);
+    const [requirements, setRequirements] = useState(() => cachedAi?.requirements ?? '');
+    const [generatedContent, setGeneratedContent] = useState(() => cachedAi?.generatedContent ?? '');
+    const [genType, setGenType] = useState<AIGenerationType>(() => cachedAi?.genType ?? 'test_case');
+    const [useMapping, setUseMapping] = useState(() => cachedAi?.useMapping ?? true);
     const [isGenerating, setIsGenerating] = useState(false);
+
+    // Sync cache
+    useEffect(() => {
+        aiGeneratorCacheMap.set(cacheKey, {
+            requirements,
+            generatedContent,
+            genType,
+            useMapping
+        });
+    }, [cacheKey, requirements, generatedContent, genType, useMapping]);
 
     const [isExportingJira, setIsExportingJira] = useState(false);
     const [isExportingAzure, setIsExportingAzure] = useState(false);

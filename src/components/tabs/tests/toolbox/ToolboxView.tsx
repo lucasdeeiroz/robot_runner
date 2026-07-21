@@ -632,69 +632,73 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                             !isGridView && "h-full flex flex-col",
                                             !isGridView && tool === 'webview' && "bg-surface-variant/10 p-4 overflow-hidden"
                                         )}>
-                                            {tool === 'console' && (
-                                                <RunConsole
-                                                    key={`console-${session.runId}-${session.sessionEpoch}`}
-                                                    runId={session.runId}
-                                                    logs={session.logs}
-                                                    isSessionRunning={session.status === 'running' || session.status === 'stopping'}
-                                                    testPath={session.testPath}
-                                                    onPairWithTool={(tool) => handlePairWithConsole(tool)}
-                                                />
-                                            )}
-                                            {tool === 'logcat' && <LogcatSubTab key={`logcat-${session.deviceUdid}`} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} onNavigate={onNavigate} onPairWithConsole={session.type === 'test' ? () => handlePairWithConsole('logcat') : undefined} />}
-                                            {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
-                                            {tool === 'performance' && (
-                                                <PerformanceSubTab
-                                                    selectedDevice={session.deviceUdid}
-                                                    {...performanceState}
-                                                    onRefresh={performanceState.fetchStats}
-                                                    isTestRunning={isTestRunning}
-                                                    allowActionsDuringTest={settings.allowActionsDuringTest}
-                                                    forceEnable={performanceState.forceEnable}
-                                                    setForceEnable={performanceState.setForceEnable}
-                                                    onNavigate={onNavigate}
-                                                    onPairWithConsole={session.type === 'test' ? () => handlePairWithConsole('performance') : undefined}
-                                                />
-                                            )}
-                                            {tool === 'stopwatch' && (
-                                                <StopwatchSubTab
-                                                    selectedDevice={session.deviceUdid}
-                                                    isTestRunning={isTestRunning}
-                                                    allowActionsDuringTest={settings.allowActionsDuringTest}
-                                                    onPairWithConsole={session.type === 'test' ? () => handlePairWithConsole('stopwatch') : undefined}
-                                                />
-                                            )}
-                                            {tool === 'apps' && <AppsSubTab isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
-                                            {tool === 'hardware' && <HardwareSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
-                                            {tool === 'checkup' && <CheckupSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
-                                            {tool === 'webview' && (
-                                                <div className={clsx("h-full w-full flex flex-col overflow-hidden min-h-0", isGridView && "bg-surface-variant/10 p-2")}>
-                                                    <DeviceViewport
-                                                        screenshot={webViewport.screenshot}
-                                                        loading={webViewport.loading}
-                                                        imgRef={webViewport.imgRef}
-                                                        imgLayout={webViewport.imgLayout}
-                                                        onImgLoad={(e) => {
-                                                            const img = e.currentTarget;
-                                                            webViewport.setImgLayout({
-                                                                width: img.clientWidth,
-                                                                height: img.clientHeight,
-                                                                naturalWidth: img.naturalWidth,
-                                                                naturalHeight: img.naturalHeight
-                                                            });
-                                                        }}
-                                                        hoveredNode={webViewport.hoveredNode}
-                                                        selectedNode={webViewport.selectedNode}
-                                                        taps={webViewport.taps}
-                                                        swipes={webViewport.swipes}
-                                                        onRefresh={(forceClear, targetWebUrl) => webViewport.refreshAll(true, forceClear, targetWebUrl)}
-                                                        handlers={webViewport.handlers}
-                                                        isWeb={true}
-                                                        maxHeight="100%"
-                                                        className="w-full h-full flex flex-col"
-                                                    />
-                                                </div>
+                                            {isVisible && (
+                                                <>
+                                                    {tool === 'console' && (
+                                                        <RunConsole
+                                                            key={`console-${session.runId}-${session.sessionEpoch}`}
+                                                            runId={session.runId}
+                                                            logs={session.logs}
+                                                            isSessionRunning={session.status === 'running' || session.status === 'stopping'}
+                                                            testPath={session.testPath}
+                                                            onPairWithTool={(tool) => handlePairWithConsole(tool)}
+                                                        />
+                                                    )}
+                                                    {tool === 'logcat' && <LogcatSubTab key={`logcat-${session.deviceUdid}`} selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} onNavigate={onNavigate} onPairWithConsole={session.type === 'test' ? () => handlePairWithConsole('logcat') : undefined} />}
+                                                    {tool === 'commands' && <CommandsSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
+                                                    {tool === 'performance' && (
+                                                        <PerformanceSubTab
+                                                            selectedDevice={session.deviceUdid}
+                                                            {...performanceState}
+                                                            onRefresh={performanceState.fetchStats}
+                                                            isTestRunning={isTestRunning}
+                                                            allowActionsDuringTest={settings.allowActionsDuringTest}
+                                                            forceEnable={performanceState.forceEnable}
+                                                            setForceEnable={performanceState.setForceEnable}
+                                                            onNavigate={onNavigate}
+                                                            onPairWithConsole={session.type === 'test' ? () => handlePairWithConsole('performance') : undefined}
+                                                        />
+                                                    )}
+                                                    {tool === 'stopwatch' && (
+                                                        <StopwatchSubTab
+                                                            selectedDevice={session.deviceUdid}
+                                                            isTestRunning={isTestRunning}
+                                                            allowActionsDuringTest={settings.allowActionsDuringTest}
+                                                            onPairWithConsole={session.type === 'test' ? () => handlePairWithConsole('stopwatch') : undefined}
+                                                        />
+                                                    )}
+                                                    {tool === 'apps' && <AppsSubTab isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
+                                                    {tool === 'hardware' && <HardwareSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
+                                                    {tool === 'checkup' && <CheckupSubTab selectedDevice={session.deviceUdid} isTestRunning={isTestRunning} allowActionsDuringTest={settings.allowActionsDuringTest} />}
+                                                    {tool === 'webview' && (
+                                                        <div className={clsx("h-full w-full flex flex-col overflow-hidden min-h-0", isGridView && "bg-surface-variant/10 p-2")}>
+                                                            <DeviceViewport
+                                                                screenshot={webViewport.screenshot}
+                                                                loading={webViewport.loading}
+                                                                imgRef={webViewport.imgRef}
+                                                                imgLayout={webViewport.imgLayout}
+                                                                onImgLoad={(e) => {
+                                                                    const img = e.currentTarget;
+                                                                    webViewport.setImgLayout({
+                                                                        width: img.clientWidth,
+                                                                        height: img.clientHeight,
+                                                                        naturalWidth: img.naturalWidth,
+                                                                        naturalHeight: img.naturalHeight
+                                                                    });
+                                                                }}
+                                                                hoveredNode={webViewport.hoveredNode}
+                                                                selectedNode={webViewport.selectedNode}
+                                                                taps={webViewport.taps}
+                                                                swipes={webViewport.swipes}
+                                                                onRefresh={(forceClear, targetWebUrl) => webViewport.refreshAll(true, forceClear, targetWebUrl)}
+                                                                handlers={webViewport.handlers}
+                                                                isWeb={true}
+                                                                maxHeight="100%"
+                                                                className="w-full h-full flex flex-col"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     </div>
