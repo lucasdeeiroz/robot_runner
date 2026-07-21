@@ -298,7 +298,7 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
         }
 
         const prompt = `${promptStr}\n\nLOGS:\n${lastLogs}`;
-        const systemInstruction = `You are an expert Android Developer and QA Engineer. Analyze logcat snippets precisely. Always provide your response in ${currentLang}. Use the exact prefix "Summary: " followed by an EXTREMELY CONCISE one-line summary (MAXIMUM 15 WORDS).`;
+        const systemInstruction = `You are an expert Android Developer and QA Engineer. Analyze logcat snippets precisely. Always provide your response in ${currentLang}. You MUST structure your response in two parts: first, a single line starting with the exact prefix "Summary: " followed by an EXTREMELY CONCISE one-line title (MAXIMUM 15 WORDS). Then, leave a blank line and provide the full, detailed analysis that the user requested.`;
 
         try {
             let result = "";
