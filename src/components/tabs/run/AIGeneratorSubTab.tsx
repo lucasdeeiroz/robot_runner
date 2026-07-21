@@ -17,7 +17,7 @@ import { generateRefinedTestCases as generateWithOpenAI } from '@/lib/dashboard/
 import { generateRefinedTestCases as generateWithClaudeCode } from '@/lib/dashboard/claudeCode';
 import { getAiContext } from '@/lib/dashboard/historyAnalysisUtils';
 import { exportToXlsx, exportToDocx } from '@/lib/dashboard/export';
-import { addToHistory } from './HistoryPanel';
+import { addToHistory } from '../dashboard/HistoryPanel';
 import { save } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import clsx from 'clsx';
@@ -284,7 +284,7 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
                 } catch (error: any) {
                     attempts++;
                     console.warn(`AI Generator Error (Attempt ${attempts} of ${maxAttempts}):`, error);
-                    
+
                     if (attempts < maxAttempts) {
                         feedback.toast.info(t('ai_agent.retry_attempt', { defaultValue: `Connection failed. Retrying... (${attempts}/${maxAttempts})` }));
                         await new Promise(resolve => setTimeout(resolve, 2000 * attempts));
@@ -421,7 +421,7 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
 
     const [leftPaneWidth, setLeftPaneWidth] = useState<number>(50);
     const [isDragging, setIsDragging] = useState<boolean>(false);
-    
+
     const containerRef = useRef<HTMLDivElement>(null);
 
     const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -454,7 +454,7 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
     }, [isDragging]);
 
     return (
-        <div 
+        <div
             ref={containerRef}
             className={clsx("flex-1 min-h-0 flex flex-col lg:flex-row gap-4", isDragging && "select-none cursor-col-resize")}
             style={{ '--left-width': `${leftPaneWidth}%` } as React.CSSProperties}
@@ -556,7 +556,7 @@ export function AIGeneratorSubTab({ onNavigate }: AIGeneratorSubTabProps) {
             </div>
 
             {/* Splitter Divider */}
-            <div 
+            <div
                 className="hidden lg:flex w-1 bg-outline-variant/30 hover:bg-primary/60 cursor-col-resize shrink-0 transition-colors z-10 shadow-[0_0_0_2px_transparent] hover:shadow-[0_0_0_2px_rgba(var(--color-primary),0.2)] self-stretch rounded-full"
                 onPointerDown={handlePointerDown}
             />

@@ -5,8 +5,8 @@ import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import { TestsSubTab } from "@/components/tabs/run/TestsSubTab";
 import { InspectorSubTab } from "@/components/tabs/run/InspectorSubTab";
-import { MapperSubTab } from "@/components/tabs/dashboard/MapperSubTab";
-import { AIGeneratorSubTab } from "@/components/tabs/dashboard/AIGeneratorSubTab";
+import { MapperSubTab } from "@/components/tabs/run/MapperSubTab";
+import { AIGeneratorSubTab } from "@/components/tabs/run/AIGeneratorSubTab";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { useDevices } from '@/lib/deviceStore'; // Import Global Store
 

@@ -22,7 +22,7 @@ import semver from 'semver';
 import pkg from '../../../../package.json';
 import { Alert } from '@/components/atoms/Alert';
 import { Modal } from '@/components/organisms/Modal';
-import { ConnectSubTab } from '@/components/tabs/run/ConnectSubTab';
+import { ConnectSubTab } from '@/components/tabs/home/ConnectSubTab';
 
 interface HomeSubTabProps {
     onNavigate: (page: string) => void;
