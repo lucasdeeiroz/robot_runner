@@ -3,10 +3,8 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageHeader } from '@/components/organisms/PageHeader';
 import { LayoutDashboard } from 'lucide-react';
-import { AIGeneratorSubTab } from '@/components/tabs/dashboard/AIGeneratorSubTab';
 import { ImageEditor } from '@/components/tabs/dashboard/ImageEditor';
 import { HistoryPanel } from '@/components/tabs/dashboard/HistoryPanel';
-import { MapperSubTab } from '@/components/tabs/dashboard/MapperSubTab';
 import clsx from 'clsx';
 import { TabItem } from '@/components/molecules/Tabs';
 import { TabBar } from '@/components/organisms/TabBar';
@@ -21,12 +19,12 @@ interface DashboardPageProps {
 
 export function DashboardPage({ onNavigate }: DashboardPageProps) {
     const { t } = useTranslation();
-    const [activeTab, setActiveTab] = useState('scenarios');
+    const [activeTab, setActiveTab] = useState('images');
 
     useEffect(() => {
         const handleNavigateSubTab = (e: Event) => {
             const detail = (e as CustomEvent).detail;
-            if (detail && (detail === 'scenarios' || detail === 'images' || detail === 'history' || detail === 'mapper')) {
+            if (detail && (detail === 'images' || detail === 'history')) {
                 setActiveTab(detail);
             }
         };
@@ -48,7 +46,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
         }
     };
 
-    const selectedDeviceId = selectedDevices[0] || null;
+
 
     const handleOpenToolbox = (device: Device) => {
         const name = device.model;
@@ -60,10 +58,8 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
 
 
     const tabs: TabItem[] = [
-        { id: 'scenarios', label: t('dashboard.tabs.scenarios', "Scenario Generator") },
         { id: 'images', label: t('dashboard.tabs.images', "Image Editor") },
-        { id: 'history', label: t('dashboard.tabs.history', "History") },
-        { id: 'mapper', label: t('dashboard.tabs.mapper', "Mapper") }
+        { id: 'history', label: t('dashboard.tabs.history', "History") }
     ];
 
     return (
@@ -100,11 +96,6 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
             />
 
             <div className="flex-1 min-h-0 bg-surface p-4 border border-outline-variant/30 rounded-2xl relative z-10 flex flex-col">
-                {/* SCENARIOS TAB */}
-                <div className={clsx("flex-1 min-h-0", activeTab === 'scenarios' ? "flex flex-col" : "hidden")}>
-                    <AIGeneratorSubTab onNavigate={onNavigate} />
-                </div>
-
                 {/* IMAGES TAB */}
                 <div className={clsx("flex-1 min-h-0", activeTab === 'images' ? "flex flex-col" : "hidden")}>
                     <ImageEditor />
@@ -113,14 +104,6 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
                 {/* HISTORY TAB */}
                 <div className={clsx("flex-1 min-h-0", activeTab === 'history' ? "flex flex-col" : "hidden")}>
                     <HistoryPanel />
-                </div>
-
-                {/* MAPPER TAB */}
-                <div className={clsx("flex-1 min-h-0", activeTab === 'mapper' ? "flex flex-col" : "hidden")}>
-                    <MapperSubTab
-                        isActive={activeTab === 'mapper'}
-                        selectedDeviceId={selectedDeviceId}
-                    />
                 </div>
             </div>
         </div>

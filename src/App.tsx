@@ -45,7 +45,7 @@ function AppContent() {
 
   // State to track if we should show the overlay or if it has been dismissed/handled
   const [initialCheckDismissed, setInitialCheckDismissed] = useState(false);
-  const [initialSubTab, setInitialSubTab] = useState<'tests' | 'connect' | 'inspector' | undefined>(undefined);
+  const [initialSubTab, setInitialSubTab] = useState<'tests' | 'inspector' | 'mapper' | 'ai_generator' | undefined>(undefined);
 
   // Initial check moved to dependence on settings_loading
 

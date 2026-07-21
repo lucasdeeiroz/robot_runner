@@ -5,7 +5,6 @@ import {
     Menu,
     FileText,
     Info,
-    LayoutDashboard,
     Wrench,
     Home,
     LogOut,
@@ -94,7 +93,6 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
             label: settings.usageMode === 'explorer' ? t('sidebar.toolbox') : t('sidebar.tests'),
             icon: settings.usageMode === 'explorer' ? Wrench : FileText
         },
-        ...(settings.usageMode !== 'explorer' ? [{ id: 'dashboard', label: t('sidebar.dashboard'), icon: LayoutDashboard }] : []),
         { id: 'settings', label: t('sidebar.settings'), icon: Settings },
         { id: 'about', label: t('sidebar.about'), icon: Info },
     ], [t, settings.usageMode]);

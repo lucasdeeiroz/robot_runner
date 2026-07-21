@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Smartphone, RefreshCw, History, Activity, Zap } from 'lucide-react';
+import { Smartphone, RefreshCw, History, Activity, Zap, Wifi } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDevices } from '@/lib/deviceStore';
 import { DeviceCard } from '@/components/molecules/DeviceCard';
@@ -21,6 +21,8 @@ import { useRemoteConfig } from '@/lib/RemoteConfigProvider';
 import semver from 'semver';
 import pkg from '../../../../package.json';
 import { Alert } from '@/components/atoms/Alert';
+import { Modal } from '@/components/organisms/Modal';
+import { ConnectSubTab } from '@/components/tabs/run/ConnectSubTab';
 
 interface HomeSubTabProps {
     onNavigate: (page: string) => void;
@@ -37,6 +39,7 @@ export function HomeSubTab({ onNavigate }: HomeSubTabProps) {
     const [appiumRunning, setAppiumRunning] = useState(false);
     const [restartingAdb, setRestartingAdb] = useState(false);
     const [restartingAppium, setRestartingAppium] = useState(false);
+    const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
 
     const screenshotSaver = useFileSave({
         fileType: 'Image',
@@ -352,19 +355,30 @@ export function HomeSubTab({ onNavigate }: HomeSubTabProps) {
                         <h3 className="text-base font-semibold text-on-surface/70">{t('home.sections.devices')}</h3>
                         <p className="text-[11px] text-on-surface-variant/40">{t('home.sections.devices_desc')}</p>
                     </div>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => loadDevices()}
-                        className="rounded-2xl h-10 px-4 gap-2 hover:bg-surface-variant/30 text-on-surface-variant/80"
-                    >
-                        {loadingDevices ? (
-                            <RefreshCw size={16} className="animate-spin text-primary" />
-                        ) : (
-                            <RefreshCw size={16} />
-                        )}
-                        <span className="font-semibold text-xs uppercase tracking-widest">{t('common.refresh')}</span>
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => loadDevices()}
+                            className="rounded-2xl h-10 px-4 gap-2 hover:bg-surface-variant/30 text-on-surface-variant/80"
+                        >
+                            {loadingDevices ? (
+                                <RefreshCw size={16} className="animate-spin text-primary" />
+                            ) : (
+                                <RefreshCw size={16} />
+                            )}
+                            <span className="font-semibold text-xs uppercase tracking-widest">{t('common.refresh')}</span>
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setIsConnectModalOpen(true)}
+                            className="rounded-2xl h-10 px-4 gap-2 mr-2"
+                        >
+                            <Wifi size={16} />
+                            <span className="font-semibold text-xs uppercase tracking-widest">{t('run_tab.connect', 'Connect')}</span>
+                        </Button>
+                    </div>
                 </div>
 
                 {devices.length === 0 ? (
@@ -477,6 +491,21 @@ export function HomeSubTab({ onNavigate }: HomeSubTabProps) {
                     </motion.section>
                 )}
             </AnimatePresence>
+
+            <Modal
+                isOpen={isConnectModalOpen}
+                onClose={() => setIsConnectModalOpen(false)}
+                title={t('run_tab.connect', 'Connect')}
+                className="max-w-4xl h-[80vh]"
+            >
+                <ConnectSubTab
+                    onDeviceConnected={() => {
+                        loadDevices();
+                        setIsConnectModalOpen(false);
+                    }}
+                    selectedDevice={devices[0]?.udid || undefined}
+                />
+            </Modal>
         </div>
     );
 }
