@@ -2207,6 +2207,9 @@ export const pt = {
             popup_blocked: "O popup de login foi bloqueado pelo sistema. Verifique as configurações.",
             logout_success: "Sessão encerrada com sucesso.",
             logout_error: "Falha ao encerrar sessão.",
+            skip_login: "Continuar sem login",
+            guest: "Visitante",
+            login_button: "Fazer Login",
             config_missing: "Recursos de nuvem desabilitados ou configuração ausente (Verifique .env ou GitHub Secrets).",
             terms_and_privacy: "Ao entrar, você concorda com nossos Termos de Serviço e Política de Privacidade."
         },

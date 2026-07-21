@@ -39,7 +39,7 @@ function AppContent() {
   const [activePage, setActivePage] = useState("home");
   const { t, i18n } = useTranslation();
   const { settings, updateSetting, checkSystemVersions, systemCheckStatus, loading: settings_loading, checkForAppUpdate } = useSettings();
-  const { user, loading: auth_loading } = useAuth();
+  const { user, skippedLogin, loading: auth_loading } = useAuth();
 
   // Initialize Remote Config once authenticated (now handled by RemoteConfigProvider)
 
@@ -272,7 +272,7 @@ function AppContent() {
     );
   }
 
-  if (!user) {
+  if (!user && !skippedLogin) {
     return <LoginPage />;
   }
 

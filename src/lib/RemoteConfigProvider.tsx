@@ -13,8 +13,8 @@ interface RemoteConfigContextType {
 const RemoteConfigContext = createContext<RemoteConfigContextType | undefined>(undefined);
 
 export const RemoteConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { user, skippedLogin } = useAuth();
     const [isReady, setIsReady] = useState(false);
-    const { user } = useAuth();
 
     useEffect(() => {
         const init = async () => {
@@ -29,7 +29,7 @@ export const RemoteConfigProvider: React.FC<{ children: React.ReactNode }> = ({ 
         init();
     }, []);
 
-    const userEmail = user?.email || null;
+    const userEmail = skippedLogin ? 'noLogin' : (user?.email || null);
 
     const value = useMemo(() => ({
         isReady,

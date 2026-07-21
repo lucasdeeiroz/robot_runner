@@ -265,7 +265,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                         "group flex items-center gap-3 p-2 rounded-2xl bg-surface-variant/20 border border-outline-variant/30 relative shadow-lg",
                         collapsed ? "justify-center" : "px-3"
                     )}
-                    data-tooltip={collapsed ? (user?.displayName || user?.email?.split('@')[0]) : undefined}
+                    data-tooltip={collapsed ? (user?.displayName || user?.email?.split('@')[0] || 'Guest') : undefined}
                     data-position="right"
                 >
                     {user?.photoURL ? (
@@ -284,21 +284,37 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                                 transition={{ duration: 0.15 }}
                                 className="flex-1 min-w-0 overflow-hidden"
                             >
-                                <p className="text-xs font-bold text-on-surface truncate">{user?.displayName || user?.email?.split('@')[0]}</p>
-                                <p className="text-[10px] text-on-surface-variant truncate">{user?.email}</p>
+                                {user ? (
+                                    <>
+                                        <p className="text-xs font-bold text-on-surface truncate">{user?.displayName || user?.email?.split('@')[0]}</p>
+                                        <p className="text-[10px] text-on-surface-variant truncate">{user?.email}</p>
+                                    </>
+                                ) : (
+                                    <p className="text-xs font-bold text-on-surface truncate">{t('auth.guest', 'Guest')}</p>
+                                )}
                             </motion.div>
                         )}
                     </AnimatePresence>
                     {!collapsed && (
-                        <Button
-                            variant="ghost" size="icon"
-                            onClick={signOut}
-                            className="w-8 h-8 hover:bg-error/10 text-on-surface-variant hover:text-error rounded-xl transition-all active:scale-95"
-                            data-tooltip={t('auth.logout')}
-                            data-position="top"
-                        >
-                            <LogOut size={16} />
-                        </Button>
+                        user ? (
+                            <Button
+                                variant="ghost" size="icon"
+                                onClick={signOut}
+                                className="w-8 h-8 hover:bg-error/10 text-on-surface-variant hover:text-error rounded-xl transition-all active:scale-95 shrink-0"
+                                data-tooltip={t('auth.logout')}
+                                data-position="top"
+                            >
+                                <LogOut size={16} />
+                            </Button>
+                        ) : (
+                            <Button
+                                variant="primary" size="sm"
+                                onClick={signOut} // signOut clears skippedLogin and redirects to Login
+                                className="text-[10px] h-6 px-2 rounded-xl shrink-0"
+                            >
+                                {t('auth.login_button', 'Login')}
+                            </Button>
+                        )
                     )}
                 </div>
             </div>
