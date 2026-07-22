@@ -419,7 +419,21 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         }, 8000);
 
         try {
-            const saved = await store.get<SettingsStoreData>('app_config');
+            let saved: SettingsStoreData | null = null;
+            try {
+                const portableJson = await invoke<string | null>('get_portable_settings');
+                if (portableJson) {
+                    const parsed = JSON.parse(portableJson);
+                    saved = parsed.app_config || parsed;
+                    console.info("[Settings] Loaded portable settings.json.");
+                }
+            } catch (err) {
+                console.warn("[Settings] Portable settings check error:", err);
+            }
+
+            if (!saved) {
+                saved = await store.get<SettingsStoreData>('app_config') ?? null;
+            }
             clearTimeout(safetyTimer);
 
             if (saved) {
@@ -520,8 +534,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const saveStore = async (data: SettingsStoreData) => {
         try {
             const encryptedData = await processStoreDataSecrets(data, 'encrypt');
-            await store.set('app_config', encryptedData);
-            await store.save();
+            const jsonStr = JSON.stringify({ app_config: encryptedData }, null, 2);
+            const wasPortable = await invoke<boolean>('save_portable_settings', { content: jsonStr });
+            if (!wasPortable) {
+                await store.set('app_config', encryptedData);
+                await store.save();
+            }
         } catch (e) {
             feedback.toast.error("settings.save_error", e);
         }

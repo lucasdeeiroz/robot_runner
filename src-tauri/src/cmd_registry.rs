@@ -139,7 +139,9 @@ macro_rules! generate_robot_runner_handler {
             crate::adb::dmesg::fetch_dmesg_buffer,
             crate::env_setup::check_environment,
             crate::env_setup::create_venv,
-            crate::env_setup::install_requirements
+            crate::env_setup::install_requirements,
+            crate::files::get_portable_settings,
+            crate::files::save_portable_settings
         ]
     };
 }
