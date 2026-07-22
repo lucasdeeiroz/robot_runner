@@ -144,7 +144,7 @@ export function useDeviceViewport({
 
             if (onRefreshSuccess) onRefreshSuccess();
         } catch (e) {
-            feedback.toast.error("inspector.update_error", e);
+            console.warn("[DeviceViewport] Refresh failed:", e);
         } finally {
             setLoading(false);
         }
