@@ -46,9 +46,9 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
         if (disabled) return;
         try {
             await invoke('adb_hardware_battery_set', { device: selectedDevice, level });
-            feedback.toast.success(t('toolbox.hardware.battery.set_success', { level }));
+            feedback.toast.success(t('toolbox.hardware.device_controls.set_success', { level }));
         } catch (e) {
-            feedback.toast.error(t('toolbox.hardware.battery.set_error', "Failed to set battery"), e);
+            feedback.toast.error(t('toolbox.hardware.device_controls.set_error', "Failed to set battery"), e);
         }
     };
 
@@ -56,9 +56,9 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
         if (disabled) return;
         try {
             await invoke('adb_hardware_battery_unplug', { device: selectedDevice });
-            feedback.toast.success(t('toolbox.hardware.battery.unplug_success', 'Battery unplugged'));
+            feedback.toast.success(t('toolbox.hardware.device_controls.unplug_success', 'Battery unplugged'));
         } catch (e) {
-            feedback.toast.error(t('toolbox.hardware.battery.unplug_error', "Failed to unplug battery"), e);
+            feedback.toast.error(t('toolbox.hardware.device_controls.unplug_error', "Failed to unplug battery"), e);
         }
     };
 
@@ -66,9 +66,9 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
         if (disabled) return;
         try {
             await invoke('adb_hardware_battery_reset', { device: selectedDevice });
-            feedback.toast.success(t('toolbox.hardware.battery.reset_success', 'Battery status reset'));
+            feedback.toast.success(t('toolbox.hardware.device_controls.reset_success', 'Battery status reset'));
         } catch (e) {
-            feedback.toast.error(t('toolbox.hardware.battery.reset_error', "Failed to reset battery"), e);
+            feedback.toast.error(t('toolbox.hardware.device_controls.reset_error', "Failed to reset battery"), e);
         }
     };
 
@@ -382,7 +382,7 @@ export function HardwareSubTab({ selectedDevice, isTestRunning, allowActionsDuri
                                         disabled={disabled}
                                         className="w-24"
                                     />
-                                    <Button variant="primary" size='icon' onClick={() => setBattery(batteryLevel)} disabled={disabled} title={t('common.set', 'Set')} data-tooltip="adb shell dumpsys battery set level <value>" data-position="bottom">
+                                    <Button variant="primary" size='icon' onClick={() => setBattery(batteryLevel)} disabled={disabled} title={t('common.set', 'Set')} data-tooltip="adb shell dumpsys battery set level <value>" data-position="left">
                                         <Send size={16} className="cursor-pointer m-2" />
                                     </Button>
                                 </div>
