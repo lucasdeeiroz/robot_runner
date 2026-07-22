@@ -54,6 +54,16 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
             lastPaths
         });
     }, [cacheKey, mode, lastPaths]);
+
+    // Keep lastPaths synchronized when settings.paths change
+    useEffect(() => {
+        setLastPaths(prev => ({
+            ...prev,
+            file: settings.paths.tests || prev.file || '.',
+            folder: settings.paths.tests || prev.folder || '.',
+            args: settings.paths.suites || prev.args || '.'
+        }));
+    }, [settings.paths.tests, settings.paths.suites]);
     const [launchStatus, setLaunchStatus] = useState("");
     const [isLaunching, setIsLaunching] = useState(false);
     const [warningModal, setWarningModal] = useState<{ isOpen: boolean, message: string, showSettingsAction?: boolean }>({ isOpen: false, message: '', showSettingsAction: false });
