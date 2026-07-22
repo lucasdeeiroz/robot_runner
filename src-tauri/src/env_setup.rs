@@ -101,11 +101,25 @@ pub fn get_venv_python_path(project_path: &Path) -> Option<PathBuf> {
     #[cfg(not(target_os = "windows"))]
     let python_path = venv_dir.join("bin").join("python");
     
-    if python_path.exists() {
-        Some(python_path)
-    } else {
-        None
+    if !python_path.exists() {
+        return None;
     }
+
+    // Check if robot framework is installed in this venv; if not, fall back to global python
+    let mut check_cmd = std::process::Command::new(&python_path);
+    check_cmd.args(&["-m", "robot", "--version"]);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        check_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    if let Ok(output) = check_cmd.output() {
+        if output.status.success() {
+            return Some(python_path);
+        }
+    }
+
+    None
 }
 
 #[tauri::command]
