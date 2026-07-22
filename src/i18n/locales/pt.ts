@@ -372,6 +372,7 @@ export const pt = {
                 desc: "Expor Dispositivo ADB na internet"
             },
             labels: {
+                target_device: "Dispositivo USB Alvo",
                 ip: "Endereço IP",
                 port: "Porta",
                 code: "Código de Pareamento (Opcional)",

@@ -12,34 +12,47 @@ import { Section } from "@/components/organisms/Section";
 import { Alert } from "@/components/atoms/Alert";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { Input } from "@/components/atoms/Input";
+import { useDevices } from "@/lib/deviceStore";
+import { Select } from "@/components/atoms/Select";
 import { Button } from "@/components/atoms/Button";
 
 interface ConnectSubTabProps {
     onDeviceConnected: () => void;
-    selectedDevice?: string; // Add this prop
+    selectedDevice?: string;
 }
 
 export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubTabProps) {
     const { t } = useTranslation();
     const { settings, systemCheckStatus, checkSystemVersions, isNgrokEnabled, enableNgrok } = useSettings();
+    const { devices } = useDevices();
+    const [currentDevice, setCurrentDevice] = useState<string>(selectedDevice || (devices.length > 0 ? devices[0].udid : ""));
     const [ip, setIp] = useState("");
     const [port, setPort] = useState("");
     const [code, setCode] = useState("");
     const [statusMsg, setStatusMsg] = useState<{ text: string, type: 'success' | 'error' | 'info' } | null>(null);
     const [loading, setLoading] = useState(false);
 
+    useEffect(() => {
+        if (selectedDevice) {
+            setCurrentDevice(selectedDevice);
+        } else if (devices.length > 0 && !currentDevice) {
+            setCurrentDevice(devices[0].udid);
+        }
+    }, [selectedDevice, devices]);
+
     // Auto-Discovery Effect
     useEffect(() => {
-        if (selectedDevice && selectedDevice.length > 5) { // Simple check if valid serial
-            fetchDeviceIp();
+        if (currentDevice && currentDevice.length > 3) {
+            fetchDeviceIp(currentDevice);
         }
-    }, [selectedDevice]);
+    }, [currentDevice]);
 
-    const fetchDeviceIp = async () => {
-        if (!selectedDevice) return;
+    const fetchDeviceIp = async (targetDev?: string) => {
+        const devToUse = targetDev || currentDevice;
+        if (!devToUse) return;
         try {
             const output = await invoke<string>('run_adb_command', {
-                device: selectedDevice,
+                device: devToUse,
                 args: ['shell', 'ip -f inet addr show']
             });
             const lines = output.split('\n');
@@ -234,12 +247,16 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
     };
 
     const handleEnableTcpIp = async () => {
-        if (!selectedDevice) return;
+        const devToUse = currentDevice || selectedDevice;
+        if (!devToUse) {
+            setStatusMsg({ text: t('connect.status.select_device_first', "Select a device first"), type: 'error' });
+            return;
+        }
         setLoading(true);
         setStatusMsg({ text: t('connect.status.enabling_tcpip', "Enabling TCP/IP 5555..."), type: 'info' });
         try {
             await invoke('run_adb_command', {
-                device: selectedDevice,
+                device: devToUse,
                 args: ['tcpip', '5555']
             });
             setPort("5555");
@@ -307,6 +324,25 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                     </Alert>
                 )}
             >
+                {devices.length > 0 && (
+                    <div className="mb-4">
+                        <label className="block text-xs font-medium text-on-surface-variant/80 ml-1 mb-1">
+                            {t('connect.labels.target_device', "Target USB Device")}
+                        </label>
+                        <Select
+                            value={currentDevice}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setCurrentDevice(val);
+                                fetchDeviceIp(val);
+                            }}
+                            options={devices.map(d => ({
+                                label: `${d.model || 'Device'} (${d.udid})`,
+                                value: d.udid
+                            }))}
+                        />
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div>
@@ -345,18 +381,16 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                     <div>
                         <div className="flex justify-between items-center mb-1">
                             <label className="block text-xs font-medium text-on-surface-variant/80 ml-1">{t('connect.labels.port')}</label>
-                            {selectedDevice && (
-                                <Button
-                                    onClick={handleEnableTcpIp}
-                                    variant="link"
-                                    className="text-[10px]"
-                                    disabled={loading}
-                                    title={t('connect.actions.enable_tcpip_tooltip', "Run 'adb tcpip 5555'")}
-                                    tooltipPosition="top"
-                                >
-                                    {t('connect.actions.enable_tcpip', "Enable 5555")}
-                                </Button>
-                            )}
+                            <Button
+                                onClick={handleEnableTcpIp}
+                                variant="link"
+                                className="text-[10px]"
+                                disabled={loading}
+                                title={t('connect.actions.enable_tcpip_tooltip', "Run 'adb tcpip 5555'")}
+                                tooltipPosition="top"
+                            >
+                                {t('connect.actions.enable_tcpip', "Enable 5555")}
+                            </Button>
                         </div>
                         <Input
                             placeholder="5555"

@@ -371,6 +371,7 @@ export const en = {
                 desc: "Expose ADB Device to the internet"
             },
             labels: {
+                target_device: "Target USB Device",
                 ip: "IP Address",
                 port: "Port",
                 code: "Pairing Code (Optional)",
