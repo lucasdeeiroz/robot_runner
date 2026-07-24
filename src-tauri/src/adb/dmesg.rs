@@ -91,7 +91,11 @@ pub fn start_dmesg(
                         thread::spawn(move || {
                             let reader = BufReader::new(out);
                             let mut file_writer = if let Some(ref path) = reader_output_file {
-                                OpenOptions::new().create(true).append(true).open(path).ok()
+                                let expanded = crate::cmd_utils::expand_env_vars(path);
+                                if let Some(parent) = std::path::Path::new(&expanded).parent() {
+                                    let _ = std::fs::create_dir_all(parent);
+                                }
+                                OpenOptions::new().create(true).append(true).open(&expanded).ok()
                             } else {
                                 None
                             };

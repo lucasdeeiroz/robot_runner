@@ -43,7 +43,9 @@ pub fn start_logcat(
 
     // Shared State for the supervisor thread
     let buffer = Arc::new(Mutex::new(Vec::new()));
-    match output_file.clone() {
+    let output_file_expanded = output_file.as_ref().map(|p| crate::cmd_utils::expand_env_vars(p));
+    
+    match output_file_expanded.clone() {
         Some(path) => {
             // Add header to buffer
             if let Ok(mut b) = buffer.lock() {
@@ -69,7 +71,7 @@ pub fn start_logcat(
     let thread_filter = filter.clone();
     let thread_level = level.clone();
     let thread_buffer = buffer.clone();
-    let thread_output_file = output_file.clone();
+    let thread_output_file = output_file_expanded.clone();
     let thread_extra_tags = extra_tags.clone();
     let thread_child_mutex = child_mutex.clone();
     let thread_should_stop = should_stop.clone();
@@ -158,7 +160,11 @@ pub fn start_logcat(
                         thread::spawn(move || {
                             let reader = BufReader::new(out);
                             let mut file_writer = if let Some(ref path) = reader_output_file {
-                                OpenOptions::new().create(true).append(true).open(path).ok()
+                                let expanded_path = crate::cmd_utils::expand_env_vars(path);
+                                if let Some(parent) = std::path::Path::new(&expanded_path).parent() {
+                                    let _ = std::fs::create_dir_all(parent);
+                                }
+                                OpenOptions::new().create(true).append(true).open(&expanded_path).ok()
                             } else {
                                 None
                             };

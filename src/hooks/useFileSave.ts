@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { save } from '@tauri-apps/plugin-dialog';
-import { join, dirname } from '@tauri-apps/api/path';
+import { join, dirname, documentDir } from '@tauri-apps/api/path';
 import { AppSettings, useSettings } from '@/lib/settings';
 import { feedback } from '@/lib/feedback';
 import { useTranslation } from 'react-i18next';
@@ -39,12 +39,24 @@ export function useFileSave({ fileType, extensions, defaultNamePrefix, settingPa
 
             // 1. Check Auto-Save Path
             if (settingPathKey) {
-                const autoSaveBasePath = settings.paths?.[settingPathKey];
+                const autoSaveBasePath = settings.paths?.[settingPathKey] || settings.paths?.logs;
                 if (autoSaveBasePath && autoSaveBasePath.trim() !== '') {
                     try {
                         filePath = await join(autoSaveBasePath, filename);
                     } catch (e) {
                         console.warn("Failed to join auto-save path", e);
+                    }
+                }
+
+                // Fallback to Documents directory
+                if (!filePath) {
+                    try {
+                        const docsPath = await documentDir();
+                        if (docsPath) {
+                            filePath = await join(docsPath, filename);
+                        }
+                    } catch (e) {
+                        console.warn("Failed to get documentDir fallback", e);
                     }
                 }
             }

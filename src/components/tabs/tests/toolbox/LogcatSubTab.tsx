@@ -5,6 +5,7 @@ import { Play, Square, Eraser, AlignLeft, Package as PackageIcon, FolderSearch, 
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { documentDir } from "@tauri-apps/api/path";
 
 import { useSettings } from "@/lib/settings";
 import { feedback } from "@/lib/feedback";
@@ -209,10 +210,21 @@ export function LogcatSubTab({ selectedDevice, isTestRunning = false, allowActio
     }, [logs, deferredSearchQuery]);
 
     const startLogcat = async () => {
-        let activeLogcatPath = settings.paths.logcat;
+        let activeLogcatPath = settings.paths.logcat || settings.paths.logs;
 
         if (!activeLogcatPath) {
-            // Prompt for path if not configured
+            try {
+                const docsPath = await documentDir();
+                if (docsPath) {
+                    activeLogcatPath = docsPath;
+                }
+            } catch (e) {
+                console.warn("[Logcat] Could not get documentDir:", e);
+            }
+        }
+
+        if (!activeLogcatPath) {
+            // Prompt for path if not configured and documentDir fallback failed
             const selected = await open({
                 directory: true,
                 multiple: false,

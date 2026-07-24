@@ -50,6 +50,25 @@ export interface ClaudeResponse {
     usage?: any;
 }
 
+function detectClaudeApiError(parsed: any): void {
+    if (!parsed || typeof parsed !== 'object') return;
+
+    const hasErrorObj = parsed.error !== null && parsed.error !== undefined && parsed.error !== false;
+    const isError = parsed.is_error === true || (hasErrorObj && typeof parsed.error === 'object') || parsed.api_error_status !== undefined || parsed.terminal_reason === 'api_error';
+    if (!isError) return;
+
+    const status = parsed.api_error_status || parsed.error?.code || parsed.error?.status;
+    const resultStr = String(parsed.result || parsed.error?.message || (typeof parsed.error === 'string' ? parsed.error : ''));
+
+    if (status === 401 || resultStr.includes('401') || resultStr.includes('OAuth access token has expired') || resultStr.includes('Failed to authenticate')) {
+        throw new Error(`AUTH_ERROR: Claude CLI authentication token has expired or is invalid. Re-authenticate to continue.`);
+    }
+    if (status === 429 || resultStr.includes('429') || resultStr.includes('Rate limit')) {
+        throw new Error(`QUOTA_EXHAUSTED: Claude CLI rate limit exceeded: ${resultStr}`);
+    }
+    throw new Error(`API_ERROR: Claude CLI error: ${resultStr}`);
+}
+
 export async function askClaudeCode(
     prompt: string,
     projectRoot: string,
@@ -105,6 +124,9 @@ export async function askClaudeCode(
 
         const parsed = safeParseJson<any>(rawResult);
         if (parsed && typeof parsed === 'object') {
+            // Check for API-level CLI errors (e.g. 401 token expired)
+            detectClaudeApiError(parsed);
+
             // If we used a schema, return the structured output
             if (options?.jsonSchema && parsed.structured_output) {
                 return {
@@ -113,6 +135,11 @@ export async function askClaudeCode(
                     session_id: parsed.session_id,
                     usage: parsed.usage
                 };
+            }
+
+            // Direct AI Agent Response format: { reply: "...", actions: [...] }
+            if (parsed.reply || parsed.actions) {
+                return rawResult;
             }
 
             // Fallback: The "result" field from Claude Code CLI --output-format json
@@ -137,8 +164,21 @@ export async function askClaudeCode(
         console.error("[Claude CLI] Invocation failed. Raw Error:", error, "Type:", typeof error);
         const errorStr = typeof error === 'string' ? error : (error?.message || String(error));
 
-        if (errorStr.includes("Not logged in") || errorStr.includes("/login")) {
-            throw new Error("Claude CLI: You are not logged in. If you provided a token in settings, check if it is correct. Otherwise, please run 'claude login' in your terminal.");
+        // Recovery: If errorStr contains a valid JSON AI payload with "reply" or "actions", recover it!
+        try {
+            const firstBrace = errorStr.indexOf('{');
+            const lastBrace = errorStr.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace > firstBrace) {
+                const candidate = errorStr.substring(firstBrace, lastBrace + 1);
+                const parsedCandidate = JSON.parse(candidate);
+                if (parsedCandidate && (parsedCandidate.reply || parsedCandidate.actions || parsedCandidate.suggested_prompts)) {
+                    return candidate;
+                }
+            }
+        } catch(e) {}
+
+        if (errorStr.includes("Not logged in") || errorStr.includes("/login") || errorStr.includes("AUTH_ERROR") || errorStr.includes("401") || errorStr.includes("OAuth access token has expired")) {
+            throw new Error("AUTH_ERROR: Claude CLI authentication expired or missing. Please run 'claude login' in your terminal or check your token in settings.");
         }
         throw new Error(errorStr);
     }
