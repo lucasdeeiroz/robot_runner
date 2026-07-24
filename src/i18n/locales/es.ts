@@ -1958,6 +1958,17 @@ export const es = {
                     prefixes: "Prefijos (ej: ro.build)",
                     add_prefix: "Añadir prefijo..."
                 },
+                ui_text_checks: "Comprobaciones de Texto de UI",
+                run_all: "Ejecutar Todos",
+                add_ui_check: "Añadir Comprobación de UI",
+                edit_ui_check: "Editar Comprobación de UI",
+                check_name: "Nombre de Comprobación",
+                check_name_placeholder: "Ejemplo: Comprobación de Texto de UI",
+                activity_command: "Activity / Comando de Inicio (Opcional)",
+                activity_placeholder: "Ejemplo: com.android.myapp/my.package.Activity",
+                activity_tip: "Formato: paquete/activity o shell am start -n ...",
+                wait_delay: "Tiempo de Espera (ms)",
+                extracted_texts: "Textos Extraídos / Esperados",
                 report: {
                     prop_compare_title: 'Mostrar Comparación de .prop',
                     prop_compare_desc: 'Incluir los resultados de la comparación de propiedades si se ejecuta',

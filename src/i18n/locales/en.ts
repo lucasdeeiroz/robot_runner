@@ -1948,6 +1948,17 @@ export const en = {
                     prefixes: "Prefixes (e.g. ro.build)",
                     add_prefix: "Add prefix..."
                 },
+                ui_text_checks: "UI Text / Golden Screen Checks",
+                run_all: "Run All",
+                add_ui_check: "Add UI Check",
+                edit_ui_check: "Edit UI Text Check",
+                check_name: "Check Name",
+                check_name_placeholder: "Example: UI Text Check",
+                activity_command: "Activity / Launch Command (Optional)",
+                activity_placeholder: "Example: com.android.myapp/my.package.Activity",
+                activity_tip: "Format: package/activity or shell am start -n ...",
+                wait_delay: "Wait Delay (ms)",
+                extracted_texts: "Extracted / Expected Texts",
                 report: {
                     prop_compare_title: 'Show .prop Compare',
                     prop_compare_desc: 'Include .prop comparison results if executed',

@@ -6,7 +6,7 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { tempDir, join } from '@tauri-apps/api/path';
 import { Button } from '@/components/atoms/Button';
-import { Upload, ShieldCheck, CheckCircle2, XCircle, Search, FileText, ListPlus, Info, Download, Filter, FilterX, Play } from 'lucide-react';
+import { Upload, ShieldCheck, CheckCircle2, XCircle, Search, FileText, ListPlus, Info, Download, Filter, FilterX, Play, Plus, Trash2, Edit3, Tv } from 'lucide-react';
 import { Section } from '@/components/organisms/Section';
 import { Modal } from '@/components/organisms/Modal';
 import { ActionCard } from '@/components/atoms/ActionCard';
@@ -21,6 +21,82 @@ import { getReportVerificationPrompt } from '@/lib/dashboard/prompts';
 import clsx from 'clsx';
 import { ExpressiveLoading } from '@/components/atoms/ExpressiveLoading';
 import { toast } from 'sonner';
+
+export function matchesFilterPattern(text: string, pattern: string): boolean {
+    if (!text || !pattern) return false;
+    const trimmed = pattern.trim();
+    if (!trimmed) return false;
+    if (trimmed.includes('*')) {
+        const regexStr = '^' + trimmed
+            .split('*')
+            .map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+            .join('.*') + '$';
+        try {
+            return new RegExp(regexStr, 'i').test(text);
+        } catch (e) {
+            return text.toLowerCase().includes(trimmed.toLowerCase());
+        }
+    }
+    return text.startsWith(trimmed) || text.includes(trimmed);
+}
+
+export function extractTextsFromXml(xmlString: string): string[] {
+    if (!xmlString) return [];
+    const texts: string[] = [];
+    const seen = new Set<string>();
+
+    try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(xmlString, 'text/xml');
+        const elements = doc.querySelectorAll('*');
+        elements.forEach(el => {
+            const text = el.getAttribute('text')?.trim();
+            const contentDesc = el.getAttribute('content-desc')?.trim();
+            if (text && text.length > 0 && !seen.has(text)) {
+                seen.add(text);
+                texts.push(text);
+            }
+            if (contentDesc && contentDesc.length > 0 && !seen.has(contentDesc)) {
+                seen.add(contentDesc);
+                texts.push(contentDesc);
+            }
+        });
+    } catch (e) {
+        const textMatches = xmlString.match(/text="([^"]+)"/g);
+        const descMatches = xmlString.match(/content-desc="([^"]+)"/g);
+        if (textMatches) {
+            textMatches.forEach(m => {
+                const val = m.substring(6, m.length - 1).trim();
+                if (val && !seen.has(val)) {
+                    seen.add(val);
+                    texts.push(val);
+                }
+            });
+        }
+        if (descMatches) {
+            descMatches.forEach(m => {
+                const val = m.substring(14, m.length - 1).trim();
+                if (val && !seen.has(val)) {
+                    seen.add(val);
+                    texts.push(val);
+                }
+            });
+        }
+    }
+    return texts;
+}
+
+export interface UiTextCheckConfig {
+    id: string;
+    name: string;
+    activity?: string;
+    delayMs?: number;
+    enabled: boolean;
+    expectedTexts?: string[];
+    foundTexts?: string[];
+    status?: 'idle' | 'running' | 'done' | 'error';
+    isGoldenMatch?: boolean;
+}
 
 interface CheckupSubTabProps {
     selectedDevice: string | null;
@@ -59,6 +135,7 @@ interface CheckupCacheEntry {
     checkResults: Record<string, any>;
     additionalCheckResults: Record<string, any>;
     packageComparisons: PackageComparison[];
+    uiTextChecks?: UiTextCheckConfig[];
 }
 const checkupCacheMap = new Map<string, CheckupCacheEntry>();
 
@@ -150,6 +227,31 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     const [additionalCheckResults, setAdditionalCheckResults] = useState<Record<string, { status: 'idle' | 'running' | 'done', found?: string, goldenExpected?: string, isGoldenMatch?: boolean }>>(() => cachedCheckup?.additionalCheckResults ?? {});
     const [packageComparisons, setPackageComparisons] = useState<PackageComparison[]>(() => cachedCheckup?.packageComparisons ?? []);
 
+    // UI Text / Screen Checks state
+    const [uiTextChecks, setUiTextChecks] = useState<UiTextCheckConfig[]>(() => {
+        if (cachedCheckup?.uiTextChecks) return cachedCheckup.uiTextChecks;
+        const stored = localStorage.getItem('checkup_uiTextChecks');
+        return stored ? JSON.parse(stored) : [
+            {
+                id: 'ui_test',
+                name: 'UI Test',
+                activity: 'com.android.settings',
+                delayMs: 1500,
+                enabled: true
+            }
+        ];
+    });
+
+    const [isUiCheckModalOpen, setIsUiCheckModalOpen] = useState(false);
+    const [editingUiCheck, setEditingUiCheck] = useState<UiTextCheckConfig | null>(null);
+    const [uiCheckNameInput, setUiCheckNameInput] = useState('');
+    const [uiCheckActivityInput, setUiCheckActivityInput] = useState('');
+    const [uiCheckDelayInput, setUiCheckDelayInput] = useState('1500');
+
+    useEffect(() => {
+        localStorage.setItem('checkup_uiTextChecks', JSON.stringify(uiTextChecks));
+    }, [uiTextChecks]);
+
     // Sync cache on change
     useEffect(() => {
         if (selectedDevice) {
@@ -158,10 +260,68 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 devicePropsCache,
                 checkResults,
                 additionalCheckResults,
-                packageComparisons
+                packageComparisons,
+                uiTextChecks
             });
         }
-    }, [selectedDevice, comparisons, devicePropsCache, checkResults, additionalCheckResults, packageComparisons]);
+    }, [selectedDevice, comparisons, devicePropsCache, checkResults, additionalCheckResults, packageComparisons, uiTextChecks]);
+
+    const runSingleUiTextCheck = async (check: UiTextCheckConfig) => {
+        if (!selectedDevice) return;
+        setUiTextChecks(prev => prev.map(c => c.id === check.id ? { ...c, status: 'running' } : c));
+
+        try {
+            if (check.activity && check.activity.trim()) {
+                const rawAct = check.activity.trim();
+                let args: string[];
+                if (rawAct.startsWith('am start')) {
+                    args = ['shell', ...rawAct.split(/\s+/)];
+                } else if (rawAct.startsWith('shell ')) {
+                    args = rawAct.split(/\s+/);
+                } else {
+                    args = ['shell', 'am', 'start', '-n', rawAct];
+                }
+                await invoke('run_adb_command', { device: selectedDevice, args });
+                const delay = check.delayMs || 1500;
+                await new Promise(r => setTimeout(r, delay));
+            }
+
+            const dumpPath = '/sdcard/window_dump.xml';
+            try {
+                await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'uiautomator', 'dump', dumpPath] });
+            } catch (e) {
+                console.warn("uiautomator dump error", e);
+            }
+
+            const xmlContent: string = await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'cat', dumpPath] });
+            const extractedTexts = extractTextsFromXml(xmlContent);
+
+            setUiTextChecks(prev => prev.map(c => {
+                if (c.id !== check.id) return c;
+                let isMatch: boolean | undefined = undefined;
+                if (c.expectedTexts && c.expectedTexts.length > 0) {
+                    isMatch = c.expectedTexts.every(exp => extractedTexts.includes(exp));
+                }
+                return {
+                    ...c,
+                    foundTexts: extractedTexts,
+                    status: 'done',
+                    isGoldenMatch: isMatch
+                };
+            }));
+        } catch (err) {
+            console.error("UI Text Check error", err);
+            setUiTextChecks(prev => prev.map(c => c.id === check.id ? { ...c, status: 'error' } : c));
+        }
+    };
+
+    const runAllUiTextChecks = async () => {
+        if (!selectedDevice) return;
+        const enabledChecks = uiTextChecks.filter(c => c.enabled);
+        for (const check of enabledChecks) {
+            await runSingleUiTextCheck(check);
+        }
+    };
 
     const standardChecksBase = useMemo(() => [
         {
@@ -632,7 +792,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
 
             for (const [key, value] of Object.entries(currentDeviceProps)) {
                 if (!existingKeys.has(key)) {
-                    if (basePropsPrefixes.some(prefix => key.startsWith(prefix))) {
+                    if (basePropsPrefixes.some(prefix => matchesFilterPattern(key, prefix))) {
                         if (value.trim() !== '') {
                             newComparisons.push({
                                 key,
@@ -742,7 +902,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 const pkgs = await invoke<PackageInfo[]>("get_installed_packages", { device: selectedDevice });
                 filteredPkgs = pkgs.filter(p => {
                     if (packageFilterPrefixes.length === 0) return packageFilterMode === 'exclude';
-                    const matchesPrefix = packageFilterPrefixes.some(prefix => p.name.startsWith(prefix));
+                    const matchesPrefix = packageFilterPrefixes.some(prefix => matchesFilterPattern(p.name, prefix));
                     if (packageFilterMode === 'include') return matchesPrefix;
                     return !matchesPrefix; // 'exclude'
                 });
@@ -868,7 +1028,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             if (packageComparisons.length > 0 && reportPackages !== 'none') {
                 let filteredComps = packageComparisons.filter(p => {
                     if (packageFilterPrefixes.length === 0) return packageFilterMode === 'exclude';
-                    const matchesPrefix = packageFilterPrefixes.some(prefix => p.name.startsWith(prefix));
+                    const matchesPrefix = packageFilterPrefixes.some(prefix => matchesFilterPattern(p.name, prefix));
                     if (packageFilterMode === 'include') return matchesPrefix;
                     return !matchesPrefix;
                 });
@@ -937,8 +1097,6 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     if (additionalCheckResults[c.id]?.goldenExpected !== undefined) {
                         return !additionalCheckResults[c.id]?.isGoldenMatch;
                     }
-                    // For AI mode, if no golden expected, we should send it. But for divergent filter, maybe not. 
-                    // Let's keep it simple: if 'divergent' or 'aiMode', no golden means we DO send it, because it might be a finding, or we want the AI to analyze it. Wait, the user said: "Apenas divergentes', onde apenas os itens com status incorreto são exibidos." and "A IA deve receber apenas itens com status incorreto ou sem base de comparação."
                     return true;
                 });
             }
@@ -981,12 +1139,47 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 html += `</tbody></table></div>`;
             }
 
+            if (uiTextChecks.length > 0 && uiTextChecks.some(c => c.enabled)) {
+                html += `
+                <div class="section">
+                    <div class="section-header">${t('toolbox.checkup.ui_text_checks', 'UI Text Checks')}</div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>${t('toolbox.checkup.check', 'Check')}</th>
+                                <th>${t('toolbox.checkup.activity', 'Activity')}</th>
+                                <th>${t('toolbox.checkup.extracted_texts', 'Extracted / Expected Texts')}</th>
+                                <th>${t('toolbox.checkup.status', 'Status')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                uiTextChecks.filter(c => c.enabled).forEach(c => {
+                    const isMatch = c.isGoldenMatch;
+                    const statusText = isMatch !== undefined ? (isMatch ? t('toolbox.checkup.status_match', 'Match') : t('toolbox.checkup.status_mismatch', 'Mismatch')) : (c.status === 'done' ? t('common.done', 'Done') : t('common.pending', 'Pending'));
+                    const statusClass = isMatch !== undefined ? (isMatch ? 'success' : 'error') : 'info';
+                    const texts = c.foundTexts || c.expectedTexts || [];
+                    const textCount = texts.length;
+                    const textPreview = texts.slice(0, 6).join(', ');
+
+                    html += `
+                        <tr>
+                            <td><strong>${c.name}</strong></td>
+                            <td><code>${c.activity || '-'}</code></td>
+                            <td>${textCount} items: <code>${textPreview}${textCount > 6 ? '...' : ''}</code></td>
+                            <td class="${statusClass}">${statusText}</td>
+                        </tr>
+                    `;
+                });
+                html += `</tbody></table></div>`;
+            }
+
             if (comparisons.length > 0) {
                 let extraProps = comparisons.filter(c => c.isExtra);
 
                 if (propsFilterPrefixes.length > 0) {
                     extraProps = extraProps.filter(c => {
-                        const matchesPrefix = propsFilterPrefixes.some(prefix => c.key.startsWith(prefix));
+                        const matchesPrefix = propsFilterPrefixes.some(prefix => matchesFilterPattern(c.key, prefix));
                         if (propsFilterMode === 'include') return matchesPrefix;
                         return !matchesPrefix;
                     });
@@ -1044,7 +1237,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             const capturedProps: Record<string, string> = {};
             const newComparisons: PropComparison[] = [];
             Object.keys(currentDeviceProps).forEach(key => {
-                if (basePropsPrefixes.some(prefix => key.startsWith(prefix))) {
+                if (basePropsPrefixes.some(prefix => matchesFilterPattern(key, prefix))) {
                     capturedProps[key] = currentDeviceProps[key];
                     newComparisons.push({
                         key,
@@ -1103,6 +1296,36 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             }));
             setAdditionalCheckResults(newAdditionalResults);
 
+            // Execute enabled UI Text checks for Golden File
+            const updatedUiChecks = await Promise.all(uiTextChecks.map(async (check) => {
+                if (!check.enabled) return check;
+                try {
+                    if (check.activity && check.activity.trim()) {
+                        const rawAct = check.activity.trim();
+                        const args = rawAct.startsWith('am start')
+                            ? ['shell', ...rawAct.split(/\s+/)]
+                            : (rawAct.startsWith('shell ') ? rawAct.split(/\s+/) : ['shell', 'am', 'start', '-n', rawAct]);
+                        await invoke('run_adb_command', { device: selectedDevice, args });
+                        await new Promise(r => setTimeout(r, check.delayMs || 1500));
+                    }
+                    const dumpPath = '/sdcard/window_dump.xml';
+                    try {
+                        await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'uiautomator', 'dump', dumpPath] });
+                    } catch (e) { }
+                    const xmlContent: string = await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'cat', dumpPath] });
+                    const extractedTexts = extractTextsFromXml(xmlContent);
+                    return {
+                        ...check,
+                        foundTexts: extractedTexts,
+                        expectedTexts: extractedTexts,
+                        status: 'done' as const
+                    };
+                } catch (e) {
+                    return check;
+                }
+            }));
+            setUiTextChecks(updatedUiChecks);
+
             const pkgs = await invoke<PackageInfo[]>("get_installed_packages", { device: selectedDevice });
 
             const newPkgComps: PackageComparison[] = pkgs.map(p => ({
@@ -1140,6 +1363,14 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     name: p.name,
                     version: p.version,
                     is_system: p.is_system
+                })),
+                ui_text_checks: updatedUiChecks.filter(c => c.enabled).map(c => ({
+                    id: c.id,
+                    name: c.name,
+                    activity: c.activity,
+                    delayMs: c.delayMs || 1500,
+                    expectedTexts: c.expectedTexts || c.foundTexts || [],
+                    enabled: c.enabled
                 }))
             };
 
@@ -1295,7 +1526,7 @@ ${html}`;
 
     const [leftPaneWidth, setLeftPaneWidth] = useState<number>(50);
     const [isDragging, setIsDragging] = useState<boolean>(false);
-    
+
     const containerRef = useRef<HTMLDivElement>(null);
 
     const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -1525,7 +1756,7 @@ ${html}`;
                         </Section>
 
                         {/* Splitter Divider */}
-                        <div 
+                        <div
                             className="hidden md:flex w-1 bg-outline-variant/30 hover:bg-primary/60 cursor-col-resize shrink-0 transition-colors z-10 shadow-[0_0_0_2px_transparent] hover:shadow-[0_0_0_2px_rgba(var(--color-primary),0.2)] self-stretch"
                             onPointerDown={handlePointerDown}
                         />
@@ -1656,64 +1887,183 @@ ${html}`;
                         </Section>
                     </div>
                 </Section>
-                {/* Package Comparisons Panel */}
-                {packageComparisons.length > 0 && (
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Package Comparisons Panel */}
+                    {packageComparisons.length > 0 && (
+                        <Section
+                            title={t('toolbox.checkup.packages_compare', 'Packages Compare')}
+                            icon={ShieldCheck}
+                            className="col-span-1 md:col-span-2 xl:col-span-1 flex-1 min-w-[280px] flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
+                            contentClassName="flex flex-col h-full overflow-hidden p-0"
+                            actions={
+                                <Button
+                                    variant="secondary"
+                                    tooltipPosition="left"
+                                    title={t('toolbox.checkup.clear', 'Clear')}
+                                    onClick={() => setPackageComparisons([])}
+                                    className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
+                                >
+                                    <XCircle size={16} />
+                                </Button>
+                            }
+                        >
+                            <div className="flex-1 h-full min-h-0 bg-surface-variant/10 rounded-xl border border-outline-variant/30 overflow-hidden m-4 mt-0">
+                                <div className="h-full overflow-y-auto overflow-x-auto custom-scrollbar">
+                                    <table className="w-full min-w-[400px] text-left border-collapse text-sm table-fixed">
+                                        <thead className="bg-surface-variant/30 backdrop-blur-md sticky top-0 shadow-sm z-10 text-on-surface-variant">
+                                            <tr>
+                                                <th className="p-3 font-medium border-b border-outline-variant/30 w-5/12">{t('toolbox.checkup.package_name', 'Package')}</th>
+                                                <th className="p-3 font-medium border-b border-outline-variant/30 w-3/12">{t('toolbox.checkup.golden', 'Golden')}</th>
+                                                <th className="p-3 font-medium border-b border-outline-variant/30 w-3/12">{t('toolbox.checkup.device', 'Device')}</th>
+                                                <th className="p-3 font-medium border-b border-outline-variant/30 w-1/12 text-center">{t('toolbox.checkup.status', 'Status')}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {packageComparisons.map(c => (
+                                                <tr key={c.name} className="border-b border-outline-variant/10 hover:bg-surface-variant/20 transition-colors">
+                                                    <td className="p-3 font-mono text-[11px] text-on-surface break-words">{c.name}</td>
+                                                    <td className="p-3 font-mono text-[11px] text-on-surface-variant break-words">{c.goldenVersion || '-'}</td>
+                                                    <td className={clsx(
+                                                        "p-3 font-mono text-[11px] break-words",
+                                                        c.isMatch ? "text-success" : (c.isExtra ? "text-warning" : "text-error font-semibold")
+                                                    )}>
+                                                        {c.deviceVersion || <span className="italic opacity-50">{t('toolbox.checkup.status_missing', 'Missing')}</span>}
+                                                    </td>
+                                                    <td className="p-3 text-center align-middle">
+                                                        {c.isMatch
+                                                            ? <CheckCircle2 size={16} className="text-success mx-auto drop-shadow-sm" />
+                                                            : (c.isExtra
+                                                                ? <Info size={16} className="text-warning mx-auto drop-shadow-sm" />
+                                                                : <XCircle size={16} className="text-error mx-auto drop-shadow-sm" />
+                                                            )
+                                                        }
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </Section>
+                    )}
+
+                    {/* UI Text / Golden Screen Checks Section */}
                     <Section
-                        title={t('toolbox.checkup.packages_compare', 'Packages Compare')}
-                        icon={ShieldCheck}
-                        className="col-span-1 md:col-span-2 xl:col-span-1 flex-1 min-w-[280px] flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden"
-                        contentClassName="flex flex-col h-full overflow-hidden p-0"
+                        title={t('toolbox.checkup.ui_text_checks', 'UI Text / Golden Screen Checks')}
+                        icon={Tv}
+                        className="flex-1 flex flex-col min-h-[300px] overflow-hidden"
+                        contentClassName="flex-1 overflow-y-auto pr-2 space-y-3 min-h-0"
                         actions={
-                            <Button
-                                variant="secondary"
-                                tooltipPosition="left"
-                                title={t('toolbox.checkup.clear', 'Clear')}
-                                onClick={() => setPackageComparisons([])}
-                                className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
-                            >
-                                <XCircle size={16} />
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="secondary"
+                                    tooltipPosition='left'
+                                    title={t('toolbox.checkup.run_all', 'Run All')}
+                                    onClick={runAllUiTextChecks}
+                                    disabled={disabled || uiTextChecks.some(c => c.status === 'running')}
+                                    className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
+                                >
+                                    <Play size={16} className={clsx(uiTextChecks.some(c => c.status === 'running') && "animate-spin")} />
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    tooltipPosition='left'
+                                    title={t('toolbox.checkup.add_ui_check', 'Add UI Check')}
+                                    onClick={() => {
+                                        setEditingUiCheck(null);
+                                        setUiCheckNameInput('');
+                                        setUiCheckActivityInput('');
+                                        setUiCheckDelayInput('1500');
+                                        setIsUiCheckModalOpen(true);
+                                    }}
+                                    className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
+                                >
+                                    <Plus size={16} />
+                                </Button>
+                            </div>
                         }
                     >
-                        <div className="flex-1 h-full min-h-0 bg-surface-variant/10 rounded-xl border border-outline-variant/30 overflow-hidden m-4 mt-0">
-                            <div className="h-full overflow-y-auto overflow-x-auto custom-scrollbar">
-                                <table className="w-full min-w-[400px] text-left border-collapse text-sm table-fixed">
-                                    <thead className="bg-surface-variant/30 backdrop-blur-md sticky top-0 shadow-sm z-10 text-on-surface-variant">
-                                        <tr>
-                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-5/12">{t('toolbox.checkup.package_name', 'Package')}</th>
-                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-3/12">{t('toolbox.checkup.golden', 'Golden')}</th>
-                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-3/12">{t('toolbox.checkup.device', 'Device')}</th>
-                                            <th className="p-3 font-medium border-b border-outline-variant/30 w-1/12 text-center">{t('toolbox.checkup.status', 'Status')}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {packageComparisons.map(c => (
-                                            <tr key={c.name} className="border-b border-outline-variant/10 hover:bg-surface-variant/20 transition-colors">
-                                                <td className="p-3 font-mono text-[11px] text-on-surface break-words">{c.name}</td>
-                                                <td className="p-3 font-mono text-[11px] text-on-surface-variant break-words">{c.goldenVersion || '-'}</td>
-                                                <td className={clsx(
-                                                    "p-3 font-mono text-[11px] break-words",
-                                                    c.isMatch ? "text-success" : (c.isExtra ? "text-warning" : "text-error font-semibold")
-                                                )}>
-                                                    {c.deviceVersion || <span className="italic opacity-50">{t('toolbox.checkup.status_missing', 'Missing')}</span>}
-                                                </td>
-                                                <td className="p-3 text-center align-middle">
-                                                    {c.isMatch
-                                                        ? <CheckCircle2 size={16} className="text-success mx-auto drop-shadow-sm" />
-                                                        : (c.isExtra
-                                                            ? <Info size={16} className="text-warning mx-auto drop-shadow-sm" />
-                                                            : <XCircle size={16} className="text-error mx-auto drop-shadow-sm" />
-                                                        )
-                                                    }
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                        {uiTextChecks.map(check => (
+                            <div key={check.id} className="p-3 rounded-xl border border-outline-variant/30 bg-surface-variant/10 flex flex-col gap-2 text-sm">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        <input
+                                            type="checkbox"
+                                            checked={check.enabled}
+                                            onChange={(e) => setUiTextChecks(prev => prev.map(c => c.id === check.id ? { ...c, enabled: e.target.checked } : c))}
+                                            className="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4 shrink-0"
+                                        />
+                                        <span className="font-semibold text-on-surface truncate">{check.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        {check.status === 'running' && <ExpressiveLoading variant="circular" size="sm" />}
+                                        {check.isGoldenMatch !== undefined && (
+                                            check.isGoldenMatch
+                                                ? <CheckCircle2 size={16} className="text-success shrink-0" />
+                                                : <XCircle size={16} className="text-error shrink-0" />
+                                        )}
+                                        <Button
+                                            variant="ghost"
+                                            tooltipPosition='left'
+                                            title={t('common.run', 'Run')}
+                                            onClick={() => runSingleUiTextCheck(check)}
+                                            disabled={disabled || check.status === 'running'}
+                                            className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
+                                        >
+                                            <Play size={12} className="mr-1" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            tooltipPosition='left'
+                                            title={t('common.edit', 'Edit')}
+                                            onClick={() => {
+                                                setEditingUiCheck(check);
+                                                setUiCheckNameInput(check.name);
+                                                setUiCheckActivityInput(check.activity || '');
+                                                setUiCheckDelayInput(String(check.delayMs || 1500));
+                                                setIsUiCheckModalOpen(true);
+                                            }}
+                                            className="h-7 w-7 p-0"
+                                        >
+                                            <Edit3 size={12} />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            tooltipPosition='left'
+                                            title={t('common.delete', 'Delete')}
+                                            onClick={() => setUiTextChecks(prev => prev.filter(c => c.id !== check.id))}
+                                            className="relative h-9 w-9 p-0 flex items-center justify-center shrink-0 rounded-md"
+                                        >
+                                            <Trash2 size={12} />
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {check.activity && (
+                                    <div className="text-[11px] font-mono px-2 py-0.5 rounded bg-surface-variant text-on-surface-variant opacity-80 truncate">
+                                        {check.activity}
+                                    </div>
+                                )}
+
+                                {(check.foundTexts || check.expectedTexts) && (
+                                    <div className="text-xs bg-surface/50 p-2 rounded-lg border border-outline-variant/20 flex flex-col gap-1 font-mono text-[11px] max-h-24 overflow-y-auto">
+                                        {check.expectedTexts && check.expectedTexts.length > 0 && (
+                                            <div className="text-on-surface-variant/80">
+                                                <strong>{t('toolbox.checkup.expected', 'Expected')} ({check.expectedTexts.length}):</strong> {check.expectedTexts.slice(0, 6).join(', ')}{check.expectedTexts.length > 6 ? '...' : ''}
+                                            </div>
+                                        )}
+                                        {check.foundTexts && check.foundTexts.length > 0 && (
+                                            <div className="text-primary">
+                                                <strong>{t('toolbox.checkup.found', 'Found')} ({check.foundTexts.length}):</strong> {check.foundTexts.slice(0, 6).join(', ')}{check.foundTexts.length > 6 ? '...' : ''}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                        </div>
+                        ))}
                     </Section>
-                )}
+                </div>
 
             </div>
 
@@ -1992,6 +2342,77 @@ ${html}`;
                     </Button>
                     <Button variant="primary" onClick={verifyReportWithAI} disabled={isAiVerifying || !aiRequirementsPrompt.trim()}>
                         {isAiVerifying ? t('toolbox.checkup.report.ai_verifying', 'Verifying...') : t('toolbox.checkup.report.start_verification', 'Start Verification')}
+                    </Button>
+                </div>
+            </Modal>
+
+            {/* UI Check Modal */}
+            <Modal
+                isOpen={isUiCheckModalOpen}
+                onClose={() => setIsUiCheckModalOpen(false)}
+                title={editingUiCheck ? t('toolbox.checkup.edit_ui_check', 'Edit UI Text Check') : t('toolbox.checkup.add_ui_check', 'Add UI Text Check')}
+                className="max-w-md"
+            >
+                <div className="flex flex-col gap-4">
+                    <div>
+                        <label className="text-xs font-semibold text-on-surface mb-1 block">{t('toolbox.checkup.check_name', 'Check Name')}</label>
+                        <Input
+                            value={uiCheckNameInput}
+                            onChange={(e) => setUiCheckNameInput(e.target.value)}
+                            placeholder={t('toolbox.checkup.check_name_placeholder', 'Example: UI Text Check')}
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs font-semibold text-on-surface mb-1 block">{t('toolbox.checkup.activity_command', 'Activity / Launch Command (Optional)')}</label>
+                        <Input
+                            value={uiCheckActivityInput}
+                            onChange={(e) => setUiCheckActivityInput(e.target.value)}
+                            placeholder={t('toolbox.checkup.activity_placeholder', 'Example: com.android.myapp/my.package.Activity')}
+                        />
+                        <span className="text-[11px] text-on-surface-variant/70 mt-1 block">
+                            {t('toolbox.checkup.activity_tip', 'Format: package/activity or shell am start -n ...')}
+                        </span>
+                    </div>
+                    <div>
+                        <label className="text-xs font-semibold text-on-surface mb-1 block">{t('toolbox.checkup.wait_delay', 'Wait Delay (ms)')}</label>
+                        <Input
+                            type="number"
+                            value={uiCheckDelayInput}
+                            onChange={(e) => setUiCheckDelayInput(e.target.value)}
+                            placeholder="1500"
+                        />
+                    </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-outline-variant/30">
+                    <Button variant="ghost" onClick={() => setIsUiCheckModalOpen(false)}>
+                        {t('common.cancel', 'Cancel')}
+                    </Button>
+                    <Button
+                        variant="primary"
+                        onClick={() => {
+                            if (!uiCheckNameInput.trim()) return;
+                            const delayMs = parseInt(uiCheckDelayInput) || 1500;
+                            if (editingUiCheck) {
+                                setUiTextChecks(prev => prev.map(c => c.id === editingUiCheck.id ? {
+                                    ...c,
+                                    name: uiCheckNameInput.trim(),
+                                    activity: uiCheckActivityInput.trim(),
+                                    delayMs
+                                } : c));
+                            } else {
+                                const newCheck: UiTextCheckConfig = {
+                                    id: `ui_check_${Date.now()}`,
+                                    name: uiCheckNameInput.trim(),
+                                    activity: uiCheckActivityInput.trim(),
+                                    delayMs,
+                                    enabled: true
+                                };
+                                setUiTextChecks(prev => [...prev, newCheck]);
+                            }
+                            setIsUiCheckModalOpen(false);
+                        }}
+                    >
+                        {t('common.save', 'Save')}
                     </Button>
                 </div>
             </Modal>
