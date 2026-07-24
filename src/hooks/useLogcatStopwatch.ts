@@ -16,6 +16,26 @@ interface StopwatchCacheEntry {
 }
 const stopwatchCacheMap = new Map<string, StopwatchCacheEntry>();
 
+function matchesWildcardKeyword(line: string, keyword: string): boolean {
+    if (!line || !keyword) return false;
+    const trimmedKw = keyword.trim();
+    if (!trimmedKw) return false;
+
+    if (trimmedKw.includes('*')) {
+        const regexStr = trimmedKw
+            .split('*')
+            .map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+            .join('.*');
+        try {
+            const regex = new RegExp(regexStr, 'i');
+            return regex.test(line);
+        } catch (e) {
+            return line.toLowerCase().includes(trimmedKw.toLowerCase());
+        }
+    }
+    return line.toLowerCase().includes(trimmedKw.toLowerCase());
+}
+
 export function useLogcatStopwatch(selectedDevice: string, selectedPackage: string) {
     const { settings } = useSettings();
     const cached = selectedDevice ? stopwatchCacheMap.get(selectedDevice) : undefined;
@@ -112,7 +132,7 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
                         const lines = event.payload.lines;
                         for (const line of lines) {
                             for (const kw of keywords) {
-                                if (line.includes(kw)) {
+                                if (matchesWildcardKeyword(line, kw)) {
                                     setLaps(prev => {
                                         const now = performance.now();
                                         const timestamp = Date.now(); // Keep Date.now for UI display of time
