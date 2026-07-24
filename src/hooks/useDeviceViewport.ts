@@ -41,6 +41,8 @@ export function useDeviceViewport({
     const [imgLayout, setImgLayout] = useState<{ width: number, height: number, naturalWidth: number, naturalHeight: number } | null>(null);
     const [selectedNode, setSelectedNode] = useState<InspectorNode | null>(null);
     const [hoveredNode, setHoveredNode] = useState<InspectorNode | null>(null);
+    const [uiTreeSource, setUiTreeSource] = useState<'companion' | 'adb' | null>(null);
+    const [uiTreeFetchTimeMs, setUiTreeFetchTimeMs] = useState<number | null>(null);
 
     const [taps, setTaps] = useState<{ id: number, x: number, y: number }[]>([]);
     const [swipes, setSwipes] = useState<{ id: number, startX: number, startY: number, endX: number, endY: number }[]>([]);
@@ -73,46 +75,39 @@ export function useDeviceViewport({
         let screenshotSucceeded = false;
         try {
             const webUrlParam = targetWebUrl || (isWeb ? activeWebUrl : undefined);
+            const startTime = performance.now();
 
+            // Fire ADB compressed screenshot in parallel at start (takes ~250ms on USB 3.0 / USB-C on S25 Ultra)
             const screenshotPromise = compressed 
                 ? invoke<string>('get_compressed_screenshot', { deviceId, maxWidth: 1024, maxHeight: 1024, webUrl: webUrlParam })
                 : invoke<string>('get_screenshot', { deviceId, webUrl: webUrlParam });
 
-            const xmlPromise = invoke<string>('get_xml_dump', { deviceId, webUrl: webUrlParam });
-
-            const [screenshotResult, xmlResult] = await Promise.allSettled([screenshotPromise, xmlPromise]);
-
-            if (screenshotResult.status === 'fulfilled') {
-                const b64 = screenshotResult.value;
-                const prefix = compressed ? 'data:image/jpeg;base64,' : 'data:image/png;base64,';
-                setScreenshot(b64.startsWith('data:') ? b64 : `${prefix}${b64}`);
-                screenshotSucceeded = true;
-            } else {
-                console.warn("[Inspector] Screenshot failed, but continuing with XML dump:", screenshotResult.reason);
-                setScreenshot(null);
-            }
-
-            // Resolve UI tree: prefer Companion sub-10ms tree, fallback to ADB XML dump
+            // Resolve UI tree: prefer Companion sub-10ms tree, fallback ONLY if needed to ADB XML dump
             let root: InspectorNode | null = null;
+            let source: 'companion' | 'adb' = 'adb';
 
             if (!isWeb) {
                 try {
+                    const companionStart = performance.now();
                     const rawJson = await invoke<string>('fetch_companion_ui_tree', { port: 9876 });
                     const companionTreeData = JSON.parse(rawJson);
                     if (companionTreeData.status === 'ok' && Array.isArray(companionTreeData.nodes) && companionTreeData.nodes.length > 0) {
                         root = transformCompanionTreeToInspectorNode(companionTreeData.nodes);
+                        source = 'companion';
+                        const duration = Math.round(performance.now() - companionStart);
+                        console.log(`⚡ [DeviceViewport] UI Tree fetched via Companion Accessibility Bridge in ${duration}ms!`);
+                    } else {
+                        console.warn("⚠️ [DeviceViewport] Companion UI Tree returned non-OK status:", companionTreeData);
                     }
-                } catch {
-                    // Companion not active or not installed — silent fallback to ADB
+                } catch (companionErr) {
+                    console.warn("⚠️ [DeviceViewport] Companion UI Tree fetch exception:", companionErr);
                 }
             }
 
             if (!root) {
-                if (xmlResult.status === 'rejected') {
-                    throw xmlResult.reason;
-                }
-
-                const xml = xmlResult.value;
+                // ADB Fallback: Only invoke slow get_xml_dump (3.5s - 4.5s) when Companion is NOT available!
+                const adbStart = performance.now();
+                const xml = await invoke<string>('get_xml_dump', { deviceId, webUrl: webUrlParam });
                 setXmlDump(xml);
                 const parser = new XMLParser({
                     ignoreAttributes: false,
@@ -121,8 +116,41 @@ export function useDeviceViewport({
                 });
                 const jsonObj = parser.parse(xml);
                 root = jsonObj.hierarchy ? transformXmlToTree(jsonObj.hierarchy) : transformXmlToTree(jsonObj);
+                source = 'adb';
+                const duration = Math.round(performance.now() - adbStart);
+                console.log(`🐢 [DeviceViewport] UI Tree fetched via ADB XML dump in ${duration}ms.`);
             }
 
+            // Screenshot resolution: Try Companion native screenshot first (fast 250ms timeout in Rust), fallback to parallel ADB screencap (~250ms)
+            try {
+                let b64: string | null = null;
+                if (source === 'companion') {
+                    try {
+                        const compStart = performance.now();
+                        b64 = await invoke<string>('fetch_companion_screenshot', { port: 9876 });
+                        console.log(`⚡ [DeviceViewport] Screenshot fetched via Companion Native Bridge in ${Math.round(performance.now() - compStart)}ms!`);
+                    } catch (e) {
+                        console.warn("[DeviceViewport] Companion screenshot fallback to parallel ADB screencap:", e);
+                    }
+                }
+
+                if (!b64) {
+                    const adbCapStart = performance.now();
+                    b64 = await screenshotPromise;
+                    console.log(`🐢 [DeviceViewport] Screenshot fetched via ADB screencap in ${Math.round(performance.now() - adbCapStart)}ms.`);
+                }
+
+                const prefix = compressed ? 'data:image/jpeg;base64,' : 'data:image/png;base64,';
+                setScreenshot(b64.startsWith('data:') ? b64 : `${prefix}${b64}`);
+                screenshotSucceeded = true;
+            } catch (screenshotErr) {
+                console.warn("[Inspector] Screenshot failed, but continuing with UI tree:", screenshotErr);
+                setScreenshot(null);
+            }
+
+            const totalDuration = Math.round(performance.now() - startTime);
+            setUiTreeSource(source);
+            setUiTreeFetchTimeMs(totalDuration);
             setRootNode(root);
 
             // If screenshot failed, we need to set a fallback layout so interactions work
@@ -438,6 +466,8 @@ export function useDeviceViewport({
         sendAdbInput,
         addTapAnimation,
         addSwipeAnimation,
+        uiTreeSource,
+        uiTreeFetchTimeMs,
         handlers: {
             onMouseMove: handleMouseMove,
             onMouseDown: handleMouseDown,

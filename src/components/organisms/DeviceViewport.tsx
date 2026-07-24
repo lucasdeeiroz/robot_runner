@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, Maximize, Scan, Globe } from 'lucide-react';
+import { RefreshCw, Maximize, Scan, Globe, Rocket } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { InspectorNode, getHighlighterStyle } from '@/lib/inspectorUtils';
@@ -25,6 +25,10 @@ interface DeviceViewportProps {
     // Interactions
     taps: { id: number, x: number, y: number }[];
     swipes: { id: number, startX: number, startY: number, endX: number, endY: number }[];
+
+    // Companion Performance Metrics
+    uiTreeSource?: 'companion' | 'adb' | null;
+    uiTreeFetchTimeMs?: number | null;
 
     // Handlers
     onRefresh: (forceClear?: boolean, targetWebUrl?: string) => void;
@@ -57,6 +61,8 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
     searchResults = [],
     taps,
     swipes,
+    uiTreeSource,
+    uiTreeFetchTimeMs,
     onRefresh,
     handlers,
     isExploring = false,
@@ -72,6 +78,19 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
     const isWeb = isWebOverride !== undefined ? isWebOverride : is_test_mode === 'web';
 
     const [urlInput, setUrlInput] = React.useState(activeWebUrl);
+    const [showEngineBadge, setShowEngineBadge] = React.useState(false);
+
+    React.useEffect(() => {
+        if (uiTreeSource) {
+            setShowEngineBadge(true);
+            const timer = setTimeout(() => {
+                setShowEngineBadge(false);
+            }, 5000);
+            return () => clearTimeout(timer);
+        } else {
+            setShowEngineBadge(false);
+        }
+    }, [uiTreeSource, uiTreeFetchTimeMs]);
 
     // Derived layout for fallback (if image fails but hierarchy is OK)
     const imgLayout = React.useMemo(() => {
@@ -435,6 +454,34 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
                     >
                         <RefreshCw size={12} />
                     </motion.button>
+                )}
+            </AnimatePresence>
+
+            {/* Floating Companion Engine Badge (Auto-hides after 5 seconds) */}
+            <AnimatePresence>
+                {showEngineBadge && uiTreeSource && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.9 }}
+                        transition={{ duration: 0.3 }}
+                        className={clsx(
+                            "absolute top-1.5 right-2 z-[60] px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5 backdrop-blur-md shadow-xl transition-all select-none border",
+                            uiTreeSource === 'companion'
+                                ? "bg-primary/90 text-on-primary border-primary/40"
+                                : "bg-black/60 text-white/90 border-white/20"
+                        )}
+                        title={uiTreeSource === 'companion' ? `Sub-10ms Accessibility Bridge (${uiTreeFetchTimeMs ?? 0}ms)` : `ADB uiautomator dump (${uiTreeFetchTimeMs ?? 0}ms)`}
+                    >
+                        {uiTreeSource === 'companion' ? (
+                            <>
+                                <Rocket size={12} className="shrink-0 text-on-primary animate-pulse" />
+                                <span>Companion ({uiTreeFetchTimeMs ?? 0}ms)</span>
+                            </>
+                        ) : (
+                            <span>ADB ({uiTreeFetchTimeMs ?? 0}ms)</span>
+                        )}
+                    </motion.div>
                 )}
             </AnimatePresence>
 

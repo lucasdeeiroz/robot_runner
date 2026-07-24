@@ -60,6 +60,8 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
         refreshAll,
         sendAdbInput,
         addTapAnimation,
+        uiTreeSource,
+        uiTreeFetchTimeMs,
         handlers
     } = useDeviceViewport({
         deviceId: selectedDevice,
@@ -664,6 +666,8 @@ Parent Tag: ${selectedNode.parent?.tagName || 'N/A'}
                         searchResults={searchResults}
                         taps={taps}
                         swipes={swipes}
+                        uiTreeSource={uiTreeSource}
+                        uiTreeFetchTimeMs={uiTreeFetchTimeMs}
                         onRefresh={(forceClear, targetWebUrl) => refreshAll(true, forceClear, targetWebUrl)}
                         handlers={handlers}
                     />

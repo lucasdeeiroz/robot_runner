@@ -167,6 +167,13 @@ export function useCompanion(selectedDevice: string | null) {
             });
             console.log("[useCompanion] ADB port forward established on port:", port);
 
+            // Ensure Accessibility Service is enabled via ADB on selected device
+            try {
+                await invoke('enable_companion_accessibility', { device: selectedDevice });
+            } catch (e) {
+                console.warn("[useCompanion] Auto enable accessibility failed silently:", e);
+            }
+
             // Initial fetch
             const success = await fetchDeviceStats(port);
             if (success) {
@@ -177,8 +184,25 @@ export function useCompanion(selectedDevice: string | null) {
                     fetchRecentEvents(port);
                 }, 5000);
             } else {
-                console.warn("[useCompanion] Initial HTTP fetch failed. Service might not be ready.");
-                setStatus('disconnected');
+                console.warn("[useCompanion] Initial HTTP fetch failed. Attempting silent launch of Companion app...");
+                try {
+                    await invoke('launch_companion_app', { device: selectedDevice });
+                    setTimeout(async () => {
+                        const retrySuccess = await fetchDeviceStats(port);
+                        if (retrySuccess) {
+                            console.log("[useCompanion] Companion connected successfully after silent launch!");
+                            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                            pollIntervalRef.current = setInterval(() => {
+                                fetchDeviceStats(port);
+                                fetchRecentEvents(port);
+                            }, 5000);
+                        } else {
+                            setStatus('disconnected');
+                        }
+                    }, 1500);
+                } catch {
+                    setStatus('disconnected');
+                }
             }
         } catch (err) {
             console.error("[useCompanion] Connection error:", err);
@@ -219,7 +243,11 @@ export function useCompanion(selectedDevice: string | null) {
 
     useEffect(() => {
         if (selectedDevice) {
-            checkInstallation();
+            checkInstallation().then(installed => {
+                if (installed) {
+                    connectCompanion();
+                }
+            });
         } else {
             setStatus('disconnected');
             setDeviceInfo(null);
@@ -234,7 +262,7 @@ export function useCompanion(selectedDevice: string | null) {
                 clearInterval(pollIntervalRef.current);
             }
         };
-    }, [selectedDevice, checkInstallation]);
+    }, [selectedDevice, checkInstallation, connectCompanion]);
 
     return {
         status,

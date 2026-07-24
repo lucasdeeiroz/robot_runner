@@ -196,6 +196,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         imgRef,
         refreshAll,
         sendAdbInput,
+        uiTreeSource,
+        uiTreeFetchTimeMs,
         handlers
     } = useDeviceViewport({
         deviceId: selectedDevice,
@@ -1798,6 +1800,8 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
                                 selectedNode={selectedNode}
                                 taps={taps}
                                 swipes={swipes}
+                                uiTreeSource={uiTreeSource}
+                                uiTreeFetchTimeMs={uiTreeFetchTimeMs}
                                 onRefresh={(forceClear, targetWebUrl) => refreshAll(true, forceClear, targetWebUrl)}
                                 handlers={handlers}
                             />

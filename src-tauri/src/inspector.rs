@@ -207,12 +207,12 @@ pub async fn get_screenshot(app_handle: AppHandle, device_id: String, web_url: O
         .await
         .map_err(|e| format!("Failed to execute adb screencap: {}", e))?;
 
-    let bytes = if !output.status.success() || output.stdout.is_empty() {
+    let bytes = if output.stdout.len() > 1000 {
+        output.stdout
+    } else {
         fallback_screencap(&app_handle, &device_id).await.map_err(|e| {
             format!("ADB screencap failed and fallback also failed. Error: {}", e)
         })?
-    } else {
-        output.stdout
     };
 
     let b64 = general_purpose::STANDARD.encode(&bytes);
@@ -246,12 +246,12 @@ pub async fn get_compressed_screenshot(app_handle: AppHandle, device_id: String,
         .await
         .map_err(|e| format!("Failed to execute adb screencap: {}", e))?;
 
-    let bytes = if !output.status.success() || output.stdout.is_empty() {
+    let bytes = if output.stdout.len() > 1000 {
+        output.stdout
+    } else {
         fallback_screencap(&app_handle, &device_id).await.map_err(|e| {
             format!("ADB screencap failed and fallback also failed. Error: {}", e)
         })?
-    } else {
-        output.stdout
     };
 
     let w = max_width.unwrap_or(800);

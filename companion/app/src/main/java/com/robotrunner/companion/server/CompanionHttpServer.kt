@@ -40,6 +40,32 @@ class CompanionHttpServer(
         requestCount++
         onStatusChangedListener?.invoke()
 
+        if (uri == "/screenshot" || uri == "/screenshot/jpeg") {
+            val service = CompanionAccessibilityService.instance
+            if (service != null) {
+                val latch = java.util.concurrent.CountDownLatch(1)
+                var imageBytes: ByteArray? = null
+                service.takeInstantScreenshot { bytes ->
+                    imageBytes = bytes
+                    latch.countDown()
+                }
+                try {
+                    latch.await(200, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    if (imageBytes != null) {
+                        val stream = java.io.ByteArrayInputStream(imageBytes)
+                        return newFixedLengthResponse(Response.Status.OK, "image/jpeg", stream, imageBytes!!.size.toLong())
+                    }
+                } catch (e: Exception) {
+                    Log.e("CompanionHttpServer", "Timeout or error taking screenshot", e)
+                }
+            }
+            val errJson = JsonObject().apply {
+                addProperty("status", "error")
+                addProperty("message", "Accessibility screenshot unavailable on this device/API level")
+            }
+            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", errJson.toString())
+        }
+
         val responseJson = when (uri) {
             "/ping" -> JsonObject().apply {
                 addProperty("status", "ok")

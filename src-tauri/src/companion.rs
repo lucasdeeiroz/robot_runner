@@ -90,7 +90,7 @@ pub async fn launch_companion_app(app: AppHandle, device: String) -> AppResult<(
 
 #[command]
 pub async fn enable_companion_accessibility(app: AppHandle, device: String) -> AppResult<()> {
-    let args = vec![
+    let args1 = vec![
         "shell".to_string(),
         "settings".to_string(),
         "put".to_string(),
@@ -98,8 +98,17 @@ pub async fn enable_companion_accessibility(app: AppHandle, device: String) -> A
         "enabled_accessibility_services".to_string(),
         "com.robotrunner.companion/.service.CompanionAccessibilityService".to_string(),
     ];
+    let args2 = vec![
+        "shell".to_string(),
+        "settings".to_string(),
+        "put".to_string(),
+        "secure".to_string(),
+        "accessibility_enabled".to_string(),
+        "1".to_string(),
+    ];
     eprintln!("[Companion Rust] Enabling accessibility service via ADB on {}", device);
-    let output = execute_adb_with_recovery(&app, Some(&device), args).await?;
+    let _ = execute_adb_with_recovery(&app, Some(&device), args1).await;
+    let output = execute_adb_with_recovery(&app, Some(&device), args2).await?;
     if output.status.success() {
         Ok(())
     } else {
@@ -140,7 +149,7 @@ pub async fn fetch_companion_ui_tree(port: Option<u16>) -> AppResult<String> {
     let url = format!("http://127.0.0.1:{}/ui-tree", p);
 
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(3000))
+        .timeout(Duration::from_millis(1000))
         .build()
         .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
 
@@ -263,4 +272,34 @@ pub async fn trigger_companion_action(
         .map_err(|e| AppError::FileSystemError(format!("Failed to read response body: {}", e)))?;
 
     Ok(text)
+}
+
+#[command]
+pub async fn fetch_companion_screenshot(port: Option<u16>) -> AppResult<String> {
+    let p = port.unwrap_or(9876);
+    let url = format!("http://127.0.0.1:{}/screenshot", p);
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_millis(1000))
+        .build()
+        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
+
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| AppError::FileSystemError(format!("Failed to fetch companion screenshot: {}", e)))?;
+
+    if resp.status().is_success() {
+        let bytes = resp
+            .bytes()
+            .await
+            .map_err(|e| AppError::FileSystemError(format!("Failed to read screenshot bytes: {}", e)))?;
+
+        use base64::Engine;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+        Ok(format!("data:image/jpeg;base64,{}", b64))
+    } else {
+        Err(AppError::FileSystemError("Companion screenshot endpoint returned error status".into()))
+    }
 }

@@ -94,8 +94,92 @@ class CompanionAccessibilityService : AccessibilityService() {
         return false
     }
 
+    fun takeInstantScreenshot(onComplete: (ByteArray?) -> Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            takeScreenshot(
+                android.view.Display.DEFAULT_DISPLAY,
+                mainExecutor,
+                object : TakeScreenshotCallback {
+                    override fun onSuccess(screenshot: ScreenshotResult) {
+                        try {
+                            val hardwareBuffer = screenshot.hardwareBuffer
+                            val colorSpace = screenshot.colorSpace
+                            val bitmap = android.graphics.Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)
+                            hardwareBuffer.close()
+
+                            if (bitmap != null) {
+                                val stream = java.io.ByteArrayOutputStream()
+                                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, stream)
+                                bitmap.recycle()
+                                onComplete(stream.toByteArray())
+                                return
+                            }
+                        } catch (e: Exception) {
+                            Log.e("CompanionAccessibility", "Error compressing hardware screenshot", e)
+                        }
+                        takeInternalScreencapFallback(onComplete)
+                    }
+
+                    override fun onFailure(errorCode: Int) {
+                        Log.w("CompanionAccessibility", "takeScreenshot failed with error $errorCode, trying internal fallback")
+                        takeInternalScreencapFallback(onComplete)
+                    }
+                }
+            )
+        } else {
+            takeInternalScreencapFallback(onComplete)
+        }
+    }
+
+    private fun takeInternalScreencapFallback(onComplete: (ByteArray?) -> Unit) {
+        Thread {
+            try {
+                val process = Runtime.getRuntime().exec("screencap -p")
+                val bytes = process.inputStream.readBytes()
+                process.waitFor()
+                if (bytes.isNotEmpty()) {
+                    val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    if (bitmap != null) {
+                        val stream = java.io.ByteArrayOutputStream()
+                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, stream)
+                        bitmap.recycle()
+                        onComplete(stream.toByteArray())
+                        return@Thread
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("CompanionAccessibility", "Internal screencap fallback failed", e)
+            }
+            onComplete(null)
+        }.start()
+    }
+
     fun getInstantUiTreeJson(): JsonObject {
-        val root = rootInActiveWindow
+        var root = rootInActiveWindow
+        if (root == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            try {
+                val activeWindows = windows
+                if (activeWindows != null) {
+                    for (w in activeWindows) {
+                        if (w.root != null && w.isFocused) {
+                            root = w.root
+                            break
+                        }
+                    }
+                    if (root == null) {
+                        for (w in activeWindows) {
+                            if (w.root != null) {
+                                root = w.root
+                                break
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("CompanionAccessibility", "Error iterating interactive windows", e)
+            }
+        }
+
         val rootObj = JsonObject()
         rootObj.addProperty("timestamp", System.currentTimeMillis())
 
