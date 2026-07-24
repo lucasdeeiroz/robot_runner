@@ -1,5 +1,6 @@
 
 import { getVersion } from '@tauri-apps/api/app';
+import { invoke } from '@tauri-apps/api/core';
 import { gt } from 'semver';
 import { platform } from '@tauri-apps/plugin-os';
 import { tempDir, join } from '@tauri-apps/api/path';
@@ -99,19 +100,19 @@ export async function checkForUpdates(channel: 'stable' | 'beta' | 'alpha' = 'st
                 if (name.includes('windows') && (name.includes('x64') || name.includes('x86_64'))) {
                     isCompatible = true;
                     if (name.includes('setup.exe') || name.includes('.msi')) type = 'installer';
-                    else if (name.includes('portable.exe')) type = 'portable';
+                    else if (name.includes('portable.exe') || name.includes('-portable.exe') || name.includes('portable')) type = 'portable';
                 }
             } else if (currentPlatform === 'linux') {
                 if (name.includes('linux') && (name.includes('amd64') || name.includes('x86_64'))) {
                     isCompatible = true;
                     if (name.includes('.deb') || name.includes('.rpm')) type = 'installer';
-                    else if (name.includes('.appimage')) type = 'portable';
+                    else if (name.includes('.appimage') || name.includes('portable')) type = 'portable';
                 }
             } else if (currentPlatform === 'macos') {
                 if (name.includes('macos') || name.includes('darwin')) {
                     isCompatible = true;
                     if (name.includes('.dmg')) type = 'installer';
-                    else if (name.includes('.tar.gz')) type = 'portable';
+                    else if (name.includes('.tar.gz') || name.includes('portable')) type = 'portable';
                 }
             }
 
@@ -180,8 +181,20 @@ export async function downloadAndInstall(asset: UpdateAsset, onProgress?: (p: nu
 
         await writeFile(filePath, data);
 
-        // Open the installer
-        await openPath(filePath);
+        if (asset.type === 'portable') {
+            try {
+                await invoke('apply_portable_update', {
+                    tempDownloadPath: filePath,
+                    assetName: asset.name
+                });
+            } catch (err) {
+                console.warn("Failed to apply portable update in-place, opening file fallback:", err);
+                await openPath(filePath);
+            }
+        } else {
+            // Open the installer
+            await openPath(filePath);
+        }
     } catch (e) {
         console.error("Update download failed:", e);
         throw e;
