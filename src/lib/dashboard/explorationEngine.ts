@@ -59,6 +59,7 @@ export interface ExplorationState {
     priorityKeywords: string[];
     avoidKeywords: string[];
     forceReexplore: string[];
+    recentSystemEvents?: Array<{ type: string; message: string; packageName: string; timestamp: number }>;
 }
 
 export interface ExplorationAction {
@@ -265,6 +266,17 @@ export class AutonomousExplorer {
         this.state.previousScreenName = undefined;
         this.state.previousActionTargetId = undefined;
         this.state.previousActionType = undefined;
+    }
+
+    /** Updates real-time system events (Toasts, alert dialogs) captured via Companion Bridge. */
+    public setRecentSystemEvents(events: Array<{ type: string; message: string; packageName: string; timestamp: number }>) {
+        this.state.recentSystemEvents = events;
+        if (events && events.length > 0) {
+            const latestToast = events.find(e => e.type === 'toast');
+            if (latestToast) {
+                this.addLog(`🔔 Toast System Event Intercepted: "${latestToast.message}"`, 'info');
+            }
+        }
     }
 
     public setSessionId(sessionId: string) {

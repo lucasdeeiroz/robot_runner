@@ -146,6 +146,23 @@ export function useCompanion(selectedDevice: string | null) {
         }
     }, []);
 
+    const performNodeAction = useCallback(async (opts: { resourceId?: string; text?: string; contentDescription?: string; action?: string; value?: string }, port = 9876) => {
+        try {
+            const rawJson = await invoke<string>('perform_companion_node_action', {
+                port,
+                resourceId: opts.resourceId,
+                text: opts.text,
+                contentDescription: opts.contentDescription,
+                action: opts.action || 'click',
+                value: opts.value
+            });
+            return JSON.parse(rawJson);
+        } catch (e) {
+            console.error("[useCompanion] Failed to perform node action:", e);
+            throw e;
+        }
+    }, []);
+
     const connectCompanion = useCallback(async () => {
         if (!selectedDevice) return;
         setStatus('connecting');
@@ -278,6 +295,7 @@ export function useCompanion(selectedDevice: string | null) {
         enableAccessibility,
         generatePdfReport,
         runStandaloneCheckup,
-        performTap
+        performTap,
+        performNodeAction
     };
 }

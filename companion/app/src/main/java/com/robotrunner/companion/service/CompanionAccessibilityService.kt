@@ -94,6 +94,96 @@ class CompanionAccessibilityService : AccessibilityService() {
         return false
     }
 
+    fun performNodeActionByMatch(
+        resourceId: String? = null,
+        textMatch: String? = null,
+        contentDescMatch: String? = null,
+        action: String = "click",
+        textValue: String? = null
+    ): Boolean {
+        var root = rootInActiveWindow
+        if (root == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            try {
+                val activeWindows = windows
+                if (activeWindows != null) {
+                    for (w in activeWindows) {
+                        if (w.root != null && w.isFocused) {
+                            root = w.root
+                            break
+                        }
+                    }
+                    if (root == null) {
+                        for (w in activeWindows) {
+                            if (w.root != null) {
+                                root = w.root
+                                break
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("CompanionAccessibility", "Error checking windows for node action", e)
+            }
+        }
+        if (root == null) return false
+
+        val targetNode = findMatchingNode(root, resourceId, textMatch, contentDescMatch)
+        if (targetNode != null) {
+            return when (action.lowercase()) {
+                "click", "tap" -> {
+                    var curr: AccessibilityNodeInfo? = targetNode
+                    var clicked = false
+                    while (curr != null) {
+                        if (curr.isClickable) {
+                            clicked = curr.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                            if (clicked) break
+                        }
+                        curr = curr.parent
+                    }
+                    if (!clicked) {
+                        targetNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    } else true
+                }
+                "input", "set_text" -> {
+                    if (textValue != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        val args = android.os.Bundle().apply {
+                            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, textValue)
+                        }
+                        targetNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+                    } else false
+                }
+                "scroll_forward" -> targetNode.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+                "scroll_backward" -> targetNode.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
+                else -> false
+            }
+        }
+        return false
+    }
+
+    private fun findMatchingNode(
+        node: AccessibilityNodeInfo,
+        resourceId: String?,
+        textMatch: String?,
+        contentDescMatch: String?
+    ): AccessibilityNodeInfo? {
+        if (!resourceId.isNullOrEmpty() && node.viewIdResourceName?.equals(resourceId, ignoreCase = true) == true) {
+            return node
+        }
+        if (!textMatch.isNullOrEmpty() && node.text?.toString()?.contains(textMatch, ignoreCase = true) == true) {
+            return node
+        }
+        if (!contentDescMatch.isNullOrEmpty() && node.contentDescription?.toString()?.contains(contentDescMatch, ignoreCase = true) == true) {
+            return node
+        }
+
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val match = findMatchingNode(child, resourceId, textMatch, contentDescMatch)
+            if (match != null) return match
+        }
+        return null
+    }
+
     fun takeInstantScreenshot(onComplete: (ByteArray?) -> Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             takeScreenshot(

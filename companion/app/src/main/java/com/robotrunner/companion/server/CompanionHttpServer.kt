@@ -159,6 +159,45 @@ class CompanionHttpServer(
                 }
             }
 
+            "/action/node-perform" -> {
+                val service = CompanionAccessibilityService.instance
+                if (service != null) {
+                    try {
+                        val map = HashMap<String, String>()
+                        session.parseBody(map)
+                        val postData = map["postData"]
+                        val json = gson.fromJson(postData, JsonObject::class.java)
+                        val resourceId = json?.get("resourceId")?.asString
+                        val textMatch = json?.get("text")?.asString
+                        val contentDesc = json?.get("contentDescription")?.asString
+                        val action = json?.get("action")?.asString ?: "click"
+                        val value = json?.get("value")?.asString
+
+                        val success = service.performNodeActionByMatch(
+                            resourceId = resourceId,
+                            textMatch = textMatch,
+                            contentDescMatch = contentDesc,
+                            action = action,
+                            textValue = value
+                        )
+                        JsonObject().apply {
+                            addProperty("status", if (success) "ok" else "error")
+                            addProperty("performed", success)
+                        }
+                    } catch (e: Exception) {
+                        JsonObject().apply {
+                            addProperty("status", "error")
+                            addProperty("message", e.message ?: "Failed to parse action body")
+                        }
+                    }
+                } else {
+                    JsonObject().apply {
+                        addProperty("status", "disabled")
+                        addProperty("message", "Accessibility Service is not active")
+                    }
+                }
+            }
+
             "/checkup/run" -> {
                 val result = checkupRunner.runLocalCheckup()
                 JsonObject().apply {

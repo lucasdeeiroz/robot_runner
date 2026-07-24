@@ -333,3 +333,44 @@ pub async fn fetch_companion_fast_screenshot(port: Option<u16>) -> AppResult<Str
         Err(AppError::FileSystemError("Companion fast screenshot endpoint returned error status".into()))
     }
 }
+
+#[command]
+pub async fn perform_companion_node_action(
+    port: Option<u16>,
+    resource_id: Option<String>,
+    text: Option<String>,
+    content_description: Option<String>,
+    action: String,
+    value: Option<String>,
+) -> AppResult<String> {
+    let p = port.unwrap_or(9876);
+    let url = format!("http://127.0.0.1:{}/action/node-perform", p);
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_millis(1500))
+        .build()
+        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
+
+    let payload = serde_json::json!({
+        "resourceId": resource_id,
+        "text": text,
+        "contentDescription": content_description,
+        "action": action,
+        "value": value
+    });
+
+    let resp = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .body(payload.to_string())
+        .send()
+        .await
+        .map_err(|e| AppError::FileSystemError(format!("Failed to perform companion node action: {}", e)))?;
+
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| AppError::FileSystemError(format!("Failed to read response body: {}", e)))?;
+
+    Ok(text)
+}

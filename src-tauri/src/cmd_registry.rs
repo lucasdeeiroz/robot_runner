@@ -155,7 +155,8 @@ macro_rules! generate_robot_runner_handler {
             crate::companion::run_companion_standalone_checkup,
             crate::companion::generate_companion_pdf_report,
             crate::companion::fetch_companion_screenshot,
-            crate::companion::fetch_companion_fast_screenshot
+            crate::companion::fetch_companion_fast_screenshot,
+            crate::companion::perform_companion_node_action
         ]
     };
 }
