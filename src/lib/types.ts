@@ -10,6 +10,8 @@ export interface Device {
     ram_used?: number | null;
     storage_total?: number | null;
     storage_used?: number | null;
+    is_companion_installed?: boolean | null;
+    companion_port?: number | null;
 }
 
 // --- Screen Mapper Types ---

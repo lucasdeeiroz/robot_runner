@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { XMLParser } from 'fast-xml-parser';
-import { InspectorNode, transformXmlToTree, findNodesAtCoords } from '@/lib/inspectorUtils';
+import { InspectorNode, transformXmlToTree, findNodesAtCoords, transformCompanionTreeToInspectorNode } from '@/lib/inspectorUtils';
 import { feedback } from '@/lib/feedback';
 import { useSettings } from '@/lib/settings';
 
@@ -92,19 +92,37 @@ export function useDeviceViewport({
                 setScreenshot(null);
             }
 
-            if (xmlResult.status === 'rejected') {
-                throw xmlResult.reason;
+            // Resolve UI tree: prefer Companion sub-10ms tree, fallback to ADB XML dump
+            let root: InspectorNode | null = null;
+
+            if (!isWeb) {
+                try {
+                    const rawJson = await invoke<string>('fetch_companion_ui_tree', { port: 9876 });
+                    const companionTreeData = JSON.parse(rawJson);
+                    if (companionTreeData.status === 'ok' && Array.isArray(companionTreeData.nodes) && companionTreeData.nodes.length > 0) {
+                        root = transformCompanionTreeToInspectorNode(companionTreeData.nodes);
+                    }
+                } catch {
+                    // Companion not active or not installed — silent fallback to ADB
+                }
             }
 
-            const xml = xmlResult.value;
-            setXmlDump(xml);
-            const parser = new XMLParser({
-                ignoreAttributes: false,
-                attributeNamePrefix: "",
-                textNodeName: "_text"
-            });
-            const jsonObj = parser.parse(xml);
-            const root = jsonObj.hierarchy ? transformXmlToTree(jsonObj.hierarchy) : transformXmlToTree(jsonObj);
+            if (!root) {
+                if (xmlResult.status === 'rejected') {
+                    throw xmlResult.reason;
+                }
+
+                const xml = xmlResult.value;
+                setXmlDump(xml);
+                const parser = new XMLParser({
+                    ignoreAttributes: false,
+                    attributeNamePrefix: "",
+                    textNodeName: "_text"
+                });
+                const jsonObj = parser.parse(xml);
+                root = jsonObj.hierarchy ? transformXmlToTree(jsonObj.hierarchy) : transformXmlToTree(jsonObj);
+            }
+
             setRootNode(root);
 
             // If screenshot failed, we need to set a fallback layout so interactions work

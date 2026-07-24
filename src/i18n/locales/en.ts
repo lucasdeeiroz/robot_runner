@@ -2260,7 +2260,8 @@ export const en = {
             accessibility_error: "Failed to enable Accessibility Service via ADB",
             pdf_saved: "PDF Report generated on device: ",
             pdf_failed: "Failed to generate device PDF report",
-            generate_pdf: "Export Device PDF"
+            generate_pdf: "Export Device PDF",
+            boosted: "Companion Boosted"
         },
         env_setup: {
             title: "Environment Setup",

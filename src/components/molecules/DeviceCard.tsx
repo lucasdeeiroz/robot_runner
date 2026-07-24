@@ -1,5 +1,5 @@
 
-import { Smartphone, Battery, Cpu, HardDrive, Wrench, Monitor, MoreVertical, Camera, RotateCw, Layout, MousePointer2, RefreshCcw, Move } from 'lucide-react';
+import { Smartphone, Battery, Cpu, HardDrive, Wrench, Monitor, MoreVertical, Camera, RotateCw, Layout, MousePointer2, RefreshCcw, Move, Rocket } from 'lucide-react';
 import { Device } from '@/lib/types';
 import { Button } from '@/components/atoms/Button';
 import { useTranslation } from 'react-i18next';
@@ -55,9 +55,14 @@ export function DeviceCard({ device, onMirror, onToolbox, onAction }: DeviceCard
                     </div>
                     <div className="flex flex-col min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0">
                             <h3 className="font-bold text-xl text-on-surface tracking-tight truncate leading-tight" title={device.model}>
                                 {device.model || 'Unknown Device'}
                             </h3>
+                            {device.is_companion_installed && (
+                                <span title={t('companion.boosted', 'Companion Boosted')}><Rocket size={14} className="shrink-0 text-primary/60" /></span>
+                            )}
+                        </div>
                             {/* UDID - Floating top right of content area */}
                             <div className="flex flex-col items-end opacity-0 group-hover:opacity-40 transition-all duration-500 translate-x-2 group-hover:translate-x-0 hidden sm:flex">
                                 <span className="text-[11px] font-mono uppercase tracking-tighter">UDID</span>

@@ -1,6 +1,9 @@
 package com.robotrunner.companion.service
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
+import android.graphics.Path
+import android.os.Build
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -76,6 +79,19 @@ class CompanionAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         instance = null
         super.onDestroy()
+    }
+
+    fun performTap(x: Float, y: Float): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            val path = Path().apply {
+                moveTo(x, y)
+            }
+            val gesture = GestureDescription.Builder()
+                .addStroke(GestureDescription.StrokeDescription(path, 0, 50))
+                .build()
+            return dispatchGesture(gesture, null, null)
+        }
+        return false
     }
 
     fun getInstantUiTreeJson(): JsonObject {

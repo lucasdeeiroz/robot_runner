@@ -2262,7 +2262,8 @@ export const pt = {
             accessibility_error: "Falha ao ativar Serviço de Acessibilidade via ADB",
             pdf_saved: "Relatório PDF gerado no dispositivo: ",
             pdf_failed: "Falha ao gerar relatório PDF no dispositivo",
-            generate_pdf: "Exportar PDF do Dispositivo"
+            generate_pdf: "Exportar PDF do Dispositivo",
+            boosted: "Turbinado pelo Companion"
         },
         env_setup: {
             title: "Configuração do Ambiente",

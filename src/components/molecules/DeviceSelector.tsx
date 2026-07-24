@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/atoms/Button';
-import { Smartphone, RefreshCw, Wrench, Globe } from 'lucide-react';
+import { Smartphone, RefreshCw, Wrench, Globe, Rocket } from 'lucide-react';
 import clsx from 'clsx';
 import { AnimatePresence } from 'framer-motion';
 import { StaggerContainer, StaggerItem } from '@/components/motion/MotionPrimitives';
@@ -89,7 +89,7 @@ export function DeviceSelector({
 
                 {showFull && (
                     <>
-                        <div className="w-48 text-sm font-medium text-on-surface/80 truncate">
+                        <div className="w-48 text-sm font-medium text-on-surface/80 truncate flex items-center gap-1.5">
                             {isWeb ? (
                                 (() => {
                                     const isWebBrowser = (id: string | null) => 
@@ -98,11 +98,19 @@ export function DeviceSelector({
                                     return browserDisplayName(activeBrowser);
                                 })()
                             ) : (
-                                selectedDevices.length === 0
-                                    ? t('run_tab.device.no_device')
-                                    : selectedDevices.length === 1
-                                        ? devices.find(d => d.udid === selectedDevices[0])?.model || selectedDevices[0]
-                                        : t('run_tab.device.selected_count', { count: selectedDevices.length })
+                                <>
+                                    <span className="truncate">
+                                        {selectedDevices.length === 0
+                                            ? t('run_tab.device.no_device')
+                                            : selectedDevices.length === 1
+                                                ? devices.find(d => d.udid === selectedDevices[0])?.model || selectedDevices[0]
+                                                : t('run_tab.device.selected_count', { count: selectedDevices.length })
+                                        }
+                                    </span>
+                                    {selectedDevices.length === 1 && devices.find(d => d.udid === selectedDevices[0])?.is_companion_installed && (
+                                        <span title={t('companion.boosted', 'Companion Boosted')}><Rocket size={13} className="shrink-0 text-primary/70" /></span>
+                                    )}
+                                </>
                             )}
                         </div>
                         {!isWeb && (
@@ -187,6 +195,9 @@ export function DeviceSelector({
                                             <div className="flex flex-col overflow-hidden">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-sm font-medium text-on-surface/80 truncate">{d.model}</span>
+                                                    {d.is_companion_installed && (
+                                                        <span title={t('companion.boosted', 'Companion Boosted')}><Rocket size={12} className="shrink-0 text-primary/70" /></span>
+                                                    )}
                                                     {busyDeviceIds.includes(d.udid) && (
                                                         <Badge variant="warning" size="sm" className="text-[10px] font-bold uppercase tracking-wide">
                                                             {t('run_tab.device.busy')}

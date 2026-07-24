@@ -14,6 +14,8 @@ pub struct Device {
     pub ram_used: Option<u64>,
     pub storage_total: Option<u64>,
     pub storage_used: Option<u64>,
+    pub is_companion_installed: Option<bool>,
+    pub companion_port: Option<u16>,
 }
 
 #[tauri::command]
@@ -53,6 +55,8 @@ pub async fn get_connected_devices(app: AppHandle) -> Result<Vec<Device>, String
                         ram_used: None,
                         storage_total: None,
                         storage_used: None,
+                        is_companion_installed: None,
+                        companion_port: None,
                     }
                 }));
                 continue;
@@ -62,7 +66,7 @@ pub async fn get_connected_devices(app: AppHandle) -> Result<Vec<Device>, String
             device_tasks.push(tokio::spawn(async move {
                 let program = get_adb_program(&app_clone);
                 let mut cmd = new_tokio_command(&program);
-                let script = "getprop ro.product.model; echo '---SEP---'; getprop ro.build.version.release; echo '---SEP---'; dumpsys battery; echo '---SEP---'; cat /proc/meminfo || dumpsys meminfo; echo '---SEP---'; df -k /data";
+                let script = "getprop ro.product.model; echo '---SEP---'; getprop ro.build.version.release; echo '---SEP---'; dumpsys battery; echo '---SEP---'; cat /proc/meminfo || dumpsys meminfo; echo '---SEP---'; df -k /data; echo '---SEP---'; pm list packages com.robotrunner.companion";
                 cmd.args(&["-s", &udid, "shell", script]);
                 
                 let output = cmd.output().await;
@@ -104,6 +108,9 @@ pub async fn get_connected_devices(app: AppHandle) -> Result<Vec<Device>, String
                     })
                     .unwrap_or((0, 0));
 
+                let is_companion_installed = parts.get(5).map(|s| s.contains("com.robotrunner.companion"));
+                let companion_port = if is_companion_installed == Some(true) { Some(9876) } else { None };
+
                 Device {
                     udid,
                     model,
@@ -114,6 +121,8 @@ pub async fn get_connected_devices(app: AppHandle) -> Result<Vec<Device>, String
                     ram_used: if ram_used > 0 { Some(ram_used) } else { None },
                     storage_total: if storage_total > 0 { Some(storage_total) } else { None },
                     storage_used: if storage_used > 0 { Some(storage_used) } else { None },
+                    is_companion_installed,
+                    companion_port,
                 }
             }));
         }

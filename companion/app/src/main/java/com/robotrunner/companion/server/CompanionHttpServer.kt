@@ -78,6 +78,35 @@ class CompanionHttpServer(
                 }
             }
 
+            "/action/tap" -> {
+                val service = CompanionAccessibilityService.instance
+                if (service != null) {
+                    try {
+                        val map = HashMap<String, String>()
+                        session.parseBody(map)
+                        val postData = map["postData"]
+                        val json = gson.fromJson(postData, JsonObject::class.java)
+                        val x = json?.get("x")?.asFloat ?: 0f
+                        val y = json?.get("y")?.asFloat ?: 0f
+                        val success = service.performTap(x, y)
+                        JsonObject().apply {
+                            addProperty("status", if (success) "ok" else "error")
+                            addProperty("tapped", success)
+                        }
+                    } catch (e: Exception) {
+                        JsonObject().apply {
+                            addProperty("status", "error")
+                            addProperty("message", e.message ?: "Failed to parse tap body")
+                        }
+                    }
+                } else {
+                    JsonObject().apply {
+                        addProperty("status", "disabled")
+                        addProperty("message", "Accessibility Service is not active")
+                    }
+                }
+            }
+
             "/checkup/run" -> {
                 val result = checkupRunner.runLocalCheckup()
                 JsonObject().apply {

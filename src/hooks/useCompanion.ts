@@ -213,6 +213,10 @@ export function useCompanion(selectedDevice: string | null) {
         }
     }, []);
 
+    const performTap = useCallback(async (x: number, y: number) => {
+        return triggerAction('/action/tap', { x, y });
+    }, [triggerAction]);
+
     useEffect(() => {
         if (selectedDevice) {
             checkInstallation();
@@ -245,6 +249,7 @@ export function useCompanion(selectedDevice: string | null) {
         fetchRecentEvents,
         enableAccessibility,
         generatePdfReport,
-        runStandaloneCheckup
+        runStandaloneCheckup,
+        performTap
     };
 }
