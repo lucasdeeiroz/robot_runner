@@ -6,7 +6,7 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { tempDir, join } from '@tauri-apps/api/path';
 import { Button } from '@/components/atoms/Button';
-import { Upload, ShieldCheck, CheckCircle2, XCircle, Search, FileText, ListPlus, Info, Download, Filter, FilterX, Play, Plus, Trash2, Edit3, Tv } from 'lucide-react';
+import { Upload, ShieldCheck, CheckCircle2, XCircle, Search, FileText, ListPlus, Info, Download, Filter, FilterX, Play, Plus, Trash2, Edit3, Tv, Zap, Printer, Activity, Smartphone } from 'lucide-react';
 import { Section } from '@/components/organisms/Section';
 import { Modal } from '@/components/organisms/Modal';
 import { ActionCard } from '@/components/atoms/ActionCard';
@@ -21,6 +21,8 @@ import { getReportVerificationPrompt } from '@/lib/dashboard/prompts';
 import clsx from 'clsx';
 import { ExpressiveLoading } from '@/components/atoms/ExpressiveLoading';
 import { toast } from 'sonner';
+import { useCompanion } from '@/hooks/useCompanion';
+import { CompanionBadge } from '@/components/atoms/CompanionBadge';
 
 export function matchesFilterPattern(text: string, pattern: string): boolean {
     if (!text || !pattern) return false;
@@ -142,6 +144,7 @@ const checkupCacheMap = new Map<string, CheckupCacheEntry>();
 export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDuringTest }: CheckupSubTabProps) => {
     const { t } = useTranslation();
     const { settings } = useSettings();
+    const { status: companionStatus, deviceInfo: companionInfo, connectCompanion, launchCompanion, triggerAction: triggerCompanionAction, enableAccessibility: enableCompanionAccessibility, generatePdfReport: generateCompanionPdf } = useCompanion(selectedDevice);
     const cachedCheckup = selectedDevice ? checkupCacheMap.get(selectedDevice) : undefined;
 
     const [isLoading, setIsLoading] = useState(false);
@@ -525,6 +528,51 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             name: t('toolbox.checkup.additional.network_mode', 'Preferred Network Mode'),
             command: ['shell', 'settings', 'get', 'global', 'preferred_network_mode'],
             foundDisplay: (out: string) => out.trim() || t('toolbox.checkup.not_found', 'Not found')
+        },
+        {
+            id: 'device_owner',
+            name: t('toolbox.checkup.additional.device_owner', 'Device Owner'),
+            command: ['shell', 'dpm list-owners 2>/dev/null || dumpsys device_policy'],
+            foundDisplay: (out: string) => {
+                const trimmed = out.trim();
+                if (!trimmed || trimmed.toLowerCase().includes('no device owner') || trimmed.includes('Device Owner: null') || /^0\s*owners?:/i.test(trimmed)) {
+                    return t('toolbox.checkup.not_configured', 'Not configured');
+                }
+                if (trimmed.includes('Permission Denial') || trimmed.includes('SecurityException')) {
+                    return t('toolbox.checkup.additional.imei_blocked', 'Blocked by OS (Shell Restriction)');
+                }
+                const lines = trimmed.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !/^\d+\s*owners?:/i.test(l));
+
+                const ownerLine = lines.find(l => l.includes(',DeviceOwner') || l.includes(',ProfileOwner'));
+                if (ownerLine) {
+                    return ownerLine
+                        .replace(/^(?:User\s*\d+:\s*)?(?:admin=)?/i, '')
+                        .replace(/ComponentInfo\{([^}]+)\}/, '$1')
+                        .trim();
+                }
+                const compMatch = trimmed.match(/ComponentInfo\{([^}]+)\}/);
+                if (compMatch) {
+                    const comp = compMatch[1];
+                    const parts = comp.split('/');
+                    if (parts.length === 2 && parts[1].startsWith(parts[0])) {
+                        const shortClass = parts[1].substring(parts[0].length);
+                        return `${parts[0]}${shortClass}`;
+                    }
+                    return comp;
+                }
+                const adminMatch = trimmed.match(/admin=([^\s\n\r]+)/);
+                if (adminMatch) {
+                    return adminMatch[1].replace(/ComponentInfo\{([^}]+)\}/, '$1');
+                }
+                if (/^Device owner:/i.test(trimmed)) {
+                    const val = trimmed.replace(/^Device owner:\s*/i, '').trim();
+                    if (val && !val.toLowerCase().includes('no device owner')) {
+                        const valLine = val.split('\n').map(l => l.trim()).find(l => l.length > 0 && !/^\d+\s*owners?:/i.test(l));
+                        if (valLine) return valLine;
+                    }
+                }
+                return lines[0] || t('toolbox.checkup.not_configured', 'Not configured');
+            }
         }
     ], [t]);
 
@@ -1571,6 +1619,12 @@ ${html}`;
                     contentClassName="flex-1 flex flex-col md:flex-row gap-4 min-h-0 p-2 overflow-x-auto"
                     menus={
                         <>
+                            <CompanionBadge
+                                status={companionStatus}
+                                deviceInfo={companionInfo}
+                                onConnect={connectCompanion}
+                                onLaunch={launchCompanion}
+                            />
                             <Button
                                 variant="ghost"
                                 size="icon"
@@ -1886,6 +1940,183 @@ ${html}`;
                             ))}
                         </Section>
                     </div>
+                </Section>
+
+                {/* Companion Hardware & POS Diagnostics Card */}
+                <Section
+                    title={t('companion.hardware_diagnostics', 'Companion Hardware & POS Diagnostics')}
+                    icon={Activity}
+                    className="flex-1 flex flex-col min-h-[220px] overflow-hidden shrink-0"
+                    contentClassName="p-4 overflow-y-auto space-y-4"
+                    actions={
+                        companionStatus === 'connected' ? (
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={async () => {
+                                    try {
+                                        const res = await generateCompanionPdf();
+                                        if (res.status === 'ok') {
+                                            toast.success(`${t('companion.pdf_saved', 'PDF Report generated on device: ')}${res.fileName}`);
+                                        }
+                                    } catch (e) {
+                                        toast.error(t('companion.pdf_failed', 'Failed to generate device PDF report'));
+                                    }
+                                }}
+                                className="flex items-center gap-1.5 text-xs h-8"
+                            >
+                                <Download size={14} />
+                                {t('companion.generate_pdf', 'Export Device PDF')}
+                            </Button>
+                        ) : undefined
+                    }
+                >
+                    {companionStatus !== 'connected' ? (
+                        <div className="flex flex-col items-center justify-center p-6 text-center bg-surface-variant/10 rounded-xl border border-outline-variant/30 text-on-surface-variant/60">
+                            <Smartphone size={32} className="mb-2 opacity-50" />
+                            <p className="text-sm font-medium text-on-surface mb-1">{t('companion.connect_to_view', 'Connect Companion to view Hardware Diagnostics')}</p>
+                            <p className="text-xs mb-3 max-w-md">{t('companion.connect_desc', 'Enables real-time battery mA meter, POS printer testing, NFC reader check, and display calibration.')}</p>
+                            <Button variant="primary" size="sm" onClick={connectCompanion}>
+                                {t('companion.connect', 'Connect Companion')}
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Battery & Power Card */}
+                            <div className="p-4 rounded-xl border border-outline-variant/30 bg-surface-variant/10 backdrop-blur-md flex flex-col gap-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-semibold text-xs text-on-surface flex items-center gap-1.5">
+                                        <Zap size={14} className="text-warning" />
+                                        {t('companion.battery_power', 'Battery & Power Meter')}
+                                    </span>
+                                    <span className="text-xs font-mono font-bold text-success">
+                                        {companionInfo?.battery?.level}%
+                                    </span>
+                                </div>
+                                <div className="h-2 w-full bg-surface-variant rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-success transition-all"
+                                        style={{ width: `${companionInfo?.battery?.level ?? 0}%` }}
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-[11px] mt-2 font-mono">
+                                    <div>
+                                        <span className="text-on-surface-variant block">{t('companion.current', 'Current')}:</span>
+                                        <span className="text-on-surface font-semibold">
+                                            {companionInfo?.battery?.currentNowmA !== undefined
+                                                ? `${companionInfo.battery.currentNowmA > 0 ? '+' : ''}${companionInfo.battery.currentNowmA} mA`
+                                                : 'N/A'}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-on-surface-variant block">{t('companion.health', 'Health')}:</span>
+                                        <span className="text-on-surface font-semibold">{companionInfo?.battery?.health ?? 'GOOD'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-on-surface-variant block">{t('companion.voltage', 'Voltage')}:</span>
+                                        <span className="text-on-surface font-semibold">{companionInfo?.battery?.voltage ? `${companionInfo.battery.voltage} V` : 'N/A'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-on-surface-variant block">{t('companion.temp', 'Temp')}:</span>
+                                        <span className="text-on-surface font-semibold">{companionInfo?.battery?.temperature ? `${companionInfo.battery.temperature} °C` : 'N/A'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* POS Printer Card */}
+                            <div className="p-4 rounded-xl border border-outline-variant/30 bg-surface-variant/10 backdrop-blur-md flex flex-col justify-between gap-2">
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="font-semibold text-xs text-on-surface flex items-center gap-1.5">
+                                            <Printer size={14} className="text-primary" />
+                                            {t('companion.pos_printer', 'POS Thermal Printer')}
+                                        </span>
+                                        <span className={clsx(
+                                            "text-[10px] px-2 py-0.5 rounded-md font-semibold",
+                                            companionInfo?.printer?.isSupported ? "bg-success/15 text-success" : "bg-surface-variant text-on-surface-variant"
+                                        )}>
+                                            {companionInfo?.printer?.isSupported ? (companionInfo.printer.vendor || 'Supported') : 'No Printer'}
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-on-surface-variant space-y-1 font-mono text-[11px]">
+                                        <div>{t('companion.paper_status', 'Paper')}: <span className="text-on-surface font-semibold">{companionInfo?.printer?.hasPaper ? 'Paper OK' : 'Out of Paper'}</span></div>
+                                        <div>{t('companion.cover_status', 'Cover')}: <span className="text-on-surface font-semibold">{companionInfo?.printer?.coverOpen ? 'Open' : 'Closed'}</span></div>
+                                    </div>
+                                </div>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    disabled={!companionInfo?.printer?.isSupported}
+                                    onClick={async () => {
+                                        try {
+                                            await triggerCompanionAction('/printer/test-print');
+                                            toast.success(t('companion.print_started', 'Test receipt sent to POS printer'));
+                                        } catch (e) {
+                                            toast.error(t('companion.print_failed', 'Failed to print test receipt'));
+                                        }
+                                    }}
+                                    className="w-full mt-2 text-xs"
+                                >
+                                    {t('companion.print_test', 'Print Test Receipt')}
+                                </Button>
+                            </div>
+
+                            {/* Display & Inspector Accessibility Card */}
+                            <div className="p-4 rounded-xl border border-outline-variant/30 bg-surface-variant/10 backdrop-blur-md flex flex-col justify-between gap-2">
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="font-semibold text-xs text-on-surface flex items-center gap-1.5">
+                                            <ShieldCheck size={14} className="text-secondary" />
+                                            {t('companion.accessibility_status', 'Accessibility Service')}
+                                        </span>
+                                        <span className={clsx(
+                                            "text-[10px] px-2 py-0.5 rounded-md font-semibold",
+                                            companionInfo?.isAccessibilityEnabled ? "bg-success/15 text-success" : "bg-warning/15 text-warning"
+                                        )}>
+                                            {companionInfo?.isAccessibilityEnabled ? t('companion.accessibility_enabled', 'Active (Sub-10ms UI Dump)') : t('companion.accessibility_disabled', 'Disabled')}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-on-surface-variant mb-2">
+                                        {t('companion.display_desc', 'Launch fullscreen pixel calibration on the device screen.')}
+                                    </p>
+                                </div>
+                                <div className="flex flex-col gap-2 mt-1">
+                                    {!companionInfo?.isAccessibilityEnabled && (
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={async () => {
+                                                try {
+                                                    await enableCompanionAccessibility();
+                                                    toast.success(t('companion.accessibility_success', 'Accessibility Service granted via ADB'));
+                                                } catch (e) {
+                                                    toast.error(t('companion.accessibility_error', 'Failed to enable Accessibility Service via ADB'));
+                                                }
+                                            }}
+                                            className="w-full text-xs"
+                                        >
+                                            {t('companion.enable_accessibility', 'Enable Accessibility (1-Click ADB)')}
+                                        </Button>
+                                    )}
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={async () => {
+                                            try {
+                                                await triggerCompanionAction('/display/color-test');
+                                                toast.info(t('companion.display_test_started', 'Color test active on device'));
+                                            } catch (e) {
+                                                toast.error(t('companion.display_test_failed', 'Failed to launch display test'));
+                                            }
+                                        }}
+                                        className="w-full text-xs"
+                                    >
+                                        {t('companion.color_test', 'Launch Color Calibration')}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </Section>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -141,7 +141,19 @@ macro_rules! generate_robot_runner_handler {
             crate::env_setup::create_venv,
             crate::env_setup::install_requirements,
             crate::files::get_portable_settings,
-            crate::files::save_portable_settings
+            crate::files::save_portable_settings,
+            crate::updater::apply_portable_update,
+            crate::companion::check_companion_installed,
+            crate::companion::start_companion_forward,
+            crate::companion::stop_companion_forward,
+            crate::companion::launch_companion_app,
+            crate::companion::fetch_companion_info,
+            crate::companion::trigger_companion_action,
+            crate::companion::fetch_companion_ui_tree,
+            crate::companion::fetch_companion_events,
+            crate::companion::enable_companion_accessibility,
+            crate::companion::run_companion_standalone_checkup,
+            crate::companion::generate_companion_pdf_report
         ]
     };
 }

@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">Robot Runner Companion</string>
+    <string name="status_server_ready">Server Ready (Waiting Connection)</string>
+    <string name="status_connected">Connected to Robot Runner Desktop</string>
+    <string name="service_running_title">Robot Runner Companion Active</string>
+    <string name="service_running_desc">Background agent listening on port 9876</string>
+    <string name="btn_start_service">Start Companion Server</string>
+    <string name="btn_stop_service">Stop Companion Server</string>
+    <string name="stat_battery">Battery</string>
+    <string name="stat_ram">RAM</string>
+    <string name="stat_storage">Storage</string>
+    <string name="stat_nfc">NFC Reader</string>
+    <string name="stat_printer">POS Printer</string>
+    <string name="text_tap_to_cycle">Tap screen to cycle color calibration</string>
+    <string name="color_red">RED (Check Dead Pixels)</string>
+    <string name="color_green">GREEN (Check Subpixels)</string>
+    <string name="color_blue">BLUE (Check Color Bleed)</string>
+    <string name="color_white">WHITE (Check Backlight Uniformity)</string>
+    <string name="color_black">BLACK (Check Light Leakage)</string>
+    <string name="btn_offline_checkup">Run Offline Checkup</string>
+    <string name="btn_export_pdf">Export PDF Report</string>
+    <string name="btn_share_pdf">Share Report</string>
+    <string name="msg_checkup_completed">Offline Checkup Completed</string>
+    <string name="msg_pdf_exported">PDF Report saved to Downloads</string>
+</resources>

@@ -17,6 +17,8 @@ mod image_utils;
 mod security;
 mod git;
 pub mod env_setup;
+pub mod updater;
+pub mod companion;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
