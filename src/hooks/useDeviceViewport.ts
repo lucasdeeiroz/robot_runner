@@ -127,10 +127,14 @@ export function useDeviceViewport({
                 if (source === 'companion') {
                     try {
                         const compStart = performance.now();
-                        b64 = await invoke<string>('fetch_companion_screenshot', { port: 9876 });
-                        console.log(`⚡ [DeviceViewport] Screenshot fetched via Companion Native Bridge in ${Math.round(performance.now() - compStart)}ms!`);
-                    } catch (e) {
-                        console.warn("[DeviceViewport] Companion screenshot fallback to parallel ADB screencap:", e);
+                        b64 = await invoke<string>('fetch_companion_fast_screenshot', { port: 9876 });
+                        console.log(`⚡ [DeviceViewport] Fast 720p Screenshot fetched via Companion Bridge in ${Math.round(performance.now() - compStart)}ms!`);
+                    } catch {
+                        try {
+                            b64 = await invoke<string>('fetch_companion_screenshot', { port: 9876 });
+                        } catch (e) {
+                            console.warn("[DeviceViewport] Companion screenshot fallback to parallel ADB screencap:", e);
+                        }
                     }
                 }
 

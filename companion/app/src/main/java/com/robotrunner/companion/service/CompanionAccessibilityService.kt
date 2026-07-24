@@ -154,6 +154,46 @@ class CompanionAccessibilityService : AccessibilityService() {
         }.start()
     }
 
+    fun takeDownscaledJpegFrame(targetWidth: Int = 720, quality: Int = 60, onComplete: (ByteArray?) -> Unit) {
+        takeInstantScreenshot { rawJpeg ->
+            if (rawJpeg == null || rawJpeg.isEmpty()) {
+                onComplete(null)
+                return@takeInstantScreenshot
+            }
+            try {
+                val opts = android.graphics.BitmapFactory.Options()
+                opts.inJustDecodeBounds = true
+                android.graphics.BitmapFactory.decodeByteArray(rawJpeg, 0, rawJpeg.size, opts)
+
+                val origW = opts.outWidth
+                if (origW <= 0) {
+                    onComplete(rawJpeg)
+                    return@takeInstantScreenshot
+                }
+
+                var sampleSize = 1
+                while (origW / (sampleSize * 2) >= targetWidth) {
+                    sampleSize *= 2
+                }
+
+                val decodeOpts = android.graphics.BitmapFactory.Options().apply {
+                    inSampleSize = sampleSize
+                }
+                val sampledBitmap = android.graphics.BitmapFactory.decodeByteArray(rawJpeg, 0, rawJpeg.size, decodeOpts)
+                if (sampledBitmap != null) {
+                    val stream = java.io.ByteArrayOutputStream()
+                    sampledBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, quality, stream)
+                    sampledBitmap.recycle()
+                    onComplete(stream.toByteArray())
+                    return@takeInstantScreenshot
+                }
+            } catch (e: Exception) {
+                Log.e("CompanionAccessibility", "Error downscaling screenshot frame", e)
+            }
+            onComplete(rawJpeg)
+        }
+    }
+
     fun getInstantUiTreeJson(): JsonObject {
         var root = rootInActiveWindow
         if (root == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {

@@ -303,3 +303,33 @@ pub async fn fetch_companion_screenshot(port: Option<u16>) -> AppResult<String> 
         Err(AppError::FileSystemError("Companion screenshot endpoint returned error status".into()))
     }
 }
+
+#[command]
+pub async fn fetch_companion_fast_screenshot(port: Option<u16>) -> AppResult<String> {
+    let p = port.unwrap_or(9876);
+    let url = format!("http://127.0.0.1:{}/screenshot/fast", p);
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_millis(600))
+        .build()
+        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
+
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| AppError::FileSystemError(format!("Failed to fetch fast companion screenshot: {}", e)))?;
+
+    if resp.status().is_success() {
+        let bytes = resp
+            .bytes()
+            .await
+            .map_err(|e| AppError::FileSystemError(format!("Failed to read fast screenshot bytes: {}", e)))?;
+
+        use base64::Engine;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+        Ok(format!("data:image/jpeg;base64,{}", b64))
+    } else {
+        Err(AppError::FileSystemError("Companion fast screenshot endpoint returned error status".into()))
+    }
+}

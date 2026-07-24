@@ -40,6 +40,32 @@ class CompanionHttpServer(
         requestCount++
         onStatusChangedListener?.invoke()
 
+        if (uri == "/screenshot/fast" || uri == "/screenshot/720p") {
+            val service = CompanionAccessibilityService.instance
+            if (service != null) {
+                val latch = java.util.concurrent.CountDownLatch(1)
+                var imageBytes: ByteArray? = null
+                service.takeDownscaledJpegFrame(720, 60) { bytes ->
+                    imageBytes = bytes
+                    latch.countDown()
+                }
+                try {
+                    latch.await(300, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    if (imageBytes != null) {
+                        val stream = java.io.ByteArrayInputStream(imageBytes)
+                        return newFixedLengthResponse(Response.Status.OK, "image/jpeg", stream, imageBytes!!.size.toLong())
+                    }
+                } catch (e: Exception) {
+                    Log.e("CompanionHttpServer", "Timeout or error taking fast downscaled screenshot", e)
+                }
+            }
+            val errJson = JsonObject().apply {
+                addProperty("status", "error")
+                addProperty("message", "Accessibility fast screenshot unavailable")
+            }
+            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", errJson.toString())
+        }
+
         if (uri == "/screenshot" || uri == "/screenshot/jpeg") {
             val service = CompanionAccessibilityService.instance
             if (service != null) {
