@@ -240,6 +240,27 @@ class CompanionHttpServer(
                 }
             }
 
+            "/network/interfaces" -> {
+                val array = JsonArray()
+                val interfaces = kotlinx.coroutines.runBlocking { com.robotrunner.companion.net.NetworkInspector.getNetworkInterfaces() }
+                interfaces.forEach { iface ->
+                    val obj = JsonObject().apply {
+                        addProperty("name", iface.name)
+                        addProperty("displayName", iface.displayName)
+                        addProperty("ipv4", iface.ipv4)
+                        addProperty("ipv6", iface.ipv6)
+                        addProperty("macAddress", iface.macAddress)
+                        addProperty("type", iface.interfaceType.name)
+                        addProperty("isUp", iface.isUp)
+                    }
+                    array.add(obj)
+                }
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    add("interfaces", array)
+                }
+            }
+
             "/device/info" -> getDeviceInfoPayload()
 
             "/checkup/run" -> {

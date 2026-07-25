@@ -76,7 +76,18 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 7. Continuous Learning & Rule Maintenance Instruction
+## 7. Wireless ADB & Network Interface Traversal Rules
+
+1. **Android 11+ Wireless Debugging Deep-Linking**:
+   - Always verify `Build.VERSION.SDK_INT >= Build.VERSION_CODES.R` (API 30) before suggesting Wireless Debugging workflows. Use `Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS` with fallback to `Settings.ACTION_SETTINGS` to safely open system Developer Options.
+
+2. **Multi-Transport Network Interface Parsing**:
+   - Network interface enumeration (`NetworkInterface.getNetworkInterfaces()`) must filter out loopback (`lo`) addresses while accurately categorizing `wlan*` (Wi-Fi), `eth*` (Ethernet), `ap*`/`swlan*` (Hotspot), `rmnet*` (Cellular), and `tun*` (VPN) interfaces.
+
+---
+
+## 8. Continuous Learning & Rule Maintenance Instruction
 
 > **IMPORTANT**: As new features, optimizations, or Android SDK workarounds are implemented in `companion/`, the **Android Companion Engineer** profile MUST update and append new rules directly to this document.
+
 

@@ -110,4 +110,23 @@
     <string name="btn_copy_output">Copy</string>
     <string name="msg_copied_clipboard">Output copied to clipboard</string>
     <string name="shell_status_format">Exit Code: %1$d | Execution Time: %2$dms</string>
+    <!-- Phase 3 Strings -->
+    <string name="tab_network">Network</string>
+    <string name="header_wireless_adb">📶 Wireless Debugging &amp; ADB Pairing</string>
+    <string name="desc_wireless_adb">Connect Robot Runner Desktop cable-free via Wi-Fi (Android 11+).</string>
+    <string name="label_pairing_pin">Pairing PIN Code</string>
+    <string name="btn_gen_pin">Generate PIN</string>
+    <string name="label_pairing_port">Pairing Port</string>
+    <string name="label_pairing_cmd">Pairing Terminal Command</string>
+    <string name="btn_copy_cmd">Copy Command</string>
+    <string name="btn_open_dev_options">Open Developer Options</string>
+    <string name="header_net_interfaces">🌐 Active Network Interfaces</string>
+    <string name="label_interface_type">Type</string>
+    <string name="label_ipv4">IPv4</string>
+    <string name="label_ipv6">IPv6</string>
+    <string name="label_mac">MAC</string>
+    <string name="header_rest_control">🔒 REST Server Engine &amp; Security</string>
+    <string name="label_server_port">Server Port (Default 9876)</string>
+    <string name="label_active_clients">Active Connected Clients: %1$d</string>
+    <string name="label_total_requests">Total Requests Processed: %1$d</string>
 </resources>

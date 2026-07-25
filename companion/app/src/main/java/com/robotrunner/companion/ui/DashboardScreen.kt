@@ -26,6 +26,7 @@ import com.robotrunner.companion.R
 import com.robotrunner.companion.apps.PackageManagerTabContent
 import com.robotrunner.companion.model.HardwareSpecCategory
 import com.robotrunner.companion.model.LiveTelemetry
+import com.robotrunner.companion.net.NetworkTabContent
 import com.robotrunner.companion.shell.ShellConsoleTabContent
 
 @Composable
@@ -118,7 +119,7 @@ fun DashboardScreen(
                             onClick = { selectedTab = 2 },
                             text = {
                                 Text(
-                                    text = stringResource(id = R.string.tab_apps),
+                                    text = stringResource(id = R.string.tab_network),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -132,7 +133,7 @@ fun DashboardScreen(
                             onClick = { selectedTab = 3 },
                             text = {
                                 Text(
-                                    text = stringResource(id = R.string.tab_shell),
+                                    text = stringResource(id = R.string.tab_apps),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -144,6 +145,20 @@ fun DashboardScreen(
                         Tab(
                             selected = selectedTab == 4,
                             onClick = { selectedTab = 4 },
+                            text = {
+                                Text(
+                                    text = stringResource(id = R.string.tab_shell),
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        )
+                        Tab(
+                            selected = selectedTab == 5,
+                            onClick = { selectedTab = 5 },
                             text = {
                                 Text(
                                     text = stringResource(id = R.string.tab_diagnostics),
@@ -173,9 +188,16 @@ fun DashboardScreen(
                             context = context
                         )
                         1 -> HardwareSpecsTabContent(detailedSpecs = detailedSpecs)
-                        2 -> PackageManagerTabContent()
-                        3 -> ShellConsoleTabContent()
-                        4 -> DiagnosticsTabContent(
+                        2 -> NetworkTabContent(
+                            ipAddress = ipAddress,
+                            port = port,
+                            isServerRunning = telemetry.isServerRunning,
+                            activeClients = telemetry.activeClientsCount,
+                            onToggleServer = onToggleServer
+                        )
+                        3 -> PackageManagerTabContent()
+                        4 -> ShellConsoleTabContent()
+                        5 -> DiagnosticsTabContent(
                             onRunOfflineCheckup = onRunOfflineCheckup,
                             onLaunchDisplayTest = onLaunchDisplayTest
                         )

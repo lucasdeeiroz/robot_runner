@@ -110,4 +110,23 @@
     <string name="btn_copy_output">Copiar</string>
     <string name="msg_copied_clipboard">Salida copiada al portapapeles</string>
     <string name="shell_status_format">Exit Code: %1$d | Tiempo de Ejecución: %2$dms</string>
+    <!-- Phase 3 Strings (ES) -->
+    <string name="tab_network">Red</string>
+    <string name="header_wireless_adb">📶 Depuración Inalámbrica y Emparejamiento ADB</string>
+    <string name="desc_wireless_adb">Conecte Robot Runner Desktop sin cables vía Wi-Fi (Android 11+).</string>
+    <string name="label_pairing_pin">Código PIN de Emparejamiento</string>
+    <string name="btn_gen_pin">Generar PIN</string>
+    <string name="label_pairing_port">Puerto de Emparejamiento</string>
+    <string name="label_pairing_cmd">Comando de Emparejamiento en Terminal</string>
+    <string name="btn_copy_cmd">Copiar Comando</string>
+    <string name="btn_open_dev_options">Abrir Opciones de Desarrollador</string>
+    <string name="header_net_interfaces">🌐 Interfaces de Red Activas</string>
+    <string name="label_interface_type">Tipo</string>
+    <string name="label_ipv4">IPv4</string>
+    <string name="label_ipv6">IPv6</string>
+    <string name="label_mac">MAC</string>
+    <string name="header_rest_control">🔒 Servidor REST y Seguridad</string>
+    <string name="label_server_port">Puerto del Servidor (Predeterminado 9876)</string>
+    <string name="label_active_clients">Clientes Conectados Activos: %1$d</string>
+    <string name="label_total_requests">Total de Solicitudes Procesadas: %1$d</string>
 </resources>
