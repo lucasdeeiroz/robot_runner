@@ -1,5 +1,5 @@
 
-import { Smartphone, Battery, Cpu, HardDrive, Wrench, Monitor, MoreVertical, Camera, RotateCw, Layout, MousePointer2, RefreshCcw, Move, Rocket } from 'lucide-react';
+import { Smartphone, Battery, Cpu, HardDrive, Wrench, Monitor, MoreVertical, Camera, RotateCw, Layout, MousePointer2, RefreshCcw, Move, Rocket, Zap, Wifi } from 'lucide-react';
 import { Device } from '@/lib/types';
 import { Button } from '@/components/atoms/Button';
 import { useTranslation } from 'react-i18next';
@@ -55,14 +55,34 @@ export function DeviceCard({ device, onMirror, onToolbox, onAction }: DeviceCard
                     </div>
                     <div className="flex flex-col min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                            <h3 className="font-bold text-xl text-on-surface tracking-tight truncate leading-tight" title={device.model}>
-                                {device.model || 'Unknown Device'}
-                            </h3>
-                            {device.is_companion_installed && (
-                                <span title={t('companion.boosted', 'Companion Boosted')}><Rocket size={14} className="shrink-0 text-primary/60" /></span>
-                            )}
-                        </div>
+                            <div className="flex items-center gap-2 min-w-0">
+                                <h3 className="font-bold text-xl text-on-surface tracking-tight truncate leading-tight" title={device.model}>
+                                    {device.model || 'Unknown Device'}
+                                </h3>
+                                {device.is_companion_installed && (
+                                    <span title={t('companion.boosted', 'Companion Boosted')}><Rocket size={14} className={clsx("shrink-0", device.is_companion_active ? "text-primary animate-pulse" : "text-primary/40")} /></span>
+                                )}
+                                {device.is_companion_active ? (
+                                    <span className="text-[10px] bg-success/10 text-success border border-success/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                                        {t('companion.status_active', 'Companion Active')}
+                                    </span>
+                                ) : device.is_companion_installed ? (
+                                    <span className="text-[10px] bg-warning/10 text-warning border border-warning/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shadow-xs">
+                                        {t('companion.status_installed', 'Companion Installed')}
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] bg-surface-variant/40 text-on-surface-variant/70 border border-outline-variant/20 px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider">
+                                        {t('companion.status_adb', 'ADB Standard')}
+                                    </span>
+                                )}
+                                {device.wifi_ip && (
+                                    <span className="text-[10px] font-mono bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20 flex items-center gap-1">
+                                        <Wifi size={10} />
+                                        {device.wifi_ip}
+                                    </span>
+                                )}
+                            </div>
                             {/* UDID - Floating top right of content area */}
                             <div className="flex flex-col items-end opacity-0 group-hover:opacity-40 transition-all duration-500 translate-x-2 group-hover:translate-x-0 hidden sm:flex">
                                 <span className="text-[11px] font-mono uppercase tracking-tighter">UDID</span>
@@ -71,7 +91,7 @@ export function DeviceCard({ device, onMirror, onToolbox, onAction }: DeviceCard
                                 </span>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <div className={clsx(
                                 "w-2.5 h-2.5 rounded-full",
                                 isOnline ? "bg-success animate-pulse shadow-sm shadow-success/50" : "bg-on-surface-variant/40"
@@ -90,11 +110,14 @@ export function DeviceCard({ device, onMirror, onToolbox, onAction }: DeviceCard
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="bg-surface-variant/10 rounded-2xl p-3 border border-outline-variant/10 flex items-center gap-3 hover:bg-surface-variant/20 transition-colors">
                         <div className={clsx("p-2 rounded-xl bg-surface/80 shadow-sm", getBatteryColor(batteryLevel))}>
-                            <Battery size={18} />
+                            {device.is_charging ? <Zap size={18} className="animate-pulse" /> : <Battery size={18} />}
                         </div>
                         <div className="flex flex-col">
                             <span className="text-[10px] text-on-surface-variant/50 uppercase font-bold tracking-wider leading-none mb-1">{t('home.device_card.battery')}</span>
-                            <span className="text-sm font-bold text-on-surface/80">{batteryLevel}%</span>
+                            <span className="text-sm font-bold text-on-surface/80">
+                                {batteryLevel}% {device.is_charging ? '⚡' : ''}
+                                {device.battery_temp ? ` (${device.battery_temp.toFixed(1)}°C)` : ''}
+                            </span>
                         </div>
                     </div>
                     <div className="bg-surface-variant/10 rounded-2xl p-3 border border-outline-variant/10 flex items-center gap-3 hover:bg-surface-variant/20 transition-colors">

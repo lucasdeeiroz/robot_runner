@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Wifi, Link, Unplug, Globe, Copy } from "lucide-react";
+import { Wifi, Link, Unplug, Globe, Copy, QrCode, RotateCw, Sparkles } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import clsx from "clsx";
 import { useSettings } from "@/lib/settings";
 import { useTranslation } from "react-i18next";
@@ -31,6 +32,18 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
     const [code, setCode] = useState("");
     const [statusMsg, setStatusMsg] = useState<{ text: string, type: 'success' | 'error' | 'info' } | null>(null);
     const [loading, setLoading] = useState(false);
+    const [hostIp, setHostIp] = useState<string>("");
+    const [pairingPin, setPairingPin] = useState<string>(() => Math.floor(100000 + Math.random() * 900000).toString());
+
+    useEffect(() => {
+        invoke<string>('get_host_local_ip')
+            .then(resIp => setHostIp(resIp))
+            .catch(() => setHostIp("192.168.1.100"));
+    }, []);
+
+    const handleRefreshPin = () => {
+        setPairingPin(Math.floor(100000 + Math.random() * 900000).toString());
+    };
 
     useEffect(() => {
         if (selectedDevice) {
@@ -457,7 +470,74 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                         />
                     </div>
                 </div>
+            </Section>
 
+            {/* QR Code & 1-Click Wireless Onboarding Card */}
+            <Section
+                title={t('connect.wireless.qr_title', 'QR Code & 1-Click Wireless Onboarding')}
+                icon={QrCode}
+                description={t('connect.wireless.qr_desc', 'Scan QR Code using Mobile Companion or enter 6-digit PIN in Android Developer Options -> Wireless Debugging')}
+                variant="card"
+            >
+                <div className="flex flex-col md:flex-row items-center gap-6 p-4 bg-surface/50 border border-outline-variant/15 rounded-3xl">
+                    {/* QR Code */}
+                    <div className="bg-white p-4 rounded-2xl border border-outline-variant/20 shadow-md flex items-center justify-center shrink-0">
+                        <QRCodeSVG
+                            value={JSON.stringify({ ip: hostIp || "192.168.1.100", port: 5555, code: pairingPin })}
+                            size={140}
+                            bgColor="#FFFFFF"
+                            fgColor="#0F172A"
+                            level="M"
+                        />
+                    </div>
+
+                    {/* Info & PIN */}
+                    <div className="flex-1 flex flex-col gap-3 min-w-0">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
+                                <Sparkles size={16} className="text-primary animate-pulse" />
+                                <span className="text-xs font-bold text-on-surface-variant/80 uppercase tracking-wider">
+                                    {t('connect.wireless.pin_code', 'Wireless Pairing PIN')}
+                                </span>
+                            </div>
+                            {hostIp && (
+                                <span className="text-[11px] font-mono bg-primary/10 text-primary px-2.5 py-0.5 rounded-full border border-primary/20">
+                                    {t('connect.wireless.host_ip', 'PC Host IP')}: {hostIp}
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Big 6-Digit PIN Display */}
+                        <div className="flex items-center gap-3">
+                            <div className="flex gap-2">
+                                {pairingPin.split('').map((digit, idx) => (
+                                    <div key={idx} className="w-10 h-12 rounded-xl bg-surface border border-outline-variant/30 flex items-center justify-center font-mono font-extrabold text-xl text-primary shadow-inner">
+                                        {digit}
+                                    </div>
+                                ))}
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleRefreshPin}
+                                className="h-10 w-10 rounded-xl border border-outline-variant/20 hover:bg-surface-variant/50"
+                                title={t('connect.wireless.refresh_pin', 'Generate New PIN')}
+                            >
+                                <RotateCw size={16} />
+                            </Button>
+                        </div>
+
+                        <div className="text-xs text-on-surface-variant/60 leading-relaxed space-y-0.5">
+                            <p>{t('connect.wireless.step1', '1. Open Android Settings → Developer Options → Wireless Debugging.')}</p>
+                            <p>
+                                {t('connect.wireless.step2', '2. Tap Pair device with pairing code and enter {{pin}} on IP {{ip}}:5555.', {
+                                    pin: pairingPin,
+                                    ip: hostIp || '192.168.x.x'
+                                })}
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </Section>
 
             {/* Ngrok Integration Card */}

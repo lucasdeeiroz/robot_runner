@@ -74,5 +74,13 @@ As seguintes diretrizes arquiteturais e técnicas são estritamente obrigatória
 - **Permissão `QUERY_ALL_PACKAGES`**: O `AndroidManifest.xml` do Companion DEVE manter a permissão `<uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />` para contornar a restrição de visibilidade de pacotes do Android 11+ (API 30+).
 - **Ícones Nativos em Base64**: O endpoint `/app/icon?package=<pkg>` extrai a `Drawable` nativa, realiza downscaling otimizado para `96x96px` e retorna a string Data URL PNG (`data:image/png;base64,...`) em RAM para renderização instantânea no `AppsSubTab.tsx`.
 
+---
+
+## 11. Pareamento Wireless e Dashboard de Frota (Fase 10)
+- **Endpoint HTTP `/device/info`**: O Companion expõe metadados de rede, IP da interface `wlan0`, nível de bateria, temperatura °C, estado de carregamento e RAM disponível em um único payload JSON de **<10ms**.
+- **Pareamento ADB Wireless (Android 11+)**: O backend Rust oferece `adb_pair_device` que auto-executa `adb pair IP:PORT CODE` seguido de `adb connect IP:PORT` sem necessidade de cabo USB.
+- **Painel Fleet Health**: O `HomeSubTab.tsx` consulta periodicamente `get_fleet_health` em Rust para apresentar o status de saúde consolidado (Companion 🟢/🟡/⚪, Bateria %, Temp °C, IP Wi-Fi e RAM) de todos os dispositivos conectados na frota.
+
+
 
 

@@ -364,7 +364,15 @@ export const en = {
         connect: {
             wireless: {
                 title: "Wireless Connection",
-                desc: "Connect to devices via Wi-Fi ADB"
+                desc: "Connect to devices via Wi-Fi ADB",
+                qr_title: "QR Code & 1-Click Wireless Onboarding",
+                qr_desc: "Scan QR Code using Mobile Companion or enter 6-digit PIN in Android Developer Options -> Wireless Debugging",
+                pin_code: "Pairing PIN",
+                refresh_pin: "Generate New PIN",
+                auto_pair_btn: "1-Click Auto-Pair & Connect",
+                host_ip: "PC Host IP",
+                step1: "1. Open Android Settings → Developer Options → Wireless Debugging.",
+                step2: "2. Tap Pair device with pairing code and enter {{pin}} on IP {{ip}}:5555."
             },
             remote: {
                 title: "Remote Access (Ngrok)",
@@ -2264,7 +2272,10 @@ export const en = {
             pdf_saved: "PDF Report generated on device: ",
             pdf_failed: "Failed to generate device PDF report",
             generate_pdf: "Export Device PDF",
-            boosted: "Companion Boosted"
+            boosted: "Companion Boosted",
+            status_active: "Companion Active",
+            status_installed: "Companion Installed",
+            status_adb: "ADB Standard"
         },
         env_setup: {
             title: "Environment Setup",

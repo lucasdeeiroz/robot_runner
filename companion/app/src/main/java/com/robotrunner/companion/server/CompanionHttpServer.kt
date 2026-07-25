@@ -19,7 +19,9 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.net.wifi.WifiManager
 import android.util.Base64
+import java.net.NetworkInterface
 import java.io.ByteArrayOutputStream
 import com.robotrunner.companion.checkup.HardwareCheckupRunner
 import com.robotrunner.companion.checkup.PdfReportGenerator
@@ -237,6 +239,8 @@ class CompanionHttpServer(
                     }
                 }
             }
+
+            "/device/info" -> getDeviceInfoPayload()
 
             "/checkup/run" -> {
                 val result = checkupRunner.runLocalCheckup()
@@ -692,6 +696,84 @@ class CompanionHttpServer(
             JsonObject().apply {
                 addProperty("status", "error")
                 addProperty("message", e.message ?: "Failed to extract app icon")
+            }
+        }
+    }
+
+    private fun getDeviceInfoPayload(): JsonObject {
+        return try {
+            val model = Build.MODEL ?: ""
+            val manufacturer = Build.MANUFACTURER ?: ""
+            val brand = Build.BRAND ?: ""
+            val androidVersion = Build.VERSION.RELEASE ?: ""
+            val sdkInt = Build.VERSION.SDK_INT
+
+            val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+            val batteryPct = if (level >= 0 && scale > 0) (level * 100) / scale else -1
+            val tempTenths = batteryIntent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1) ?: -1
+            val batteryTempC = if (tempTenths > 0) tempTenths / 10.0f else 0.0f
+            val status = batteryIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+            val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+
+            var wifiIp = ""
+            try {
+                val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+                val ipInt = wifiManager?.connectionInfo?.ipAddress ?: 0
+                if (ipInt != 0) {
+                    wifiIp = String.format(
+                        java.util.Locale.US, "%d.%d.%d.%d",
+                        ipInt and 0xff, ipInt shr 8 and 0xff, ipInt shr 16 and 0xff, ipInt shr 24 and 0xff
+                    )
+                }
+            } catch (_: Exception) {}
+
+            if (wifiIp.isEmpty() || wifiIp == "0.0.0.0") {
+                try {
+                    val interfaces = NetworkInterface.getNetworkInterfaces()
+                    while (interfaces.hasMoreElements()) {
+                        val iface = interfaces.nextElement()
+                        if (iface.name.contains("wlan") || iface.name.contains("eth")) {
+                            val addrs = iface.inetAddresses
+                            while (addrs.hasMoreElements()) {
+                                val addr = addrs.nextElement()
+                                if (!addr.isLoopbackAddress && addr is java.net.Inet4Address) {
+                                    wifiIp = addr.hostAddress ?: ""
+                                    break
+                                }
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+
+            val actManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            val memInfo = ActivityManager.MemoryInfo()
+            actManager?.getMemoryInfo(memInfo)
+            val totalRamMb = (memInfo.totalMem / (1024 * 1024)).toInt()
+            val availRamMb = (memInfo.availMem / (1024 * 1024)).toInt()
+
+            JsonObject().apply {
+                addProperty("status", "ok")
+                addProperty("model", model)
+                addProperty("manufacturer", manufacturer)
+                addProperty("brand", brand)
+                addProperty("android_version", androidVersion)
+                addProperty("sdk_int", sdkInt)
+                addProperty("battery_level", batteryPct)
+                addProperty("battery_temp", batteryTempC)
+                addProperty("is_charging", isCharging)
+                addProperty("wifi_ip", wifiIp)
+                addProperty("total_ram_mb", totalRamMb)
+                addProperty("avail_ram_mb", availRamMb)
+                addProperty("companion_version", "2.3.3")
+                addProperty("accessibility_active", CompanionAccessibilityService.activePackageName != null)
+            }
+        } catch (e: Exception) {
+            JsonObject().apply {
+                addProperty("status", "error")
+                addProperty("message", e.message ?: "Failed to query device info")
             }
         }
     }

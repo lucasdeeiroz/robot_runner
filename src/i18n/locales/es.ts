@@ -361,8 +361,16 @@ export const es = {
         },
         connect: {
             wireless: {
-                title: "Conexión Inalámbrica",
-                desc: "Conectar vía Wi-Fi ADB"
+                title: "Conexión Inalámbrica (Wi-Fi)",
+                desc: "Conecte dispositivos a través de Wi-Fi ADB inalámbrico",
+                qr_title: "Código QR y Emparejamiento Inalámbrico 1-Clic",
+                qr_desc: "Escanee el código QR con Mobile Companion o ingrese el PIN de 6 dígitos en Opciones de Desarrollador -> Depuración Inalámbrica",
+                pin_code: "PIN de Emparejamiento",
+                refresh_pin: "Generar Nuevo PIN",
+                auto_pair_btn: "Emparejamiento Inalámbrico 1-Clic",
+                host_ip: "IP del PC Host",
+                step1: "1. Abra Ajustes de Android → Opciones de Desarrollador → Depuración Inalámbrica.",
+                step2: "2. Toque en Emparejar dispositivo con código de emparejamiento e ingrese {{pin}} en la IP {{ip}}:5555."
             },
             remote: {
                 title: "Acceso Remoto (Ngrok)",
@@ -2274,7 +2282,10 @@ export const es = {
             pdf_saved: "Informe PDF generado en el dispositivo: ",
             pdf_failed: "Fallo al generar informe PDF en el dispositivo",
             generate_pdf: "Exportar PDF del Dispositivo",
-            boosted: "Potenciado por Companion"
+            boosted: "Potenciado por Companion",
+            status_active: "Companion Activo",
+            status_installed: "Companion Instalado",
+            status_adb: "ADB Estándar"
         },
         env_setup: {
             title: "Configuración del Entorno",

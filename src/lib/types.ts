@@ -6,11 +6,15 @@ export interface Device {
     is_emulator?: boolean;
     android_version?: string | null;
     battery_level?: number | null;
+    battery_temp?: number | null;
+    is_charging?: boolean | null;
+    wifi_ip?: string | null;
     ram_total?: number | null;
     ram_used?: number | null;
     storage_total?: number | null;
     storage_used?: number | null;
     is_companion_installed?: boolean | null;
+    is_companion_active?: boolean | null;
     companion_port?: number | null;
 }
 

@@ -364,8 +364,16 @@ export const pt = {
         },
         connect: {
             wireless: {
-                title: "Conexão Sem Fio",
-                desc: "Conectar via Wi-Fi ADB"
+                title: "Conexão Sem Fio (Wi-Fi)",
+                desc: "Conecte dispositivos via Wi-Fi ADB sem fio",
+                qr_title: "QR Code e Pareamento Sem Fio 1-Clique",
+                qr_desc: "Escaneie o QR Code no Mobile Companion ou digite o PIN de 6 dígitos nas Opções do Desenvolvedor -> Depuração Sem Fio",
+                pin_code: "PIN de Pareamento",
+                refresh_pin: "Gerar Novo PIN",
+                auto_pair_btn: "Pareamento Sem Fio 1-Clique",
+                host_ip: "IP do PC Host",
+                step1: "1. Abra Configurações do Android → Opções do Desenvolvedor → Depuração Sem Fio.",
+                step2: "2. Toque em Parear dispositivo com código de pareamento e digite {{pin}} no IP {{ip}}:5555."
             },
             remote: {
                 title: "Acesso Remoto (Ngrok)",
@@ -2266,7 +2274,10 @@ export const pt = {
             pdf_saved: "Relatório PDF gerado no dispositivo: ",
             pdf_failed: "Falha ao gerar relatório PDF no dispositivo",
             generate_pdf: "Exportar PDF do Dispositivo",
-            boosted: "Turbinado pelo Companion"
+            boosted: "Turbinado pelo Companion",
+            status_active: "Companion Ativo",
+            status_installed: "Companion Instalado",
+            status_adb: "ADB Padrão"
         },
         env_setup: {
             title: "Configuração do Ambiente",
