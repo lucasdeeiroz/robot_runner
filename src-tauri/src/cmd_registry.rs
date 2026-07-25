@@ -161,7 +161,10 @@ macro_rules! generate_robot_runner_handler {
             crate::companion::generate_companion_pdf_report,
             crate::companion::fetch_companion_screenshot,
             crate::companion::fetch_companion_fast_screenshot,
-            crate::companion::perform_companion_node_action
+            crate::companion::perform_companion_node_action,
+            crate::companion::fetch_companion_artifacts,
+            crate::companion::fetch_companion_fleet_peers,
+            crate::companion::push_companion_payload
         ]
     };
 }

@@ -281,6 +281,36 @@ export function useCompanion(selectedDevice: string | null) {
         };
     }, [selectedDevice, checkInstallation, connectCompanion]);
 
+    const fetchArtifacts = useCallback(async (port = 9876) => {
+        try {
+            const rawJson = await invoke<string>('fetch_companion_artifacts', { port });
+            return JSON.parse(rawJson);
+        } catch (e) {
+            console.error("[useCompanion] Failed to fetch companion artifacts:", e);
+            throw e;
+        }
+    }, []);
+
+    const fetchFleetPeers = useCallback(async (port = 9876) => {
+        try {
+            const rawJson = await invoke<string>('fetch_companion_fleet_peers', { port });
+            return JSON.parse(rawJson);
+        } catch (e) {
+            console.error("[useCompanion] Failed to fetch companion fleet peers:", e);
+            throw e;
+        }
+    }, []);
+
+    const pushPayload = useCallback(async (payload: { artifactType: string; fileName: string; contentJson: string }, port = 9876) => {
+        try {
+            const rawJson = await invoke<string>('push_companion_payload', { port, payload: JSON.stringify(payload) });
+            return JSON.parse(rawJson);
+        } catch (e) {
+            console.error("[useCompanion] Failed to push companion payload:", e);
+            throw e;
+        }
+    }, []);
+
     return {
         status,
         isInstalled,
@@ -296,6 +326,9 @@ export function useCompanion(selectedDevice: string | null) {
         generatePdfReport,
         runStandaloneCheckup,
         performTap,
-        performNodeAction
+        performNodeAction,
+        fetchArtifacts,
+        fetchFleetPeers,
+        pushPayload
     };
 }

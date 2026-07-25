@@ -38,6 +38,7 @@ import com.robotrunner.companion.net.NetworkTabContent
 import com.robotrunner.companion.performance.PerformanceTabContent
 import com.robotrunner.companion.shell.ShellConsoleTabContent
 import com.robotrunner.companion.stopwatch.StopwatchTabContent
+import com.robotrunner.companion.sync.SyncCenterTabContent
 
 @Composable
 fun DashboardScreen(
@@ -264,6 +265,20 @@ fun DashboardScreen(
                                 )
                             }
                         )
+                        Tab(
+                            selected = selectedTab == 12,
+                            onClick = { selectedTab = 12 },
+                            text = {
+                                Text(
+                                    text = stringResource(id = R.string.tab_sync_center),
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        )
                     }
                 }
 
@@ -301,6 +316,7 @@ fun DashboardScreen(
                             onRunOfflineCheckup = onRunOfflineCheckup,
                             onLaunchDisplayTest = onLaunchDisplayTest
                         )
+                        12 -> SyncCenterTabContent()
                     }
                 }
             }

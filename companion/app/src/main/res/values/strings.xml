@@ -207,4 +207,14 @@
     <string name="msg_golden_file_exported">Golden File JSON saved to Downloads: %1$s</string>
     <string name="msg_pdf_report_generated">PDF Technical Audit Report generated: %1$s</string>
     <string name="msg_receipt_printed">POS Thermal receipt printed successfully!</string>
+    <!-- Phase 10 Strings (Sync & Fleet P2P) -->
+    <string name="header_sync_center">🔄 Bi-Directional Sync &amp; Desktop Bridge</string>
+    <string name="desc_sync_center">Synchronize test artifacts, Golden Files, and project configs with Robot Runner Desktop over REST / Wi-Fi.</string>
+    <string name="btn_refresh_vault">Refresh Vault Index</string>
+    <string name="btn_export_all_desktop">Export All to Desktop</string>
+    <string name="header_fleet_radar">🛰️ Fleet P2P Network Radar</string>
+    <string name="desc_fleet_radar">Discover active Robot Runner Companion devices and Desktop servers on local Wi-Fi subnet.</string>
+    <string name="btn_scan_fleet">Scan Fleet Subnet</string>
+    <string name="header_artifact_vault">📦 Local Artifact Vault</string>
+    <string name="tab_sync_center">Sync Center</string>
 </resources>

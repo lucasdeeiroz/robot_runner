@@ -207,4 +207,14 @@
     <string name="msg_golden_file_exported">Archivo Golden JSON guardado en Descargas: %1$s</string>
     <string name="msg_pdf_report_generated">Informe de Auditoría PDF generado: %1$s</string>
     <string name="msg_receipt_printed">¡Recibo térmico impreso con éxito!</string>
+    <!-- Phase 10 Strings (Sync & Fleet P2P ES) -->
+    <string name="header_sync_center">🔄 Sincronización Bidireccional y Puente de Escritorio</string>
+    <string name="desc_sync_center">Sincronice artefactos de prueba, Archivos Golden y configuraciones de proyectos con Robot Runner Desktop vía REST / Wi-Fi.</string>
+    <string name="btn_refresh_vault">Actualizar Índice de la Bóveda</string>
+    <string name="btn_export_all_desktop">Exportar Todo al Escritorio</string>
+    <string name="header_fleet_radar">🛰️ Radar P2P de la Flota de Dispositivos</string>
+    <string name="desc_fleet_radar">Descubra dispositivos Robot Runner Companion y servidores de escritorio activos en la subred Wi-Fi local.</string>
+    <string name="btn_scan_fleet">Escanear Subred de la Flota</string>
+    <string name="header_artifact_vault">📦 Bóveda Local de Artefactos</string>
+    <string name="tab_sync_center">Centro Sync</string>
 </resources>

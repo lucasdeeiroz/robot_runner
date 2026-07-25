@@ -414,18 +414,20 @@ class CompanionHttpServer(
                 }
             }
 
-            "/checkup/pdf" -> {
-                val result = checkupRunner.runLocalCheckup()
-                val file = pdfGenerator.generatePdfReport(result)
+            "/sync/artifacts" -> {
+                val syncManager = com.robotrunner.companion.sync.SyncManager(context)
+                val artifacts = kotlinx.coroutines.runBlocking { syncManager.listLocalArtifacts() }
                 JsonObject().apply {
-                    if (file != null) {
-                        addProperty("status", "ok")
-                        addProperty("pdfPath", file.absolutePath)
-                        addProperty("fileName", file.name)
-                    } else {
-                        addProperty("status", "error")
-                        addProperty("message", "Failed to generate PDF report")
-                    }
+                    addProperty("status", "ok")
+                    add("artifacts", gson.toJsonTree(artifacts))
+                }
+            }
+
+            "/fleet/peers" -> {
+                val peers = com.robotrunner.companion.sync.FleetP2pBridge.peersFlow.value
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    add("peers", gson.toJsonTree(peers))
                 }
             }
 

@@ -146,9 +146,20 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 14. Continuous Learning & Rule Maintenance Instruction
+## 14. Bi-Directional Synchronization & Fleet P2P Subnet Discovery Rules
+
+1. **Artifact Vault Indexing & Scoped File Sharing**:
+   - `SyncManager` indexes local artifacts (`map_*.json`, `golden_*.json`, `suite_*.json`, `report_*.html`, `audit_report_*.pdf`) directly from `Environment.DIRECTORY_DOWNLOADS`. Sharing files to external apps or Desktop must always go through `FileProvider.getUriForFile()` with `FLAG_GRANT_READ_URI_PERMISSION`.
+
+2. **Subnet P2P Discovery Rate & Timeout Isolation**:
+   - Subnet scanning in `FleetP2pBridge` queries up to 254 IP addresses on `Dispatchers.IO` using bounded Coroutine jobs (`async`). Enforce strict connection and read timeouts (e.g. 400ms) on each HTTP socket check to prevent ANR UI thread lockup.
+
+---
+
+## 15. Continuous Learning & Rule Maintenance Instruction
 
 > **IMPORTANT**: As new features, optimizations, or Android SDK workarounds are implemented in `companion/`, the **Android Companion Engineer** profile MUST update and append new rules directly to this document.
+
 
 
 

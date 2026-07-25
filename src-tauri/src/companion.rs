@@ -399,3 +399,77 @@ pub async fn perform_companion_node_action(
 
     Ok(text)
 }
+
+#[command]
+pub async fn fetch_companion_artifacts(port: Option<u16>) -> AppResult<String> {
+    let p = port.unwrap_or(9876);
+    let url = format!("http://127.0.0.1:{}/sync/artifacts", p);
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_millis(4000))
+        .build()
+        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
+
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| AppError::FileSystemError(format!("Failed to fetch companion artifacts: {}", e)))?;
+
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| AppError::FileSystemError(format!("Failed to read response body: {}", e)))?;
+
+    Ok(text)
+}
+
+#[command]
+pub async fn fetch_companion_fleet_peers(port: Option<u16>) -> AppResult<String> {
+    let p = port.unwrap_or(9876);
+    let url = format!("http://127.0.0.1:{}/fleet/peers", p);
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_millis(3000))
+        .build()
+        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
+
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| AppError::FileSystemError(format!("Failed to fetch companion fleet peers: {}", e)))?;
+
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| AppError::FileSystemError(format!("Failed to read response body: {}", e)))?;
+
+    Ok(text)
+}
+
+#[command]
+pub async fn push_companion_payload(port: Option<u16>, payload: String) -> AppResult<String> {
+    let p = port.unwrap_or(9876);
+    let url = format!("http://127.0.0.1:{}/sync/push", p);
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_millis(5000))
+        .build()
+        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
+
+    let resp = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .body(payload)
+        .send()
+        .await
+        .map_err(|e| AppError::FileSystemError(format!("Failed to push payload to companion: {}", e)))?;
+
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| AppError::FileSystemError(format!("Failed to read response body: {}", e)))?;
+
+    Ok(text)
+}
