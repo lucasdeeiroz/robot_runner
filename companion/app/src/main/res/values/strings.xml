@@ -217,4 +217,10 @@
     <string name="btn_scan_fleet">Scan Fleet Subnet</string>
     <string name="header_artifact_vault">📦 Local Artifact Vault</string>
     <string name="tab_sync_center">Sync Center</string>
+    <!-- Play Store Style Bottom Navigation Strings -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_performance">Perf &amp; Logs</string>
+    <string name="nav_automation">Automation</string>
+    <string name="nav_tools">Tools &amp; OS</string>
+    <string name="nav_sync">Sync &amp; Fleet</string>
 </resources>

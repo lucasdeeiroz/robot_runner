@@ -12,8 +12,9 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@android:drawable/sym_def_app_icon"
-        android:label="Robot Runner Companion"
+        android:icon="@drawable/ic_launcher_chromakey"
+        android:roundIcon="@drawable/ic_launcher_chromakey"
+        android:label="RR Companion"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
 

@@ -217,4 +217,10 @@
     <string name="btn_scan_fleet">Escanear Sub-rede da Frota</string>
     <string name="header_artifact_vault">📦 Cofre Local de Artefatos</string>
     <string name="tab_sync_center">Central Sync</string>
+    <!-- Play Store Style Bottom Navigation Strings PT-BR -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_performance">Perf &amp; Logs</string>
+    <string name="nav_automation">Automação</string>
+    <string name="nav_tools">Ferramentas</string>
+    <string name="nav_sync">Sync &amp; Frota</string>
 </resources>

@@ -217,4 +217,10 @@
     <string name="btn_scan_fleet">Escanear Subred de la Flota</string>
     <string name="header_artifact_vault">📦 Bóveda Local de Artefactos</string>
     <string name="tab_sync_center">Centro Sync</string>
+    <!-- Play Store Style Bottom Navigation Strings ES -->
+    <string name="nav_dashboard">Panel</string>
+    <string name="nav_performance">Rend &amp; Logs</string>
+    <string name="nav_automation">Automatización</string>
+    <string name="nav_tools">Herramientas</string>
+    <string name="nav_sync">Sync y Flota</string>
 </resources>

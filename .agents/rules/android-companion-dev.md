@@ -156,9 +156,20 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 15. Continuous Learning & Rule Maintenance Instruction
+## 15. Dual Navigation Architecture & Atomic Design UI Rules
+
+1. **Play Store-Style Dual Navigation Isolation**:
+   - The Companion UI architecture uses a two-tier navigation hierarchy: a 5-item Bottom Navigation Bar (`NavigationBar`) for primary domain sections (Dashboard, Perf & Logs, Automation, Tools & OS, Sync & Fleet) housing top sub-tabs (`TabRow`) scoped strictly to each domain section. Always retain local sub-tab selection state across section switches.
+
+2. **Atomic Design & Glassmorphism Standardization**:
+   - UI elements must utilize reusable Atomic components in `ui/components/CompanionAtoms.kt` (`CompanionCard`, `CompanionSectionHeader`, `CompanionStatusBadge`, `CompanionActionButton`) to maintain visual consistency with the Desktop dark theme.
+
+---
+
+## 16. Continuous Learning & Rule Maintenance Instruction
 
 > **IMPORTANT**: As new features, optimizations, or Android SDK workarounds are implemented in `companion/`, the **Android Companion Engineer** profile MUST update and append new rules directly to this document.
+
 
 
 
