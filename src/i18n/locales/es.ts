@@ -197,6 +197,9 @@ export const es = {
                 launch: "Abrir App",
                 download: "Descargar APK"
             },
+            download_companion: "Descargar Companion.apk",
+            download_companion_tooltip: "Descargar companion.apk de la versión actual ({{version}})",
+            downloading_companion: "Abriendo enlace de descarga de companion.apk ({{version}})...",
             search_placeholder: "Buscar paquetes...",
             toggle_system: "Mostrar Apps del Sistema",
             no_device: "Ningún dispositivo seleccionado",

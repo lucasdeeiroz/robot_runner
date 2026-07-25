@@ -5,7 +5,9 @@ import { Search, Smartphone, Package, Trash2, Snowflake, PlayCircle, Eraser, Upl
 import clsx from "clsx";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { open, save } from '@tauri-apps/plugin-dialog';
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { Virtuoso } from "react-virtuoso";
+import packageJson from "../../../../../package.json";
 
 import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
 import { feedback } from "@/lib/feedback";
@@ -57,7 +59,7 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                     setIconMap(prev => ({ ...prev, [pkgName]: icon }));
                 }
             })
-            .catch(() => {});
+            .catch(() => { });
     };
 
     // ... (rest of state)
@@ -136,9 +138,9 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
         if (!search) return true;
         const lower = search.toLowerCase();
         const label = p.label || friendlyNames[String(p.name)] || "";
-        return p.name.toLowerCase().includes(lower) || 
-               label.toLowerCase().includes(lower) || 
-               p.path.toLowerCase().includes(lower);
+        return p.name.toLowerCase().includes(lower) ||
+            label.toLowerCase().includes(lower) ||
+            p.path.toLowerCase().includes(lower);
     }).sort((a, b) => {
         if (sortBy === 'name') {
             const nameA = (a.label || friendlyNames[String(a.name)] || String(a.name)).toLowerCase();
@@ -277,12 +279,24 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
         }
     };
 
-    /*
-    const handleBackup = async (pkg: PackageInfo) => {
-        // ...
-        toast.info("Coming soon");
+    const handleDownloadCompanion = async () => {
+        try {
+            let version = packageJson.version || '2.3.3';
+            try {
+                const { getVersion } = await import('@tauri-apps/api/app');
+                const v = await getVersion();
+                if (v) version = v;
+            } catch (_) { }
+
+            const tag = version.startsWith('v') ? version : `v${version}`;
+            const downloadUrl = `https://github.com/lucasdeeiroz/robot_runner/releases/download/${tag}/companion.apk`;
+
+            feedback.toast.raw.success(t('apps.downloading_companion', { version: tag, defaultValue: `Downloading companion.apk (${tag})...` }));
+            await openUrl(downloadUrl);
+        } catch (e) {
+            feedback.toast.raw.error(t('apps.error.download_companion_failed', { defaultValue: 'Failed to open download link' }), e);
+        }
     };
-    */
 
 
     return (
@@ -344,7 +358,20 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                     </div>
                 ) : null}
                 actions={
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                        {companionStatus === 'not_installed' && (
+                            <Button
+                                onClick={handleDownloadCompanion}
+                                variant="ghost"
+                                size="sm"
+                                className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 hover:bg-primary/20 border border-primary/30 rounded-xl py-1.5 px-3 transition-all h-auto"
+                                data-tooltip={t('apps.download_companion_tooltip', { version: packageJson.version, defaultValue: `Download companion.apk from current release (v${packageJson.version})` })}
+                                data-position="bottom"
+                            >
+                                <Rocket size={14} className="text-primary animate-pulse" />
+                                <span>{t('apps.download_companion', 'Download Companion APK')}</span>
+                            </Button>
+                        )}
                         <SplitButton
                             disabled={isTestRunning && !allowActionsDuringTest}
                             variant="primary"

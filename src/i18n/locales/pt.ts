@@ -197,6 +197,9 @@ export const pt = {
                 launch: "Abrir App",
                 download: "Baixar APK"
             },
+            download_companion: "Baixar Companion.apk",
+            download_companion_tooltip: "Baixar companion.apk da release atual ({{version}})",
+            downloading_companion: "Abrindo link de download do companion.apk ({{version}})...",
             search_placeholder: "Buscar pacotes...",
             toggle_system: "Exibir Apps do Sistema",
             no_device: "Nenhum dispositivo selecionado",

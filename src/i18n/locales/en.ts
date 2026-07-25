@@ -197,6 +197,9 @@ export const en = {
                 launch: "Launch App",
                 download: "Download APK"
             },
+            download_companion: "Download Companion APK",
+            download_companion_tooltip: "Download companion.apk from current release ({{version}})",
+            downloading_companion: "Opening download link for companion.apk ({{version}})...",
             search_placeholder: "Search packages...",
             toggle_system: "Toggle System Apps",
             no_device: "No device selected",

@@ -27,6 +27,39 @@ jobs:
           prerelease: false
           generate_release_notes: true
 
+  build-companion:
+    needs: create-release
+    permissions:
+      contents: write
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Build Companion APK
+        run: |
+          chmod +x companion/gradlew
+          cd companion
+          ./gradlew assembleRelease
+
+      - name: Rename APK to companion.apk
+        run: |
+          find companion/app/build/outputs/apk/release -name "*.apk" -exec cp {} companion.apk \;
+
+      - name: Upload Companion APK Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: companion.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build-tauri:
     needs: create-release
     permissions:
