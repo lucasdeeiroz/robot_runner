@@ -162,4 +162,13 @@
     <string name="label_avg_delta">LATENCIA PROMEDIO</string>
     <string name="label_p95_delta">LATENCIA P95</string>
     <string name="msg_benchmark_exported">Informe de benchmark guardado en Descargas: %1$s</string>
+    <!-- Phase 6 Strings (ES) -->
+    <string name="tab_bdd_runner">Pruebas BDD</string>
+    <string name="header_bdd_runner">🤖 Motor de Ejecución de Pruebas BDD en Dispositivo</string>
+    <string name="desc_bdd_runner">Ejecuta escenarios Gherkin nativamente en el dispositivo sin necesidad de PC o servidor Appium.</string>
+    <string name="btn_run_suite">Ejecutar Suite de Pruebas</string>
+    <string name="btn_stop_suite">Detener Ejecución</string>
+    <string name="btn_export_html_report">Exportar Informe HTML</string>
+    <string name="label_pass_rate">TASA DE ÉXITO</string>
+    <string name="msg_report_exported">Informe de auditoría guardado en Descargas: %1$s</string>
 </resources>

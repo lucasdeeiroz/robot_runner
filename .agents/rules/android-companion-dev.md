@@ -106,9 +106,20 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 10. Continuous Learning & Rule Maintenance Instruction
+## 10. Accessibility-Driven BDD Execution & Report Generation Rules
+
+1. **Native UI Tree Matching & Gesture Dispatching**:
+   - Native BDD test step execution relies on `CompanionAccessibilityService.performNodeActionByMatch` to locate interactive views by `textMatch`, `contentDescMatch`, or `resourceId`. Always fallback to parent containers if `isClickable` is false on child text views.
+
+2. **On-Device Audit Report Formatting**:
+   - Generated audit reports (`report_*.html` and `report_*.json`) must be self-contained files saved directly to `Environment.DIRECTORY_DOWNLOADS` or served securely via `FileProvider`. HTML reports must include dark mode CSS themes compatible with mobile and desktop web browsers.
+
+---
+
+## 11. Continuous Learning & Rule Maintenance Instruction
 
 > **IMPORTANT**: As new features, optimizations, or Android SDK workarounds are implemented in `companion/`, the **Android Companion Engineer** profile MUST update and append new rules directly to this document.
+
 
 
 

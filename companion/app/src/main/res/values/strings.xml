@@ -162,4 +162,13 @@
     <string name="label_avg_delta">AVG LATENCY</string>
     <string name="label_p95_delta">P95 LATENCY</string>
     <string name="msg_benchmark_exported">Benchmark report saved to Downloads: %1$s</string>
+    <!-- Phase 6 Strings -->
+    <string name="tab_bdd_runner">BDD Runner</string>
+    <string name="header_bdd_runner">🤖 On-Device BDD Test Execution Engine</string>
+    <string name="desc_bdd_runner">Execute Gherkin scenarios natively on device without requiring a PC or Appium server.</string>
+    <string name="btn_run_suite">Run Test Suite</string>
+    <string name="btn_stop_suite">Stop Execution</string>
+    <string name="btn_export_html_report">Export HTML Audit Report</string>
+    <string name="label_pass_rate">PASS RATE</string>
+    <string name="msg_report_exported">Audit report saved to Downloads: %1$s</string>
 </resources>

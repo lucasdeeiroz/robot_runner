@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.robotrunner.companion.R
 import com.robotrunner.companion.apps.PackageManagerTabContent
+import com.robotrunner.companion.bdd.BddTestRunnerTabContent
 import com.robotrunner.companion.logcat.LogcatTabContent
 import com.robotrunner.companion.model.HardwareSpecCategory
 import com.robotrunner.companion.model.LiveTelemetry
@@ -150,7 +151,7 @@ fun DashboardScreen(
                             onClick = { selectedTab = 4 },
                             text = {
                                 Text(
-                                    text = stringResource(id = R.string.tab_logcat),
+                                    text = stringResource(id = R.string.tab_bdd_runner),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -164,7 +165,7 @@ fun DashboardScreen(
                             onClick = { selectedTab = 5 },
                             text = {
                                 Text(
-                                    text = stringResource(id = R.string.tab_performance),
+                                    text = stringResource(id = R.string.tab_logcat),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -178,7 +179,7 @@ fun DashboardScreen(
                             onClick = { selectedTab = 6 },
                             text = {
                                 Text(
-                                    text = stringResource(id = R.string.tab_apps),
+                                    text = stringResource(id = R.string.tab_performance),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -192,7 +193,7 @@ fun DashboardScreen(
                             onClick = { selectedTab = 7 },
                             text = {
                                 Text(
-                                    text = stringResource(id = R.string.tab_shell),
+                                    text = stringResource(id = R.string.tab_apps),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -204,6 +205,20 @@ fun DashboardScreen(
                         Tab(
                             selected = selectedTab == 8,
                             onClick = { selectedTab = 8 },
+                            text = {
+                                Text(
+                                    text = stringResource(id = R.string.tab_shell),
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        )
+                        Tab(
+                            selected = selectedTab == 9,
+                            onClick = { selectedTab = 9 },
                             text = {
                                 Text(
                                     text = stringResource(id = R.string.tab_diagnostics),
@@ -241,11 +256,12 @@ fun DashboardScreen(
                             onToggleServer = onToggleServer
                         )
                         3 -> StopwatchTabContent()
-                        4 -> LogcatTabContent()
-                        5 -> PerformanceTabContent()
-                        6 -> PackageManagerTabContent()
-                        7 -> ShellConsoleTabContent()
-                        8 -> DiagnosticsTabContent(
+                        4 -> BddTestRunnerTabContent()
+                        5 -> LogcatTabContent()
+                        6 -> PerformanceTabContent()
+                        7 -> PackageManagerTabContent()
+                        8 -> ShellConsoleTabContent()
+                        9 -> DiagnosticsTabContent(
                             onRunOfflineCheckup = onRunOfflineCheckup,
                             onLaunchDisplayTest = onLaunchDisplayTest
                         )

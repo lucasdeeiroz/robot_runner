@@ -325,6 +325,22 @@ class CompanionHttpServer(
                 }
             }
 
+            "/bdd/suites" -> {
+                val suites = com.robotrunner.companion.bdd.BddRunnerEngine.getSampleSuites()
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    add("suites", gson.toJsonTree(suites))
+                }
+            }
+
+            "/bdd/status" -> {
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    addProperty("isRunning", com.robotrunner.companion.bdd.BddRunnerEngine.isRunning)
+                    addProperty("currentStep", com.robotrunner.companion.bdd.BddRunnerEngine.currentStepDescription)
+                }
+            }
+
             "/device/info" -> getDeviceInfoPayload()
 
             "/checkup/run" -> {
