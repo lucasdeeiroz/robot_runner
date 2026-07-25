@@ -141,4 +141,25 @@
     <string name="msg_grant_overlay_permission">Conceda permissão de Exibição sobre outros apps</string>
     <string name="chart_cpu_title">⚡ Histórico de Uso de CPU (%)</string>
     <string name="chart_ram_title">⚡ Memória RAM do App (MB)</string>
+    <!-- Phase 5 Strings (PT-BR) -->
+    <string name="tab_stopwatch">Cronômetro</string>
+    <string name="header_redraw_stopwatch">⏱️ Cronômetro e Benchmark de Redesenho de Tela (ms)</string>
+    <string name="desc_redraw_stopwatch">Mede a latência exata do gesto até o redesenho visual em milissegundos via Acessibilidade.</string>
+    <string name="header_floating_hud_stopwatch">🖥️ Overlay Flutuante do Cronômetro (HUD)</string>
+    <string name="desc_floating_hud_stopwatch">Exibe latência de redesenho sobre aplicativos em uso.</string>
+    <string name="header_floating_hud_logcat">🖥️ Overlay Flutuante do Logcat (HUD)</string>
+    <string name="desc_floating_hud_logcat">Transmite logs do logcat sobre aplicativos em uso.</string>
+    <string name="label_last_delta">Última Latência de Redesenho</string>
+    <string name="status_fast_ui">RÁPIDO (&lt;50ms)</string>
+    <string name="status_normal_ui">NORMAL (50-200ms)</string>
+    <string name="status_slow_ui">LENTO (&gt;200ms)</string>
+    <string name="btn_start_benchmark">Iniciar Gravação</string>
+    <string name="btn_stop_benchmark">Parar e Resumir</string>
+    <string name="btn_manual_lap">Registrar Volta</string>
+    <string name="btn_export_benchmark">Exportar Relatório</string>
+    <string name="label_min_delta">LATÊNCIA MÍN</string>
+    <string name="label_max_delta">LATÊNCIA MÁX</string>
+    <string name="label_avg_delta">LATÊNCIA MÉD</string>
+    <string name="label_p95_delta">LATÊNCIA P95</string>
+    <string name="msg_benchmark_exported">Relatório de benchmark salvo em Downloads: %1$s</string>
 </resources>

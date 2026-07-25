@@ -301,6 +301,30 @@ class CompanionHttpServer(
                 }
             }
 
+            "/stopwatch/start" -> {
+                com.robotrunner.companion.stopwatch.RedrawStopwatchEngine.startSession()
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    addProperty("message", "Benchmark session started")
+                }
+            }
+
+            "/stopwatch/stop" -> {
+                val benchSession = com.robotrunner.companion.stopwatch.RedrawStopwatchEngine.stopSession()
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    add("session", gson.toJsonTree(benchSession))
+                }
+            }
+
+            "/stopwatch/laps" -> {
+                val laps = com.robotrunner.companion.stopwatch.RedrawStopwatchEngine.getLapsSnapshot()
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    add("laps", gson.toJsonTree(laps))
+                }
+            }
+
             "/device/info" -> getDeviceInfoPayload()
 
             "/checkup/run" -> {

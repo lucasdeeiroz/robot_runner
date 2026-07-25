@@ -141,4 +141,25 @@
     <string name="msg_grant_overlay_permission">Please grant Overlay Display permission</string>
     <string name="chart_cpu_title">⚡ CPU Usage History (%)</string>
     <string name="chart_ram_title">⚡ RAM Memory Heap (MB)</string>
+    <!-- Phase 5 Strings -->
+    <string name="tab_stopwatch">Stopwatch</string>
+    <string name="header_redraw_stopwatch">⏱️ Millisecond UI Redraw &amp; Latency Benchmark</string>
+    <string name="desc_redraw_stopwatch">Measures exact gesture-to-frame rendering latency in milliseconds using Accessibility events.</string>
+    <string name="header_floating_hud_stopwatch">🖥️ Floating Stopwatch HUD Overlay</string>
+    <string name="desc_floating_hud_stopwatch">Measures live redraw latency over active target apps.</string>
+    <string name="header_floating_hud_logcat">🖥️ Floating Logcat HUD Overlay</string>
+    <string name="desc_floating_hud_logcat">Streams live logcat entries over active target apps.</string>
+    <string name="label_last_delta">Last Screen Redraw Delta</string>
+    <string name="status_fast_ui">FAST (&lt;50ms)</string>
+    <string name="status_normal_ui">NORMAL (50-200ms)</string>
+    <string name="status_slow_ui">SLOW (&gt;200ms)</string>
+    <string name="btn_start_benchmark">Start Recording</string>
+    <string name="btn_stop_benchmark">Stop &amp; Summarize</string>
+    <string name="btn_manual_lap">Record Manual Lap</string>
+    <string name="btn_export_benchmark">Export Report</string>
+    <string name="label_min_delta">MIN LATENCY</string>
+    <string name="label_max_delta">MAX LATENCY</string>
+    <string name="label_avg_delta">AVG LATENCY</string>
+    <string name="label_p95_delta">P95 LATENCY</string>
+    <string name="msg_benchmark_exported">Benchmark report saved to Downloads: %1$s</string>
 </resources>

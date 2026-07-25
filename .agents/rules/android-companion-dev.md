@@ -96,9 +96,20 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 9. Continuous Learning & Rule Maintenance Instruction
+## 9. Accessibility-Driven Redraw Latency & Stopwatch Rules
+
+1. **Hardware-Accurate Event Delta Calculation**:
+   - Screen redraw deltas are computed inside `CompanionAccessibilityService` by pairing the touch event timestamp (`TYPE_VIEW_CLICKED`, `performTap`) with the subsequent screen content change event timestamp (`TYPE_WINDOW_CONTENT_CHANGED`). Always validate that `now >= lastTouchTimestamp` and cap realistic UI render deltas between 1ms and 10,000ms to eliminate anomalous background redraw noise.
+
+2. **Thread-Safe Benchmark History Isolation**:
+   - Lap history and session summaries in `RedrawStopwatchEngine` must use synchronized lists (`Collections.synchronizedList`) and thread-safe data structures so concurrent REST queries (`/stopwatch/laps`) and UI Compose renders never trigger `ConcurrentModificationException`.
+
+---
+
+## 10. Continuous Learning & Rule Maintenance Instruction
 
 > **IMPORTANT**: As new features, optimizations, or Android SDK workarounds are implemented in `companion/`, the **Android Companion Engineer** profile MUST update and append new rules directly to this document.
+
 
 
 

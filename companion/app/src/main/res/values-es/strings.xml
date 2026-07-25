@@ -141,4 +141,25 @@
     <string name="msg_grant_overlay_permission">Otorgue permiso de Mostrar sobre otras aplicaciones</string>
     <string name="chart_cpu_title">⚡ Historial de Uso de CPU (%)</string>
     <string name="chart_ram_title">⚡ Memoria RAM de la App (MB)</string>
+    <!-- Phase 5 Strings (ES) -->
+    <string name="tab_stopwatch">Cronómetro</string>
+    <string name="header_redraw_stopwatch">⏱️ Cronómetro y Benchmark de Rediseño de Pantalla (ms)</string>
+    <string name="desc_redraw_stopwatch">Mide la latencia exacta desde el gesto hasta el rediseño visual en milisegundos vía Accesibilidad.</string>
+    <string name="header_floating_hud_stopwatch">🖥️ Superposición Flotante del Cronómetro (HUD)</string>
+    <string name="desc_floating_hud_stopwatch">Muestra latencia de rediseño sobre aplicaciones en uso.</string>
+    <string name="header_floating_hud_logcat">🖥️ Superposición Flotante de Logcat (HUD)</string>
+    <string name="desc_floating_hud_logcat">Transmite registros de logcat sobre aplicaciones en uso.</string>
+    <string name="label_last_delta">Última Latencia de Rediseño</string>
+    <string name="status_fast_ui">RÁPIDO (&lt;50ms)</string>
+    <string name="status_normal_ui">NORMAL (50-200ms)</string>
+    <string name="status_slow_ui">LENTO (&gt;200ms)</string>
+    <string name="btn_start_benchmark">Iniciar Grabación</string>
+    <string name="btn_stop_benchmark">Detener y Resumir</string>
+    <string name="btn_manual_lap">Registrar Vuelta</string>
+    <string name="btn_export_benchmark">Exportar Informe</string>
+    <string name="label_min_delta">LATENCIA MÍN</string>
+    <string name="label_max_delta">LATENCIA MÁX</string>
+    <string name="label_avg_delta">LATENCIA PROMEDIO</string>
+    <string name="label_p95_delta">LATENCIA P95</string>
+    <string name="msg_benchmark_exported">Informe de benchmark guardado en Descargas: %1$s</string>
 </resources>
