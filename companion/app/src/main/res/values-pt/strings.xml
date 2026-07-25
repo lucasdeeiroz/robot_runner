@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">Robot Runner Companion</string>
+    <string name="subtitle_agent">Central de Comando QA &amp; Agente no Dispositivo</string>
     <string name="status_server_ready">Servidor Pronto (Aguardando Conexão)</string>
     <string name="status_connected">Conectado ao Robot Runner Desktop</string>
     <string name="service_running_title">Robot Runner Companion Ativo</string>
@@ -22,4 +23,64 @@
     <string name="btn_share_pdf">Compartilhar Relatório</string>
     <string name="msg_checkup_completed">Checkup Offline Concluído</string>
     <string name="msg_pdf_exported">Relatório PDF salvo na pasta Downloads</string>
+
+    <!-- Phase 1 Strings (PT-BR) -->
+    <string name="tab_dashboard">Painel</string>
+    <string name="tab_hardware_specs">Especificações</string>
+    <string name="tab_diagnostics">Diagnósticos</string>
+    <string name="label_rest_server">Servidor REST</string>
+    <string name="status_port_active">Porta %1$d Ativa</string>
+    <string name="status_server_offline">Servidor Offline</string>
+    <string name="subtext_server_ip">IP: %1$s</string>
+    <string name="subtext_tap_start">Toque abaixo para iniciar</string>
+    <string name="label_accessibility">Acessibilidade</string>
+    <string name="status_sub10ms_bridge">Ponte Sub-10ms</string>
+    <string name="status_bridge_off">Ponte Desligada</string>
+    <string name="subtext_ready_dump">Pronto para extração de UI</string>
+    <string name="subtext_grant_adb">Toque para conceder via ADB</string>
+    <string name="header_live_metrics">⚡ Métricas de Recursos em Tempo Real</string>
+    <string name="gauge_cpu_title">Uso de CPU</string>
+    <string name="gauge_cpu_sub">Carga do Sistema</string>
+    <string name="gauge_ram_title">Memória RAM</string>
+    <string name="gauge_battery_title">Bateria</string>
+    <string name="gauge_storage_title">Armazenamento Interno</string>
+    <string name="header_quick_actions">⚡ Ações Rápidas e Controle</string>
+    <string name="btn_stop_rest_server">Parar Servidor REST</string>
+    <string name="btn_start_rest_server">Iniciar Servidor REST</string>
+    <string name="btn_open_accessibility_settings">Abrir Configurações de Acessibilidade</string>
+
+    <!-- Specs Categories & Items (PT-BR) -->
+    <string name="category_device_os">Identidade do Dispositivo e SO</string>
+    <string name="spec_manufacturer">Fabricante</string>
+    <string name="spec_model">Modelo</string>
+    <string name="spec_device_name">Nome do Dispositivo</string>
+    <string name="spec_android_version">Versão do Android</string>
+    <string name="spec_build_fingerprint">Fingerprint da Build</string>
+    <string name="spec_security_patch">Patch de Segurança</string>
+    <string name="category_processor">Processador e Arquitetura SoC</string>
+    <string name="spec_soc_hardware">Hardware SoC</string>
+    <string name="spec_board">Placa (Board)</string>
+    <string name="spec_cpu_cores">Núcleos de CPU</string>
+    <string name="spec_supported_abis">ABIs Suportadas</string>
+    <string name="category_display">Tela e Gráficos</string>
+    <string name="spec_resolution">Resolução</string>
+    <string name="spec_density">Densidade DPI</string>
+    <string name="spec_refresh_rate">Taxa de Atualização</string>
+    <string name="category_memory_storage">Memória e Armazenamento Interno</string>
+    <string name="spec_total_ram">RAM Total</string>
+    <string name="spec_low_mem_threshold">Limite de Memória Baixa</string>
+    <string name="spec_total_storage">Armazenamento Interno Total</string>
+    <string name="spec_free_storage">Armazenamento Interno Livre</string>
+    <string name="category_sensors">Sensores e Periféricos</string>
+    <string name="spec_active_sensors">Total de Sensores Ativos</string>
+    <string name="spec_sensor_list">Lista de Sensores</string>
+    <string name="sensors_registered_format">%1$d sensores registrados</string>
+
+    <!-- Diagnostics Tab (PT-BR) -->
+    <string name="title_pos_checklist">📋 Checkup e Diagnóstico de Hardware e POS</string>
+    <string name="desc_pos_checklist">Executa auditoria local de hardware (Bateria mA, Térmico, NFC, Armazenamento) e gera relatório PDF offline no dispositivo.</string>
+    <string name="btn_run_offline_pdf">Executar Checkup Offline e Exportar PDF</string>
+    <string name="title_display_test">🖥️ Teste de Calibração de Tela e Pixels</string>
+    <string name="desc_display_test">Inicia o teste de cores em tela cheia para detectar pixels mortos ou retenção de imagem (burn-in).</string>
+    <string name="btn_launch_display_test">Iniciar Teste de Tela Cheia</string>
 </resources>

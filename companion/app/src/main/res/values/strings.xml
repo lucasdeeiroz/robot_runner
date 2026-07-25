@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">Robot Runner Companion</string>
+    <string name="subtitle_agent">On-Device QA Command Center &amp; Agent</string>
     <string name="status_server_ready">Server Ready (Waiting Connection)</string>
     <string name="status_connected">Connected to Robot Runner Desktop</string>
     <string name="service_running_title">Robot Runner Companion Active</string>
@@ -22,4 +23,64 @@
     <string name="btn_share_pdf">Share Report</string>
     <string name="msg_checkup_completed">Offline Checkup Completed</string>
     <string name="msg_pdf_exported">PDF Report saved to Downloads</string>
+
+    <!-- Phase 1 Strings -->
+    <string name="tab_dashboard">Dashboard</string>
+    <string name="tab_hardware_specs">Hardware Specs</string>
+    <string name="tab_diagnostics">Diagnostics</string>
+    <string name="label_rest_server">REST Server</string>
+    <string name="status_port_active">Port %1$d Active</string>
+    <string name="status_server_offline">Server Offline</string>
+    <string name="subtext_server_ip">IP: %1$s</string>
+    <string name="subtext_tap_start">Tap below to start</string>
+    <string name="label_accessibility">Accessibility</string>
+    <string name="status_sub10ms_bridge">Sub-10ms Bridge</string>
+    <string name="status_bridge_off">Bridge Off</string>
+    <string name="subtext_ready_dump">Ready for UI dump</string>
+    <string name="subtext_grant_adb">Tap to grant via ADB</string>
+    <string name="header_live_metrics">⚡ Live Resource Metrics</string>
+    <string name="gauge_cpu_title">CPU Usage</string>
+    <string name="gauge_cpu_sub">Live System Load</string>
+    <string name="gauge_ram_title">RAM Memory</string>
+    <string name="gauge_battery_title">Battery</string>
+    <string name="gauge_storage_title">Internal Storage</string>
+    <string name="header_quick_actions">⚡ Quick Actions &amp; Control</string>
+    <string name="btn_stop_rest_server">Stop REST Server Engine</string>
+    <string name="btn_start_rest_server">Start REST Server Engine</string>
+    <string name="btn_open_accessibility_settings">Open Android Accessibility Settings</string>
+
+    <!-- Specs Categories & Items -->
+    <string name="category_device_os">Device Identity &amp; OS</string>
+    <string name="spec_manufacturer">Manufacturer</string>
+    <string name="spec_model">Model</string>
+    <string name="spec_device_name">Device Name</string>
+    <string name="spec_android_version">Android Version</string>
+    <string name="spec_build_fingerprint">Build Fingerprint</string>
+    <string name="spec_security_patch">Security Patch</string>
+    <string name="category_processor">Processor &amp; SoC Architecture</string>
+    <string name="spec_soc_hardware">SoC Hardware</string>
+    <string name="spec_board">Board</string>
+    <string name="spec_cpu_cores">CPU Cores</string>
+    <string name="spec_supported_abis">Supported ABIs</string>
+    <string name="category_display">Display &amp; Graphics</string>
+    <string name="spec_resolution">Resolution</string>
+    <string name="spec_density">Density DPI</string>
+    <string name="spec_refresh_rate">Refresh Rate</string>
+    <string name="category_memory_storage">Memory &amp; Internal Storage</string>
+    <string name="spec_total_ram">Total RAM</string>
+    <string name="spec_low_mem_threshold">Low Memory Threshold</string>
+    <string name="spec_total_storage">Total Internal Storage</string>
+    <string name="spec_free_storage">Free Internal Storage</string>
+    <string name="category_sensors">Sensors &amp; Peripherals</string>
+    <string name="spec_active_sensors">Total Active Sensors</string>
+    <string name="spec_sensor_list">Sensor List</string>
+    <string name="sensors_registered_format">%1$d sensors registered</string>
+
+    <!-- Diagnostics Tab -->
+    <string name="title_pos_checklist">📋 Standalone POS &amp; Hardware Diagnostic Checklist</string>
+    <string name="desc_pos_checklist">Executes local hardware audit (Battery mA, Thermal, NFC, Storage) and generates an offline PDF report directly on the device.</string>
+    <string name="btn_run_offline_pdf">Run Offline Checkup &amp; Export PDF</string>
+    <string name="title_display_test">🖥️ Screen Pixel &amp; Color Calibration Test</string>
+    <string name="desc_display_test">Launch full-screen pixel color cycling test to detect dead pixels or screen burn-in.</string>
+    <string name="btn_launch_display_test">Launch Fullscreen Display Test</string>
 </resources>

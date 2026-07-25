@@ -30,6 +30,8 @@ import androidx.core.content.FileProvider
 import com.robotrunner.companion.checkup.HardwareCheckupRunner
 import com.robotrunner.companion.checkup.LocalCheckupResult
 import com.robotrunner.companion.checkup.PdfReportGenerator
+import com.robotrunner.companion.hardware.HardwareSpecsProvider
+import com.robotrunner.companion.model.LiveTelemetry
 import java.io.File
 import java.net.NetworkInterface
 import java.util.Collections
@@ -98,12 +100,27 @@ class MainActivity : ComponentActivity() {
         val pdfGenerator = PdfReportGenerator(this)
 
         setContent {
-            CompanionAppUI(
-                isServerRunning = isServerRunning,
-                activeClients = activeClients,
+            var telemetry by remember { mutableStateOf(LiveTelemetry()) }
+
+            LaunchedEffect(Unit) {
+                while (true) {
+                    telemetry = HardwareSpecsProvider.getLiveTelemetry(
+                        context = this@MainActivity,
+                        isServerRunning = isServerRunning,
+                        activeClients = activeClients
+                    )
+                    kotlinx.coroutines.delay(2000)
+                }
+            }
+
+            val detailedSpecs = remember { HardwareSpecsProvider.getDetailedSpecs(this@MainActivity) }
+
+            com.robotrunner.companion.ui.DashboardScreen(
+                telemetry = telemetry,
+                detailedSpecs = detailedSpecs,
                 ipAddress = getLocalIpAddress(),
                 port = CompanionServerService.SERVER_PORT,
-                onToggleService = {
+                onToggleServer = {
                     companionService?.let { s ->
                         if (s.isRunning) s.stopServer() else s.startServer()
                         updateState()
@@ -116,6 +133,14 @@ class MainActivity : ComponentActivity() {
                         Toast.makeText(this, getString(R.string.msg_pdf_exported), Toast.LENGTH_LONG).show()
                     } else {
                         Toast.makeText(this, "Checkup done, but failed to save PDF", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onLaunchDisplayTest = {
+                    try {
+                        val intent = Intent(this, com.robotrunner.companion.hardware.DisplayTestActivity::class.java)
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        Toast.makeText(this, "Failed to launch display test", Toast.LENGTH_SHORT).show()
                     }
                 }
             )
