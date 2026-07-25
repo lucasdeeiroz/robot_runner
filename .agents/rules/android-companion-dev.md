@@ -126,9 +126,20 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 12. Continuous Learning & Rule Maintenance Instruction
+## 12. On-Device DFS Graph Autonomous Exploration Rules
+
+1. **Native DFS State Machine Isolation**:
+   - On-device autonomous exploration runs on `Dispatchers.IO` using Kotlin Coroutines inside `AutonomousExplorerEngine`. Always emit graph state changes (`UNEXPLORED`, `EXPLORING`, `EXHAUSTED`) through thread-safe `StateFlow` streams.
+
+2. **Dead-End & Back-Navigation Guards**:
+   - When no unvisited interactive elements remain on the active screen node, the explorer must dispatch `AccessibilityService.GLOBAL_ACTION_BACK` to backtrack to parent screen nodes without causing ANR crashes or navigation traps.
+
+---
+
+## 13. Continuous Learning & Rule Maintenance Instruction
 
 > **IMPORTANT**: As new features, optimizations, or Android SDK workarounds are implemented in `companion/`, the **Android Companion Engineer** profile MUST update and append new rules directly to this document.
+
 
 
 

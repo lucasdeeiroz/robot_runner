@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.robotrunner.companion.R
 import com.robotrunner.companion.apps.PackageManagerTabContent
 import com.robotrunner.companion.bdd.BddTestRunnerTabContent
+import com.robotrunner.companion.explorer.ExplorerTabContent
 import com.robotrunner.companion.inspector.InspectorTabContent
 import com.robotrunner.companion.logcat.LogcatTabContent
 import com.robotrunner.companion.model.HardwareSpecCategory
@@ -166,7 +167,7 @@ fun DashboardScreen(
                             onClick = { selectedTab = 5 },
                             text = {
                                 Text(
-                                    text = stringResource(id = R.string.tab_bdd_runner),
+                                    text = stringResource(id = R.string.tab_explorer),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -180,7 +181,7 @@ fun DashboardScreen(
                             onClick = { selectedTab = 6 },
                             text = {
                                 Text(
-                                    text = stringResource(id = R.string.tab_logcat),
+                                    text = stringResource(id = R.string.tab_bdd_runner),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -194,7 +195,7 @@ fun DashboardScreen(
                             onClick = { selectedTab = 7 },
                             text = {
                                 Text(
-                                    text = stringResource(id = R.string.tab_performance),
+                                    text = stringResource(id = R.string.tab_logcat),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -208,7 +209,7 @@ fun DashboardScreen(
                             onClick = { selectedTab = 8 },
                             text = {
                                 Text(
-                                    text = stringResource(id = R.string.tab_apps),
+                                    text = stringResource(id = R.string.tab_performance),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -222,7 +223,7 @@ fun DashboardScreen(
                             onClick = { selectedTab = 9 },
                             text = {
                                 Text(
-                                    text = stringResource(id = R.string.tab_shell),
+                                    text = stringResource(id = R.string.tab_apps),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -234,6 +235,20 @@ fun DashboardScreen(
                         Tab(
                             selected = selectedTab == 10,
                             onClick = { selectedTab = 10 },
+                            text = {
+                                Text(
+                                    text = stringResource(id = R.string.tab_shell),
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        )
+                        Tab(
+                            selected = selectedTab == 11,
+                            onClick = { selectedTab = 11 },
                             text = {
                                 Text(
                                     text = stringResource(id = R.string.tab_diagnostics),
@@ -272,12 +287,13 @@ fun DashboardScreen(
                         )
                         3 -> StopwatchTabContent()
                         4 -> InspectorTabContent()
-                        5 -> BddTestRunnerTabContent()
-                        6 -> LogcatTabContent()
-                        7 -> PerformanceTabContent()
-                        8 -> PackageManagerTabContent()
-                        9 -> ShellConsoleTabContent()
-                        10 -> DiagnosticsTabContent(
+                        5 -> ExplorerTabContent()
+                        6 -> BddTestRunnerTabContent()
+                        7 -> LogcatTabContent()
+                        8 -> PerformanceTabContent()
+                        9 -> PackageManagerTabContent()
+                        10 -> ShellConsoleTabContent()
+                        11 -> DiagnosticsTabContent(
                             onRunOfflineCheckup = onRunOfflineCheckup,
                             onLaunchDisplayTest = onLaunchDisplayTest
                         )

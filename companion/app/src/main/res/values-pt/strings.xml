@@ -180,4 +180,17 @@
     <string name="btn_capture_ui">Capturar UI da Tela</string>
     <string name="btn_export_ui_map">Exportar Mapa de UI JSON</string>
     <string name="msg_ui_map_exported">Mapa de elementos salvo em Downloads: %1$s</string>
+    <!-- Phase 7 Strings (Autonomous Explorer PT-BR) -->
+    <string name="tab_explorer">Explorador</string>
+    <string name="header_autonomous_explorer">🕸️ Explorador Autônomo Nativo Kotlin DFS</string>
+    <string name="desc_autonomous_explorer">Explore aplicativos autônomamente usando máquina de estados DFS sem necessidade de PC conectado.</string>
+    <string name="btn_start_exploration">Iniciar Exploração</string>
+    <string name="btn_pause_exploration">Pausar Exploração</string>
+    <string name="btn_stop_exploration">Parar Exploração</string>
+    <string name="btn_reset_exploration">Resetar Estado</string>
+    <string name="btn_export_dfs_map">Exportar Mapa DFS JSON</string>
+    <string name="label_visited_screens">TELAS VISITADAS</string>
+    <string name="label_total_actions">AÇÕES TOTAIS</string>
+    <string name="label_dead_ends">BECOS SEM SAÍDA</string>
+    <string name="msg_dfs_map_exported">Mapa DFS de UI salvo em Downloads: %1$s</string>
 </resources>

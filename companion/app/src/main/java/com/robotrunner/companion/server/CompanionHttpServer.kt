@@ -357,6 +357,34 @@ class CompanionHttpServer(
                 }
             }
 
+            "/explorer/start" -> {
+                com.robotrunner.companion.explorer.AutonomousExplorerEngine.startExploration()
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    addProperty("message", "Autonomous DFS exploration started")
+                }
+            }
+
+            "/explorer/stop" -> {
+                com.robotrunner.companion.explorer.AutonomousExplorerEngine.stopExploration()
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    addProperty("message", "Autonomous DFS exploration stopped")
+                }
+            }
+
+            "/explorer/status" -> {
+                val report = com.robotrunner.companion.explorer.AutonomousExplorerEngine.reportFlow.value
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    addProperty("state", report.currentState.name)
+                    addProperty("visitedScreensCount", report.visitedScreensCount)
+                    addProperty("totalActionsCount", report.totalActionsCount)
+                    addProperty("deadEndsHandled", report.deadEndsHandled)
+                    addProperty("activeScreenName", report.activeScreenName)
+                }
+            }
+
             "/device/info" -> getDeviceInfoPayload()
 
             "/checkup/run" -> {
