@@ -86,8 +86,19 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 8. Continuous Learning & Rule Maintenance Instruction
+## 8. Ring-Buffer Logcat Streaming & Overlay HUD Rules
+
+1. **Memory-Bounded Ring Buffer for Logcat**:
+   - Streaming `logcat` on device can generate thousands of lines per minute. Always bound the in-memory log buffer (e.g. max 1,000 items) using thread-safe synchronization (`Collections.synchronizedList` or `ArrayDeque`) to prevent OutOfMemory (OOM) crashes during long QA testing sessions.
+
+2. **System Alert Window Permission Guard for Overlay HUD**:
+   - Creating a floating overlay window requires `SYSTEM_ALERT_WINDOW` permission and `WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY` (API 26+). Always verify `Settings.canDrawOverlays(context)` before starting `FloatingHudService`, and guide the user to `Settings.ACTION_MANAGE_OVERLAY_PERMISSION` if ungranted.
+
+---
+
+## 9. Continuous Learning & Rule Maintenance Instruction
 
 > **IMPORTANT**: As new features, optimizations, or Android SDK workarounds are implemented in `companion/`, the **Android Companion Engineer** profile MUST update and append new rules directly to this document.
+
 
 

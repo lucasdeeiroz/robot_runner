@@ -24,9 +24,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.robotrunner.companion.R
 import com.robotrunner.companion.apps.PackageManagerTabContent
+import com.robotrunner.companion.logcat.LogcatTabContent
 import com.robotrunner.companion.model.HardwareSpecCategory
 import com.robotrunner.companion.model.LiveTelemetry
 import com.robotrunner.companion.net.NetworkTabContent
+import com.robotrunner.companion.performance.PerformanceTabContent
 import com.robotrunner.companion.shell.ShellConsoleTabContent
 
 @Composable
@@ -133,7 +135,7 @@ fun DashboardScreen(
                             onClick = { selectedTab = 3 },
                             text = {
                                 Text(
-                                    text = stringResource(id = R.string.tab_apps),
+                                    text = stringResource(id = R.string.tab_logcat),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -147,7 +149,7 @@ fun DashboardScreen(
                             onClick = { selectedTab = 4 },
                             text = {
                                 Text(
-                                    text = stringResource(id = R.string.tab_shell),
+                                    text = stringResource(id = R.string.tab_performance),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -159,6 +161,34 @@ fun DashboardScreen(
                         Tab(
                             selected = selectedTab == 5,
                             onClick = { selectedTab = 5 },
+                            text = {
+                                Text(
+                                    text = stringResource(id = R.string.tab_apps),
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        )
+                        Tab(
+                            selected = selectedTab == 6,
+                            onClick = { selectedTab = 6 },
+                            text = {
+                                Text(
+                                    text = stringResource(id = R.string.tab_shell),
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        )
+                        Tab(
+                            selected = selectedTab == 7,
+                            onClick = { selectedTab = 7 },
                             text = {
                                 Text(
                                     text = stringResource(id = R.string.tab_diagnostics),
@@ -195,9 +225,11 @@ fun DashboardScreen(
                             activeClients = telemetry.activeClientsCount,
                             onToggleServer = onToggleServer
                         )
-                        3 -> PackageManagerTabContent()
-                        4 -> ShellConsoleTabContent()
-                        5 -> DiagnosticsTabContent(
+                        3 -> LogcatTabContent()
+                        4 -> PerformanceTabContent()
+                        5 -> PackageManagerTabContent()
+                        6 -> ShellConsoleTabContent()
+                        7 -> DiagnosticsTabContent(
                             onRunOfflineCheckup = onRunOfflineCheckup,
                             onLaunchDisplayTest = onLaunchDisplayTest
                         )

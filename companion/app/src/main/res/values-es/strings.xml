@@ -129,4 +129,16 @@
     <string name="label_server_port">Puerto del Servidor (Predeterminado 9876)</string>
     <string name="label_active_clients">Clientes Conectados Activos: %1$d</string>
     <string name="label_total_requests">Total de Solicitudes Procesadas: %1$d</string>
+    <!-- Phase 4 Strings (ES) -->
+    <string name="tab_logcat">Logcat</string>
+    <string name="tab_performance">Rendimiento</string>
+    <string name="search_logcat_placeholder">Buscar etiquetas o texto de logcat...</string>
+    <string name="msg_logcat_exported">Logcat guardado en Descargas: %1$s</string>
+    <string name="header_floating_hud">🖥️ Superposición Flotante de Rendimiento (HUD)</string>
+    <string name="desc_floating_hud">Muestra HUD con CPU, RAM y Batería sobre aplicaciones en uso.</string>
+    <string name="btn_start_hud">Iniciar HUD Flotante</string>
+    <string name="btn_stop_hud">Detener HUD Flotante</string>
+    <string name="msg_grant_overlay_permission">Otorgue permiso de Mostrar sobre otras aplicaciones</string>
+    <string name="chart_cpu_title">⚡ Historial de Uso de CPU (%)</string>
+    <string name="chart_ram_title">⚡ Memoria RAM de la App (MB)</string>
 </resources>

@@ -261,6 +261,46 @@ class CompanionHttpServer(
                 }
             }
 
+            "/logcat/recent" -> {
+                val array = JsonArray()
+                val recentLogs = com.robotrunner.companion.logcat.LogcatStreamer.getFilteredLogs()
+                recentLogs.takeLast(200).forEach { msg ->
+                    val obj = JsonObject().apply {
+                        addProperty("timestamp", msg.timestamp)
+                        addProperty("pid", msg.pid)
+                        addProperty("tid", msg.tid)
+                        addProperty("level", msg.level.name)
+                        addProperty("tag", msg.tag)
+                        addProperty("message", msg.message)
+                    }
+                    array.add(obj)
+                }
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    add("logs", array)
+                }
+            }
+
+            "/performance/history" -> {
+                val array = JsonArray()
+                val history = com.robotrunner.companion.performance.PerformanceCollector.getHistorySnapshot()
+                history.forEach { sample ->
+                    val obj = JsonObject().apply {
+                        addProperty("timestamp", sample.timestamp)
+                        addProperty("cpuUsagePercent", sample.cpuUsagePercent)
+                        addProperty("ramUsedMb", sample.ramUsedMb)
+                        addProperty("ramTotalMb", sample.ramTotalMb)
+                        addProperty("batteryCurrentMa", sample.batteryCurrentMa)
+                        addProperty("batteryTempC", sample.batteryTempC)
+                    }
+                    array.add(obj)
+                }
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    add("samples", array)
+                }
+            }
+
             "/device/info" -> getDeviceInfoPayload()
 
             "/checkup/run" -> {

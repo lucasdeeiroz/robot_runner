@@ -129,4 +129,16 @@
     <string name="label_server_port">Server Port (Default 9876)</string>
     <string name="label_active_clients">Active Connected Clients: %1$d</string>
     <string name="label_total_requests">Total Requests Processed: %1$d</string>
+    <!-- Phase 4 Strings -->
+    <string name="tab_logcat">Logcat</string>
+    <string name="tab_performance">Performance</string>
+    <string name="search_logcat_placeholder">Search logcat tags or text...</string>
+    <string name="msg_logcat_exported">Logcat saved to Downloads: %1$s</string>
+    <string name="header_floating_hud">🖥️ Floating Performance HUD Overlay</string>
+    <string name="desc_floating_hud">Displays live CPU, RAM, and Battery HUD over active target apps.</string>
+    <string name="btn_start_hud">Start Floating HUD</string>
+    <string name="btn_stop_hud">Stop Floating HUD</string>
+    <string name="msg_grant_overlay_permission">Please grant Overlay Display permission</string>
+    <string name="chart_cpu_title">⚡ CPU Usage History (%)</string>
+    <string name="chart_ram_title">⚡ RAM Memory Heap (MB)</string>
 </resources>
