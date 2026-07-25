@@ -1,5 +1,6 @@
 package com.robotrunner.companion.server
 
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -100,6 +101,11 @@ class CompanionHttpServer(
             }
 
             "/device-info", "/info" -> buildDeviceInfoPayload()
+
+            "/telemetry" -> {
+                val targetPkg = session.parameters["package"]?.firstOrNull()
+                buildTelemetryPayload(targetPkg)
+            }
 
             "/ui-tree" -> {
                 val service = CompanionAccessibilityService.instance
@@ -347,6 +353,241 @@ class CompanionHttpServer(
                 addProperty("vendor", printerStatus.vendor)
             }
             add("printer", printerObj)
+        }
+    }
+
+    private fun buildTelemetryPayload(targetPackage: String? = null): JsonObject {
+        return JsonObject().apply {
+            addProperty("status", "ok")
+            addProperty("type", "telemetry")
+            addProperty("source", "companion")
+
+            // RAM Info
+            val actManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            val memInfo = ActivityManager.MemoryInfo()
+            if (actManager != null) {
+                actManager.getMemoryInfo(memInfo)
+            }
+            val totalMem = memInfo.totalMem
+            val availMem = memInfo.availMem
+            val ramTotalKb: Long = totalMem / 1024L
+            val ramUsedKb: Long = (totalMem - availMem) / 1024L
+            addProperty("ram_total", ramTotalKb)
+            addProperty("ram_used", ramUsedKb)
+
+            // Battery Info
+            val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+            val temp = batteryIntent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1) ?: -1
+            val status = batteryIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+            val plugInt = batteryIntent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) ?: -1
+
+            val batteryLevel = if (level != -1 && scale != -1) (level * 100 / scale) else 0
+            val temperature = if (temp != -1) (temp / 10.0f) else 0.0f
+            val batteryStatusStr = when (status) {
+                BatteryManager.BATTERY_STATUS_CHARGING -> "charging"
+                BatteryManager.BATTERY_STATUS_DISCHARGING -> "discharging"
+                BatteryManager.BATTERY_STATUS_FULL -> "full"
+                BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "not_charging"
+                else -> "unknown"
+            }
+            val plugStr = when (plugInt) {
+                BatteryManager.BATTERY_PLUGGED_AC -> "ac"
+                BatteryManager.BATTERY_PLUGGED_USB -> "usb"
+                BatteryManager.BATTERY_PLUGGED_WIRELESS -> "wireless"
+                else -> "none"
+            }
+
+            addProperty("battery_level", batteryLevel)
+            addProperty("temperature", temperature)
+            addProperty("battery_status", batteryStatusStr)
+            addProperty("battery_power_source", plugStr)
+
+            // Real-time CPU Usage estimation
+            val cpuUsage = getProcessCpuUsage()
+            addProperty("cpu_usage", cpuUsage)
+
+            // Active Package/Window
+            val activePkg = CompanionAccessibilityService.activePackageName ?: "unknown"
+            addProperty("foreground_activity", activePkg)
+
+            // Target Package App Stats
+            val appStatsObj = getAppStatsPayload(targetPackage)
+            if (appStatsObj != null) {
+                add("app_stats", appStatsObj)
+            }
+        }
+    }
+
+    private var lastTotalTime: Long = 0
+    private var lastIdleTime: Long = 0
+
+    private fun getProcessCpuUsage(): Float {
+        // Priority 1: /proc/stat delta (most accurate, but Knox/Android 16 may deny access)
+        try {
+            val statFile = java.io.File("/proc/stat")
+            if (statFile.exists() && statFile.canRead()) {
+                val line = statFile.useLines { it.firstOrNull() }
+                if (line != null) {
+                    val toks = line.split("\\s+".toRegex())
+                    if (toks.size >= 8) {
+                        val idle = toks[4].toLongOrNull() ?: 0L
+                        val total = toks.slice(1..7).mapNotNull { it.toLongOrNull() }.sum()
+                        if (lastTotalTime > 0 && total > lastTotalTime) {
+                            val totalDelta = total - lastTotalTime
+                            val idleDelta = idle - lastIdleTime
+                            lastTotalTime = total
+                            lastIdleTime = idle
+                            if (totalDelta > 0) {
+                                val usage = ((totalDelta - idleDelta).toFloat() / totalDelta.toFloat()) * 100.0f
+                                return Math.min(100.0f, Math.max(0.0f, usage))
+                            }
+                        }
+                        lastTotalTime = total
+                        lastIdleTime = idle
+                        // First call: no delta yet, fall through to dumpsys
+                    }
+                }
+            }
+        } catch (_: Throwable) { /* Fall through to dumpsys fallback */ }
+
+        // Priority 2: dumpsys cpuinfo (works on Knox-restricted devices)
+        return getCpuViaDumpsys()
+    }
+
+    private fun getCpuViaDumpsys(): Float {
+        return try {
+            // Use 'top -b -n 1 -m 0' which is accessible from any Android process (no DUMP permission needed)
+            val process = Runtime.getRuntime().exec(arrayOf("top", "-b", "-n", "1", "-m", "0"))
+            val output = process.inputStream.bufferedReader().readText()
+            process.waitFor()
+            // Parse "%cpu" / "%idle" header line like: "800%cpu  62%user  12%nice  68%sys  639%idle  9%iow  6%irq  2%sirq  0%host"
+            for (line in output.lines()) {
+                if (line.contains("%cpu") && line.contains("%idle")) {
+                    val parts = line.trim().split("\\s+".toRegex())
+                    var totalCap = 0.0f
+                    var idle = 0.0f
+                    for (part in parts) {
+                        if (part.endsWith("%cpu")) {
+                            totalCap = part.replace("%cpu", "").toFloatOrNull() ?: 0.0f
+                        } else if (part.endsWith("%idle")) {
+                            idle = part.replace("%idle", "").toFloatOrNull() ?: 0.0f
+                        }
+                    }
+                    if (totalCap > 0) {
+                        val used = totalCap - idle
+                        return Math.min(100.0f, Math.max(0.0f, (used / totalCap) * 100.0f))
+                    }
+                }
+            }
+            0.0f
+        } catch (e: Throwable) {
+            Log.w("CompanionHttpServer", "top-based CPU fallback failed", e)
+            0.0f
+        }
+    }
+
+    private fun getAppStatsPayload(targetPackage: String?): JsonObject? {
+        if (targetPackage.isNullOrEmpty()) return null
+        return try {
+            val actManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return null
+
+            // RAM: Use dumpsys meminfo for reliable PSS
+            var pssKb = 0L
+            var appCpu = 0.0f
+            var appPid = 0
+
+            // Find PID via pidof or top
+            try {
+                val pidProc = Runtime.getRuntime().exec(arrayOf("pidof", targetPackage))
+                val pidOut = pidProc.inputStream.bufferedReader().readText().trim()
+                pidProc.waitFor()
+                appPid = pidOut.split("\\s+".toRegex()).firstOrNull()?.toIntOrNull() ?: 0
+            } catch (_: Throwable) { }
+
+            // If pidof failed (common for non-root process on third-party packages), find PID & CPU from top output
+            try {
+                val cpuProc = Runtime.getRuntime().exec(arrayOf("top", "-b", "-n", "1", "-m", "50"))
+                val cpuOutput = cpuProc.inputStream.bufferedReader().readText()
+                cpuProc.waitFor()
+                for (line in cpuOutput.lines()) {
+                    val trimmed = line.trim()
+                    if (trimmed.isEmpty()) continue
+                    if (trimmed.contains(targetPackage)) {
+                        val cols = trimmed.split("\\s+".toRegex())
+                        val linePid = cols.getOrNull(0)?.toIntOrNull()
+                        if (linePid != null && linePid > 0) {
+                            if (appPid == 0) appPid = linePid
+                            if (linePid == appPid && cols.size >= 9) {
+                                appCpu = cols[8].toFloatOrNull() ?: 0.0f
+                                break
+                            }
+                        }
+                    }
+                }
+            } catch (_: Throwable) { }
+
+            // Get PSS / Resident RAM via ActivityManager (works even when runningAppProcesses is restricted)
+            if (appPid > 0) {
+                try {
+                    val memInfos = actManager.getProcessMemoryInfo(intArrayOf(appPid))
+                    if (memInfos != null && memInfos.isNotEmpty()) {
+                        val info = memInfos[0]
+                        pssKb = if (info.totalPss > 0) {
+                            info.totalPss.toLong()
+                        } else {
+                            (info.totalPrivateDirty + info.totalSharedDirty).toLong()
+                        }
+                    }
+                } catch (_: Throwable) { }
+            }
+
+            // Get FPS from dumpsys gfxinfo
+            val fps = getAppFpsFromGfxInfo(targetPackage)
+
+            JsonObject().apply {
+                addProperty("cpu_usage", appCpu)
+                addProperty("ram_used", pssKb)
+                addProperty("fps", fps)
+            }
+        } catch (e: Throwable) {
+            Log.w("CompanionHttpServer", "Failed to get app stats for $targetPackage", e)
+            null
+        }
+    }
+
+    private var lastAppFrameCount: Long = 0
+    private var lastAppFrameTime: Long = 0
+
+    private fun getAppFpsFromGfxInfo(packageName: String): Int {
+        return try {
+            val proc = Runtime.getRuntime().exec(arrayOf("dumpsys", "gfxinfo", packageName))
+            val output = proc.inputStream.bufferedReader().readText()
+            proc.waitFor()
+            var totalFrames = 0L
+            for (line in output.lines()) {
+                if (line.startsWith("Total frames rendered:")) {
+                    totalFrames = line.replace("Total frames rendered:", "").trim().toLongOrNull() ?: 0L
+                    break
+                }
+            }
+            val now = System.currentTimeMillis()
+            if (lastAppFrameTime > 0 && totalFrames > lastAppFrameCount) {
+                val framesDelta = totalFrames - lastAppFrameCount
+                val timeDelta = (now - lastAppFrameTime) / 1000.0
+                lastAppFrameCount = totalFrames
+                lastAppFrameTime = now
+                if (timeDelta > 0) {
+                    return Math.min(120, (framesDelta / timeDelta).toInt())
+                }
+            }
+            lastAppFrameCount = totalFrames
+            lastAppFrameTime = now
+            0 // First sample, no delta yet
+        } catch (e: Throwable) {
+            Log.w("CompanionHttpServer", "gfxinfo FPS extraction failed", e)
+            0
         }
     }
 }

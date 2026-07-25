@@ -289,6 +289,11 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
                 contentClassName="flex flex-col flex-1 min-h-0"
                 status={
                     <div className="flex items-center gap-4">
+                        {stats?.telemetry_source === 'companion' && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                {t('performance.companion_telemetry', '🚀 Companion Bridge')}
+                            </span>
+                        )}
                         <div className="flex items-center gap-2">
                             <Button
                                 onClick={onRefresh}
@@ -828,12 +833,20 @@ function ProgressBar({ value, max, color }: { value: number, max: number, color:
 
 
 const PerformanceCharts = React.memo(({ history, t, selectedPackage }: { history: any[], t: any, selectedPackage: string }) => {
+    // Flatten nested app_stats into top-level keys for Recharts compatibility
+    const flatHistory = useMemo(() => history.map(h => ({
+        ...h,
+        app_cpu: h.app_stats?.cpu_usage ?? null,
+        app_ram: h.app_stats?.ram_used ?? null,
+        app_fps: h.app_stats?.fps ?? null,
+    })), [history]);
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card title={t('performance.general_history', 'System History')} icon={<Activity size={20} className="text-primary" />}>
                 <div className="h-64 w-full mt-4">
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={history} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                        <AreaChart data={flatHistory} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
                             <defs>
                                 <linearGradient id="colorSysRam" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3} />
@@ -874,7 +887,7 @@ const PerformanceCharts = React.memo(({ history, t, selectedPackage }: { history
                 <Card title={t('performance.app_history', 'App History')} icon={<PackageIcon size={20} className="text-secondary" />}>
                     <div className="h-64 w-full mt-4">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={history} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                            <AreaChart data={flatHistory} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="colorAppRam" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%" stopColor="#ec4899" stopOpacity={0.3} />
@@ -897,15 +910,15 @@ const PerformanceCharts = React.memo(({ history, t, selectedPackage }: { history
                                     contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-outline-variant)', borderRadius: '8px', fontSize: '12px', color: 'var(--color-on-surface)' }}
                                     labelFormatter={(label) => new Date(label).toLocaleTimeString()}
                                     formatter={(value: any, name: any) => {
-                                        if (name === 'app_stats.ram_used') return [(Number(value) / 1024).toFixed(1) + ' MB', t('performance.app_ram', 'App RAM')];
-                                        if (name === 'app_stats.cpu_usage') return [Number(value).toFixed(1) + '%', t('performance.cpu', 'CPU')];
-                                        if (name === 'app_stats.fps') return [Math.round(Number(value)) + ' fps', t('performance.fps', 'FPS')];
+                                        if (name === 'app_ram') return [(Number(value) / 1024).toFixed(1) + ' MB', t('performance.app_ram', 'App RAM')];
+                                        if (name === 'app_cpu') return [Number(value).toFixed(1) + '%', t('performance.cpu', 'CPU')];
+                                        if (name === 'app_fps') return [Math.round(Number(value)) + ' fps', t('performance.fps', 'FPS')];
                                         return [value, name];
                                     }}
                                 />
-                                <Area yAxisId="left" type="monotone" dataKey="app_stats.ram_used" stroke="#ec4899" fillOpacity={1} fill="url(#colorAppRam)" isAnimationActive={false} name="app_stats.ram_used" />
-                                <Area yAxisId="right" type="monotone" dataKey="app_stats.cpu_usage" stroke="#f97316" fillOpacity={1} fill="url(#colorAppCpu)" isAnimationActive={false} name="app_stats.cpu_usage" />
-                                <Area yAxisId="right" type="monotone" dataKey="app_stats.fps" stroke="#22c55e" fillOpacity={1} fill="url(#colorAppFps)" isAnimationActive={false} name="app_stats.fps" />
+                                <Area yAxisId="left" type="monotone" dataKey="app_ram" stroke="#ec4899" fillOpacity={1} fill="url(#colorAppRam)" isAnimationActive={false} name="app_ram" />
+                                <Area yAxisId="right" type="monotone" dataKey="app_cpu" stroke="#f97316" fillOpacity={1} fill="url(#colorAppCpu)" isAnimationActive={false} name="app_cpu" />
+                                <Area yAxisId="right" type="monotone" dataKey="app_fps" stroke="#22c55e" fillOpacity={1} fill="url(#colorAppFps)" isAnimationActive={false} name="app_fps" />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>

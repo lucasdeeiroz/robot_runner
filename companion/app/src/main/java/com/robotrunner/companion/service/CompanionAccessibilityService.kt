@@ -22,6 +22,7 @@ class CompanionAccessibilityService : AccessibilityService() {
 
         private const val MAX_RECENT_EVENTS = 50
         val recentEvents = ConcurrentLinkedQueue<CompanionEvent>()
+        var activePackageName: String? = null
     }
 
     override fun onServiceConnected() {
@@ -32,6 +33,10 @@ class CompanionAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
+
+        if (event.packageName != null) {
+            activePackageName = event.packageName.toString()
+        }
 
         when (event.eventType) {
             AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED -> {

@@ -48,3 +48,16 @@ As seguintes diretrizes arquiteturais e técnicas são estritamente obrigatória
   settings put secure enabled_accessibility_services com.robotrunner.companion/.service.CompanionAccessibilityService
   settings put secure accessibility_enabled 1
   ```
+
+---
+
+## 7. Telemetria de Hardware com Zero Overhead no Host PC
+- **Eliminação de Subprocessos `adb.exe`**: A consulta periódica de CPU, RAM e Bateria a cada 3 segundos via `adb shell top` ou `dumpsys` gera alto consumo de CPU no Windows.
+- **Regra**: O sistema DEVE consultar prioritariamente o endpoint HTTP `/telemetry` do Companion no Rust (`get_device_stats_internal`). O Companion extrai a telemetria em RAM localmente no dispositivo, reduzindo o overhead de CPU do computador host a **0%** e entregando o payload JSON em **<10ms**.
+
+---
+
+## 8. Telemetria Híbrida para Pacientes e Sandbox do Android (SELinux)
+- **Isolamento de Processos Unprivileged**: O Companion (app Android regular) tem permissão total para ler telemetria global de hardware (RAM total/usada, nível e temperatura de bateria, status de carregamento e atividade em primeiro plano). No entanto, devido às restrições do SELinux/Android Sandbox, um processo de app não possui privilégios de sistema (`android.permission.DUMP`) nem visibilidade de `pidof`/procfs para consultar PIDs e `gfxinfo` de **pacientes de terceiros** (ex: `com.positivo.casainteligente`).
+- **Regra da Ponte Híbrida**: O Rust (`stats.rs`) consulta primeiro o Companion via HTTP `/telemetry`. Se o app alvo for de terceiros e o Companion retornar métricas de app nulas/zeradas (ou se a CPU global reportar `0%` devido a bloqueios de procfs em Knox/Android 16), o backend Rust deve complementar **unicamente** as métricas ausentes (CPU global e `app_stats` por pacote) disparando uma chamada leve do ADB (`top -b -n 1 && dumpsys meminfo <pkg> && dumpsys gfxinfo <pkg> && pidof <pkg>`), mantendo o payload consolidado como `telemetry_source: "companion"`.
+
