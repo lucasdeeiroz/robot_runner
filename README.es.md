@@ -50,6 +50,7 @@ Explore nuestras guías detalladas de cada módulo:
 ### 📖 Guías Principales
 - [Instalación y Configuración](docs/es/SETUP.md)
 - [Guía del Usuario](docs/es/USAGE.md)
+- [Arquitectura y Benchmarks del Companion](docs/es/CompanionIntegration.md)
 - [Solución de Problemas](docs/es/TROUBLESHOOTING.md)
 
 ### 🏠 Módulos Principales
