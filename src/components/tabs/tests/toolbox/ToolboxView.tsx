@@ -25,6 +25,8 @@ import { Button } from "@/components/atoms/Button";
 import { TabBar } from "@/components/organisms/TabBar";
 import { useDeviceViewport } from "@/hooks/useDeviceViewport";
 import { DeviceViewport } from "@/components/organisms/DeviceViewport";
+import { useCompanion } from "@/hooks/useCompanion";
+import { CompanionBadge } from "@/components/atoms/CompanionBadge";
 
 interface ToolboxViewProps {
     session: TestSession;
@@ -66,6 +68,8 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
 
     // Calculate isNarrow based on container width AND session type
     // If running a test, we have big "Stop" / "Rerun" buttons, so we need more space (higher threshold)
+    const { status: companionStatus, deviceInfo: companionInfo, connectCompanion, launchCompanion } = useCompanion(session.deviceUdid);
+
     const narrowThreshold = session.type === 'test' ? 1000 : 700;
     const isNarrow = containerWidth < narrowThreshold;
 
@@ -378,30 +382,39 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                 variant="pills"
                 className="z-10 shrink-0"
                 menus={
-                    !isCompact && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                                if (!isGridView) {
-                                    const defaults: ToolTab[] = isWebMode
-                                        ? ['console', 'webview']
-                                        : ['console', 'logcat', 'performance'];
-                                    setVisibleToolsInGrid(new Set([...defaults, activeTool]));
-                                }
-                                setIsGridView(!isGridView);
-                            }}
-                            className={clsx(
-                                "p-1.5 rounded-2xl transition-all flex items-center justify-center border border-transparent h-8 w-8",
-                                isGridView
-                                    ? "bg-primary/10 text-primary dark:text-primary/80 border-none"
-                                    : "text-on-surface/80 hover:text-on-surface/80 hover:bg-surface-variant/30"
-                            )}
-                            data-tooltip={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
-                            data-position="top"
-                        >
-                            <LayoutGrid size={18} />
-                        </Button>
+                    !isCompact && !isWebMode && (
+                        <>
+                            <CompanionBadge
+                                status={companionStatus}
+                                deviceInfo={companionInfo}
+                                showBattery={true}
+                                onConnect={connectCompanion}
+                                onLaunch={launchCompanion}
+                            />
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                    if (!isGridView) {
+                                        const defaults: ToolTab[] = isWebMode
+                                            ? ['console', 'webview']
+                                            : ['console', 'logcat', 'performance'];
+                                        setVisibleToolsInGrid(new Set([...defaults, activeTool]));
+                                    }
+                                    setIsGridView(!isGridView);
+                                }}
+                                className={clsx(
+                                    "ml-2 p-1.5 rounded-2xl transition-all flex items-center justify-center border border-transparent h-8 w-8",
+                                    isGridView
+                                        ? "bg-primary/10 text-primary dark:text-primary/80 border-none"
+                                        : "text-on-surface/80 hover:text-on-surface/80 hover:bg-surface-variant/30"
+                                )}
+                                data-tooltip={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
+                                data-position="top"
+                            >
+                                <LayoutGrid size={18} />
+                            </Button>
+                        </>
                     )
                 }
                 actions={

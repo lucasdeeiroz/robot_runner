@@ -1,5 +1,5 @@
 
-import { Smartphone, Battery, Cpu, HardDrive, Wrench, Monitor, MoreVertical, Camera, RotateCw, Layout, MousePointer2, RefreshCcw, Move, Rocket, Zap, Wifi } from 'lucide-react';
+import { Smartphone, Battery, Cpu, HardDrive, Wrench, Monitor, MoreVertical, Camera, RotateCw, Layout, MousePointer2, RefreshCcw, Move, Zap, Wifi } from 'lucide-react';
 import { Device } from '@/lib/types';
 import { Button } from '@/components/atoms/Button';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { AndroidVersionPill } from '@/components/atoms/AndroidVersionPill';
 import { DropdownMenu } from './DropdownMenu';
+import { CompanionBadge } from '@/components/atoms/CompanionBadge';
 
 interface DeviceCardProps {
     device: Device;
@@ -59,23 +60,12 @@ export function DeviceCard({ device, onMirror, onToolbox, onAction }: DeviceCard
                                 <h3 className="font-bold text-xl text-on-surface tracking-tight truncate leading-tight" title={device.model}>
                                     {device.model || 'Unknown Device'}
                                 </h3>
-                                {device.is_companion_installed && (
-                                    <span title={t('companion.boosted', 'Companion Boosted')}><Rocket size={14} className={clsx("shrink-0", device.is_companion_active ? "text-primary animate-pulse" : "text-primary/40")} /></span>
-                                )}
-                                {device.is_companion_active ? (
-                                    <span className="text-[10px] bg-success/10 text-success border border-success/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                                        {t('companion.status_active', 'Companion Active')}
-                                    </span>
-                                ) : device.is_companion_installed ? (
-                                    <span className="text-[10px] bg-warning/10 text-warning border border-warning/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shadow-xs">
-                                        {t('companion.status_installed', 'Companion Installed')}
-                                    </span>
-                                ) : (
-                                    <span className="text-[10px] bg-surface-variant/40 text-on-surface-variant/70 border border-outline-variant/20 px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider">
-                                        {t('companion.status_adb', 'ADB Standard')}
-                                    </span>
-                                )}
+                                <CompanionBadge
+                                    variant="ghost"
+                                    status={device.is_companion_active ? 'connected' : (device.is_companion_installed ? 'disconnected' : 'not_installed')}
+                                    onConnect={() => onAction(device, 'connect_companion')}
+                                    onLaunch={() => onAction(device, 'launch_companion')}
+                                />
                                 {device.wifi_ip && (
                                     <span className="text-[10px] font-mono bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20 flex items-center gap-1">
                                         <Wifi size={10} />

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, Maximize, Scan, Globe, Rocket } from 'lucide-react';
+import { RefreshCw, Maximize, Scan, Globe } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { InspectorNode, getHighlighterStyle } from '@/lib/inspectorUtils';
@@ -8,6 +8,7 @@ import { Button } from '@/components/atoms/Button';
 import { ExpressiveLoading } from '@/components/atoms/ExpressiveLoading';
 import { GestureOverlay } from '@/components/molecules/GestureOverlay';
 import { useSettings } from '@/lib/settings';
+import { CompanionBadge } from '@/components/atoms/CompanionBadge';
 
 interface DeviceViewportProps {
     screenshot: string | null;
@@ -465,21 +466,17 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -10, scale: 0.9 }}
                         transition={{ duration: 0.3 }}
-                        className={clsx(
-                            "absolute top-1.5 right-2 z-[60] px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5 backdrop-blur-md shadow-xl transition-all select-none border",
-                            uiTreeSource === 'companion'
-                                ? "bg-primary/90 text-on-primary border-primary/40"
-                                : "bg-black/60 text-white/90 border-white/20"
-                        )}
-                        title={uiTreeSource === 'companion' ? `Sub-10ms Accessibility Bridge (${uiTreeFetchTimeMs ?? 0}ms)` : `ADB uiautomator dump (${uiTreeFetchTimeMs ?? 0}ms)`}
+                        className="absolute top-1.5 right-2 z-[60]"
                     >
                         {uiTreeSource === 'companion' ? (
-                            <>
-                                <Rocket size={12} className="shrink-0 text-on-primary animate-pulse" />
-                                <span>Companion ({uiTreeFetchTimeMs ?? 0}ms)</span>
-                            </>
+                            <CompanionBadge
+                                status="connected"
+                                extraInfo={`${uiTreeFetchTimeMs ?? 0}ms`}
+                            />
                         ) : (
-                            <span>ADB ({uiTreeFetchTimeMs ?? 0}ms)</span>
+                            <div className="px-2.5 py-1 rounded-xl bg-surface-variant/40 border border-outline-variant/30 text-on-surface-variant text-xs font-medium">
+                                <span>ADB ({uiTreeFetchTimeMs ?? 0}ms)</span>
+                            </div>
                         )}
                     </motion.div>
                 )}

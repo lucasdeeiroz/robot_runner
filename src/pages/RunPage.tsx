@@ -17,6 +17,8 @@ import { logEvent } from "@/lib/analytics";
 import { TabItem } from "@/components/molecules/Tabs";
 import { TabBar } from "@/components/organisms/TabBar";
 import { DeviceSelector } from "@/components/molecules/DeviceSelector";
+import { useCompanion } from "@/hooks/useCompanion";
+import { CompanionBadge } from "@/components/atoms/CompanionBadge";
 
 type TabType = 'tests' | 'inspector' | 'mapper' | 'ai_generator';
 
@@ -95,6 +97,9 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
     // Global Device State
     const { devices, selectedDevices, loading: loadingDevices, loadDevices, setSelectedDevices } = useDevices();
 
+    const activeDeviceId = selectedDevices[0] || "";
+    const { status: companionStatus, deviceInfo: companionInfo, connectCompanion, launchCompanion } = useCompanion(activeDeviceId);
+
     const { sessions, addToolboxSession } = useTestSessions();
     // Only 'test' type sessions mark device as busy
     const busyDeviceIds = sessions.filter(s => s.status === 'running' && s.type === 'test').map(s => s.deviceUdid);
@@ -151,6 +156,17 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
                 variant="pills"
                 className="z-20 relative"
                 menus={
+                    activeDeviceId ? (
+                        <CompanionBadge
+                            status={companionStatus}
+                            deviceInfo={companionInfo}
+                            showBattery={true}
+                            onConnect={connectCompanion}
+                            onLaunch={launchCompanion}
+                        />
+                    ) : undefined
+                }
+                actions={
                     <DeviceSelector
                         devices={devices}
                         selectedDevices={selectedDevices}

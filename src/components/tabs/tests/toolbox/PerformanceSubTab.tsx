@@ -289,11 +289,6 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
                 contentClassName="flex flex-col flex-1 min-h-0"
                 status={
                     <div className="flex items-center gap-4">
-                        {stats?.telemetry_source === 'companion' && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                                {t('performance.companion_telemetry', '🚀 Companion Bridge')}
-                            </span>
-                        )}
                         <div className="flex items-center gap-2">
                             <Button
                                 onClick={onRefresh}

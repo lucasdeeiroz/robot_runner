@@ -22,7 +22,6 @@ import clsx from 'clsx';
 import { ExpressiveLoading } from '@/components/atoms/ExpressiveLoading';
 import { toast } from 'sonner';
 import { useCompanion } from '@/hooks/useCompanion';
-import { CompanionBadge } from '@/components/atoms/CompanionBadge';
 
 export function matchesFilterPattern(text: string, pattern: string): boolean {
     if (!text || !pattern) return false;
@@ -144,7 +143,7 @@ const checkupCacheMap = new Map<string, CheckupCacheEntry>();
 export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDuringTest }: CheckupSubTabProps) => {
     const { t } = useTranslation();
     const { settings } = useSettings();
-    const { status: companionStatus, deviceInfo: companionInfo, connectCompanion, launchCompanion } = useCompanion(selectedDevice);
+    const { status: companionStatus, deviceInfo: companionInfo } = useCompanion(selectedDevice);
     const cachedCheckup = selectedDevice ? checkupCacheMap.get(selectedDevice) : undefined;
 
     const [isLoading, setIsLoading] = useState(false);
@@ -1675,12 +1674,6 @@ ${html}`;
                     contentClassName="flex-1 flex flex-col md:flex-row gap-4 min-h-0 p-2 overflow-x-auto"
                     menus={
                         <>
-                            <CompanionBadge
-                                status={companionStatus}
-                                deviceInfo={companionInfo}
-                                onConnect={connectCompanion}
-                                onLaunch={launchCompanion}
-                            />
                             <Button
                                 variant="ghost"
                                 size="icon"
