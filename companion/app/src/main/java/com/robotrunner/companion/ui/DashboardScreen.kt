@@ -23,8 +23,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.robotrunner.companion.R
+import com.robotrunner.companion.apps.PackageManagerTabContent
 import com.robotrunner.companion.model.HardwareSpecCategory
 import com.robotrunner.companion.model.LiveTelemetry
+import com.robotrunner.companion.shell.ShellConsoleTabContent
 
 @Composable
 fun DashboardScreen(
@@ -76,10 +78,11 @@ fun DashboardScreen(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     // Tab Selection Bar
-                    TabRow(
+                    ScrollableTabRow(
                         selectedTabIndex = selectedTab,
                         containerColor = Color(0xFF1E293B),
                         contentColor = Color(0xFF38BDF8),
+                        edgePadding = 8.dp,
                         modifier = Modifier.height(44.dp)
                     ) {
                         Tab(
@@ -115,6 +118,34 @@ fun DashboardScreen(
                             onClick = { selectedTab = 2 },
                             text = {
                                 Text(
+                                    text = stringResource(id = R.string.tab_apps),
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        )
+                        Tab(
+                            selected = selectedTab == 3,
+                            onClick = { selectedTab = 3 },
+                            text = {
+                                Text(
+                                    text = stringResource(id = R.string.tab_shell),
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        )
+                        Tab(
+                            selected = selectedTab == 4,
+                            onClick = { selectedTab = 4 },
+                            text = {
+                                Text(
                                     text = stringResource(id = R.string.tab_diagnostics),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.SemiBold,
@@ -142,7 +173,9 @@ fun DashboardScreen(
                             context = context
                         )
                         1 -> HardwareSpecsTabContent(detailedSpecs = detailedSpecs)
-                        2 -> DiagnosticsTabContent(
+                        2 -> PackageManagerTabContent()
+                        3 -> ShellConsoleTabContent()
+                        4 -> DiagnosticsTabContent(
                             onRunOfflineCheckup = onRunOfflineCheckup,
                             onLaunchDisplayTest = onLaunchDisplayTest
                         )

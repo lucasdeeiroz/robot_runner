@@ -62,6 +62,21 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 5. Continuous Learning & Rule Maintenance Instruction
+## 6. On-Device Package Management & Local Shell Execution Rules
+
+1. **Async Package Traversal**:
+   - Querying `packageManager.getInstalledPackages()` or requested permissions can inspect hundreds of applications on Android devices. This operation MUST be run asynchronously on `Dispatchers.IO` to prevent blocking the UI frame rendering or triggering ANR (Application Not Responding) dialogs.
+
+2. **FileProvider & Temporary Storage Scoping for APK Sharing**:
+   - Never share APK files directly from `/data/app/...` via raw file paths, as Android 10+ scoped storage blocks cross-package file access.
+   - Always copy the APK file (`applicationInfo.sourceDir`) to `context.cacheDir` (or external storage) and expose it securely using `FileProvider.getUriForFile()` with `Intent.FLAG_GRANT_READ_URI_PERMISSION`.
+
+3. **Local Shell Command Timeout & Stream Isolation**:
+   - When executing local shell commands (`dumpsys`, `pm`, `getprop`, `settings`, `wm`) via `ProcessBuilder("sh", "-c", command)`, always enforce a timeout limit (e.g. 10 seconds) and read `stdout` and `stderr` on separate worker threads to avoid stream deadlocks when stdout buffers fill up.
+
+---
+
+## 7. Continuous Learning & Rule Maintenance Instruction
 
 > **IMPORTANT**: As new features, optimizations, or Android SDK workarounds are implemented in `companion/`, the **Android Companion Engineer** profile MUST update and append new rules directly to this document.
+

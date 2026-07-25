@@ -83,4 +83,31 @@
     <string name="title_display_test">🖥️ Teste de Calibração de Tela e Pixels</string>
     <string name="desc_display_test">Inicia o teste de cores em tela cheia para detectar pixels mortos ou retenção de imagem (burn-in).</string>
     <string name="btn_launch_display_test">Iniciar Teste de Tela Cheia</string>
+    <!-- Phase 2 Strings (PT-BR) -->
+    <string name="tab_apps">Apps</string>
+    <string name="tab_shell">Shell</string>
+    <string name="search_apps_placeholder">Pesquisar apps ou nome de pacotes...</string>
+    <string name="chip_all_apps">Todos</string>
+    <string name="chip_user_apps">Usuário</string>
+    <string name="chip_system_apps">Sistema</string>
+    <string name="label_system_badge">SISTEMA</string>
+    <string name="label_user_badge">USUÁRIO</string>
+    <string name="label_version">v%1$s (%2$d)</string>
+    <string name="action_launch_app">Abrir Aplicativo</string>
+    <string name="action_app_details">Configurações do App</string>
+    <string name="action_backup_apk">Backup do APK em Downloads</string>
+    <string name="action_share_apk">Compartilhar APK</string>
+    <string name="action_uninstall_app">Desinstalar Pacote</string>
+    <string name="msg_apk_backed_up">APK salvo em Downloads: %1$s</string>
+    <string name="msg_apk_backup_failed">Falha ao extrair/fazer backup do APK</string>
+    <string name="header_permissions">Inspetor de Permissões Solicitadas</string>
+    <string name="perm_granted">CONCEDIDA</string>
+    <string name="perm_denied">NEGADA</string>
+    <string name="shell_header_templates">⚡ Modelos de Comandos</string>
+    <string name="shell_input_placeholder">Digite o comando (ex: dumpsys battery)...</string>
+    <string name="btn_run_shell">Executar</string>
+    <string name="btn_clear_console">Limpar</string>
+    <string name="btn_copy_output">Copiar</string>
+    <string name="msg_copied_clipboard">Saída copiada para a área de transferência</string>
+    <string name="shell_status_format">Exit Code: %1$d | Tempo de Execução: %2$dms</string>
 </resources>

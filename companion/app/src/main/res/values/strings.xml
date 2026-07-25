@@ -83,4 +83,31 @@
     <string name="title_display_test">🖥️ Screen Pixel &amp; Color Calibration Test</string>
     <string name="desc_display_test">Launch full-screen pixel color cycling test to detect dead pixels or screen burn-in.</string>
     <string name="btn_launch_display_test">Launch Fullscreen Display Test</string>
+    <!-- Phase 2 Strings -->
+    <string name="tab_apps">Apps</string>
+    <string name="tab_shell">Shell</string>
+    <string name="search_apps_placeholder">Search apps or package names...</string>
+    <string name="chip_all_apps">All Apps</string>
+    <string name="chip_user_apps">User Apps</string>
+    <string name="chip_system_apps">System Apps</string>
+    <string name="label_system_badge">SYSTEM</string>
+    <string name="label_user_badge">USER</string>
+    <string name="label_version">v%1$s (%2$d)</string>
+    <string name="action_launch_app">Launch App</string>
+    <string name="action_app_details">App Info Settings</string>
+    <string name="action_backup_apk">Backup APK to Downloads</string>
+    <string name="action_share_apk">Share APK File</string>
+    <string name="action_uninstall_app">Uninstall Package</string>
+    <string name="msg_apk_backed_up">APK saved to Downloads: %1$s</string>
+    <string name="msg_apk_backup_failed">Failed to extract/backup APK</string>
+    <string name="header_permissions">Requested Permissions Inspector</string>
+    <string name="perm_granted">GRANTED</string>
+    <string name="perm_denied">DENIED</string>
+    <string name="shell_header_templates">⚡ Command Templates</string>
+    <string name="shell_input_placeholder">Enter command (e.g. dumpsys battery)...</string>
+    <string name="btn_run_shell">Run</string>
+    <string name="btn_clear_console">Clear</string>
+    <string name="btn_copy_output">Copy</string>
+    <string name="msg_copied_clipboard">Output copied to clipboard</string>
+    <string name="shell_status_format">Exit Code: %1$d | Execution Time: %2$dms</string>
 </resources>

@@ -83,4 +83,31 @@
     <string name="title_display_test">🖥️ Prueba de Calibración de Pantalla y Píxeles</string>
     <string name="desc_display_test">Inicia la prueba de colores en pantalla completa para detectar píxeles muertos o retención de imagen (burn-in).</string>
     <string name="btn_launch_display_test">Iniciar Prueba de Pantalla Completa</string>
+    <!-- Phase 2 Strings (ES) -->
+    <string name="tab_apps">Apps</string>
+    <string name="tab_shell">Shell</string>
+    <string name="search_apps_placeholder">Buscar aplicaciones o nombres de paquete...</string>
+    <string name="chip_all_apps">Todos</string>
+    <string name="chip_user_apps">Usuario</string>
+    <string name="chip_system_apps">Sistema</string>
+    <string name="label_system_badge">SISTEMA</string>
+    <string name="label_user_badge">USUARIO</string>
+    <string name="label_version">v%1$s (%2$d)</string>
+    <string name="action_launch_app">Abrir Aplicación</string>
+    <string name="action_app_details">Configuración de App</string>
+    <string name="action_backup_apk">Copia del APK en Descargas</string>
+    <string name="action_share_apk">Compartir APK</string>
+    <string name="action_uninstall_app">Desinstalar Paquete</string>
+    <string name="msg_apk_backed_up">APK guardado en Descargas: %1$s</string>
+    <string name="msg_apk_backup_failed">Error al guardar copia del APK</string>
+    <string name="header_permissions">Inspector de Permisos Solicitados</string>
+    <string name="perm_granted">CONCEDIDO</string>
+    <string name="perm_denied">DENEGADO</string>
+    <string name="shell_header_templates">⚡ Plantillas de Comandos</string>
+    <string name="shell_input_placeholder">Ingrese el comando (ej: dumpsys battery)...</string>
+    <string name="btn_run_shell">Ejecutar</string>
+    <string name="btn_clear_console">Limpiar</string>
+    <string name="btn_copy_output">Copiar</string>
+    <string name="msg_copied_clipboard">Salida copiada al portapapeles</string>
+    <string name="shell_status_format">Exit Code: %1$d | Tiempo de Ejecución: %2$dms</string>
 </resources>
