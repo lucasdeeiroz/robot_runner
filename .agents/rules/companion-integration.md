@@ -67,4 +67,12 @@ As seguintes diretrizes arquiteturais e técnicas são estritamente obrigatória
 - **Captura Nível Hardware de Redraw**: O `CompanionAccessibilityService` escuta os eventos `TYPE_WINDOW_CONTENT_CHANGED` (redesenho de tela) e `TYPE_VIEW_CLICKED` (toque na interface).
 - **Regra do TTI de Precisão**: O tempo de resposta da interface (TTI / Time to Interactive) é calculado no Kotlin pela diferença em milissegundos entre `lastTouchTimestamp` e `lastRedrawTimestamp`, sem sofrer latências de cabo USB ou transporte ADB. O Rust consulta `/frame-delta` e expõe a métrica para o `StopwatchSubTab.tsx`, fornecendo benchmarks reais de hardware (`🎯 Hardware TTI: +Xms`).
 
+---
+
+## 10. Gerenciamento Híbrido de Aplicativos e Ícones Nativos (Fase 9)
+- **Extração Nativa em RAM (<15ms)**: O Companion consulta diretamente o `PackageManager` no dispositivo e retorna a lista de apps instalados (`/apps`) com nomes legíveis (Labels), versões e status em **<15ms**, eliminando chamadas demoradas de `dumpsys package`.
+- **Permissão `QUERY_ALL_PACKAGES`**: O `AndroidManifest.xml` do Companion DEVE manter a permissão `<uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />` para contornar a restrição de visibilidade de pacotes do Android 11+ (API 30+).
+- **Ícones Nativos em Base64**: O endpoint `/app/icon?package=<pkg>` extrai a `Drawable` nativa, realiza downscaling otimizado para `96x96px` e retorna a string Data URL PNG (`data:image/png;base64,...`) em RAM para renderização instantânea no `AppsSubTab.tsx`.
+
+
 

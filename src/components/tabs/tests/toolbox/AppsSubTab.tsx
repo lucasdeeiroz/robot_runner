@@ -16,11 +16,13 @@ import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { SplitButton } from "@/components/molecules/SplitButton";
 
 interface PackageInfo {
-    name: String;
-    path: String;
-    version: String;
+    name: string;
+    label?: string;
+    path: string;
+    version: string;
     is_system: boolean;
     is_disabled: boolean;
+    icon?: string;
 }
 
 interface AppsSubTabProps {
@@ -43,6 +45,18 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
     const [grantPermissions, setGrantPermissions] = useState(false);
     const [allowTest, setAllowTest] = useState(false);
     const [installSdcard, setInstallSdcard] = useState(false);
+    const [iconMap, setIconMap] = useState<Record<string, string>>({});
+
+    const loadIcon = (pkgName: string) => {
+        if (!activeDevice || iconMap[pkgName]) return;
+        invoke<string>("get_app_icon", { device: activeDevice, package: pkgName })
+            .then((icon) => {
+                if (icon) {
+                    setIconMap(prev => ({ ...prev, [pkgName]: icon }));
+                }
+            })
+            .catch(() => {});
+    };
 
     // ... (rest of state)
 
@@ -103,11 +117,14 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
         if (!showSystem && p.is_system) return false;
         if (!search) return true;
         const lower = search.toLowerCase();
-        return p.name.toLowerCase().includes(lower) || p.path.toLowerCase().includes(lower);
+        const label = p.label || friendlyNames[String(p.name)] || "";
+        return p.name.toLowerCase().includes(lower) || 
+               label.toLowerCase().includes(lower) || 
+               p.path.toLowerCase().includes(lower);
     }).sort((a, b) => {
         if (sortBy === 'name') {
-            const nameA = (friendlyNames[String(a.name)] || String(a.name)).toLowerCase();
-            const nameB = (friendlyNames[String(b.name)] || String(b.name)).toLowerCase();
+            const nameA = (a.label || friendlyNames[String(a.name)] || String(a.name)).toLowerCase();
+            const nameB = (b.label || friendlyNames[String(b.name)] || String(b.name)).toLowerCase();
             return nameA.localeCompare(nameB);
         }
         return String(a.name).localeCompare(String(b.name));
@@ -377,71 +394,90 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                         data={filtered}
                         className="custom-scrollbar overflow-y-auto"
                         style={{ height: '100%' }}
-                        itemContent={(_index, pkg) => (
-                            <div className="px-3 py-2 border-b border-outline-variant/30 hover:bg-surface-variant/20 group flex items-center gap-3">
-                                <div className={clsx(
-                                    "p-2 rounded-2xl shrink-0",
-                                    pkg.is_system ? "bg-tertiary-container text-on-tertiary-container" : "bg-primary-container text-on-primary-container"
-                                )}>
-                                    <Package size={16} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="text-sm text-on-surface/80 truncate font-medium flex items-center gap-2">
-                                        {friendlyNames[String(pkg.name)] || pkg.name}
-                                        {pkg.is_disabled && (
-                                            <span className="text-[10px] bg-error-container text-on-error-container px-1 rounded uppercase font-bold tracking-wider">
-                                                {t('apps.status.disabled_badge', "Disabled")}
+                        itemContent={(_index, pkg) => {
+                            const pkgName = String(pkg.name);
+                            const hasIcon = iconMap[pkgName] || pkg.icon;
+                            if (!hasIcon) {
+                                loadIcon(pkgName);
+                            }
+                            const displayName = pkg.label || friendlyNames[pkgName] || pkgName;
+
+                            return (
+                                <div className="px-3 py-2 border-b border-outline-variant/30 hover:bg-surface-variant/20 group flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-surface-variant/40 border border-outline-variant/30 flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
+                                        {hasIcon ? (
+                                            <img
+                                                src={iconMap[pkgName] || pkg.icon}
+                                                alt={displayName}
+                                                className="w-full h-full object-cover rounded-xl"
+                                            />
+                                        ) : (
+                                            <div className={clsx(
+                                                "w-full h-full flex items-center justify-center rounded-xl",
+                                                pkg.is_system ? "bg-tertiary-container text-on-tertiary-container" : "bg-primary-container text-on-primary-container"
+                                            )}>
+                                                <Package size={16} />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-sm text-on-surface/80 truncate font-medium flex items-center gap-2">
+                                            {displayName}
+                                            {pkg.is_disabled && (
+                                                <span className="text-[10px] bg-error-container text-on-error-container px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">
+                                                    {t('apps.status.disabled_badge', "Disabled")}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="text-xs text-on-surface-variant/80 truncate font-mono opacity-70 flex items-center gap-2">
+                                            <span className="shrink-0 truncate max-w-[40%]">{pkg.name}</span>
+                                            {pkg.version && (
+                                                <>
+                                                    <span className="text-outline-variant px-1 shrink-0">•</span>
+                                                    <span className="shrink-0 text-primary">v{pkg.version}</span>
+                                                </>
+                                            )}
+                                            <span className="text-outline-variant px-1 shrink-0">•</span>
+                                            <span data-tooltip={String(pkg.path)} data-position="left" className="truncate cursor-help hover:text-on-surface/80 transition-colors">
+                                                {pkg.path}
                                             </span>
-                                        )}
+                                        </div>
                                     </div>
-                                    <div className="text-xs text-on-surface-variant/80 truncate font-mono opacity-70 flex items-center gap-2">
-                                        <span className="shrink-0 truncate max-w-[40%]">{pkg.name}</span>
-                                        {pkg.version && (
-                                            <>
-                                                <span className="text-outline-variant px-1 shrink-0">•</span>
-                                                <span className="shrink-0 text-primary">v{pkg.version}</span>
-                                            </>
+
+                                    <div className="flex items-center gap-1 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button size="icon" variant="ghost" onClick={() => handleLaunch(String(pkg.name))} className="h-7 w-7 hover:bg-success/10 text-success/80 rounded" data-tooltip={`${t('apps.actions.launch', "Launch")} (adb shell monkey)`} data-position="left">
+                                            <Rocket size={14} />
+                                        </Button>
+
+                                        <Button size="icon" variant="ghost" onClick={() => handleDownload(pkg)} className="h-7 w-7 hover:bg-primary/10 text-primary/80 rounded" data-tooltip={`${t('apps.actions.download', "Download APK")} (adb pull)`} data-position="left">
+                                            <Download size={14} />
+                                        </Button>
+
+                                        {pkg.is_disabled ? (
+                                            <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), false)} className="h-7 w-7 hover:bg-primary/10 text-info-container/80 rounded" data-tooltip={`${t('apps.actions.enable', "Enable")} (adb shell pm enable)`} data-position="left">
+                                                <PlayCircle size={14} />
+                                            </Button>
+                                        ) : (
+                                            <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), true)} className="h-7 w-7 hover:bg-sky-500/10 text-sky-400 rounded" data-tooltip={`${t('apps.actions.disable', "Freeze")} (adb shell pm disable-user)`} data-position="left">
+                                                <Snowflake size={14} />
+                                            </Button>
                                         )}
-                                        <span className="text-outline-variant px-1 shrink-0">•</span>
-                                        <span data-tooltip={String(pkg.path)} data-position="left" className="truncate cursor-help hover:text-on-surface/80 transition-colors">
-                                            {pkg.path}
-                                        </span>
+
+                                        <Button size="icon" variant="ghost" onClick={() => handleForceStop(String(pkg.name))} className="h-7 w-7 hover:bg-error/10 text-error/80 rounded" data-tooltip={`${t('apps.actions.force_stop', "Force Stop")} (adb shell am force-stop)`} data-position="left">
+                                            <OctagonX size={14} />
+                                        </Button>
+
+                                        <Button size="icon" variant="ghost" onClick={() => confirmClear(String(pkg.name))} className="h-7 w-7 hover:bg-warning/10 text-warning-container/40 rounded" data-tooltip={`${t('apps.actions.clear', "Clear Data")} (adb shell pm clear)`} data-position="left">
+                                            <Eraser size={14} />
+                                        </Button>
+
+                                        <Button size="icon" variant="ghost" onClick={() => confirmUninstall(String(pkg.name))} className="h-7 w-7 hover:bg-error/10 text-error-container/60 rounded" data-tooltip={`${t('apps.actions.uninstall', "Uninstall")} (adb uninstall)`} data-position="left">
+                                            <Trash2 size={14} />
+                                        </Button>
                                     </div>
                                 </div>
-
-                                <div className="flex items-center gap-1 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button size="icon" variant="ghost" onClick={() => handleLaunch(String(pkg.name))} className="h-7 w-7 hover:bg-success/10 text-success/80 rounded" data-tooltip={`${t('apps.actions.launch', "Launch")} (adb shell monkey)`} data-position="left">
-                                        <Rocket size={14} />
-                                    </Button>
-
-                                    <Button size="icon" variant="ghost" onClick={() => handleDownload(pkg)} className="h-7 w-7 hover:bg-primary/10 text-primary/80 rounded" data-tooltip={`${t('apps.actions.download', "Download APK")} (adb pull)`} data-position="left">
-                                        <Download size={14} />
-                                    </Button>
-
-                                    {pkg.is_disabled ? (
-                                        <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), false)} className="h-7 w-7 hover:bg-primary/10 text-info-container/80 rounded" data-tooltip={`${t('apps.actions.enable', "Enable")} (adb shell pm enable)`} data-position="left">
-                                            <PlayCircle size={14} />
-                                        </Button>
-                                    ) : (
-                                        <Button size="icon" variant="ghost" onClick={() => confirmFreeze(String(pkg.name), true)} className="h-7 w-7 hover:bg-sky-500/10 text-sky-400 rounded" data-tooltip={`${t('apps.actions.disable', "Freeze")} (adb shell pm disable-user)`} data-position="left">
-                                            <Snowflake size={14} />
-                                        </Button>
-                                    )}
-
-                                    <Button size="icon" variant="ghost" onClick={() => handleForceStop(String(pkg.name))} className="h-7 w-7 hover:bg-error/10 text-error/80 rounded" data-tooltip={`${t('apps.actions.force_stop', "Force Stop")} (adb shell am force-stop)`} data-position="left">
-                                        <OctagonX size={14} />
-                                    </Button>
-
-                                    <Button size="icon" variant="ghost" onClick={() => confirmClear(String(pkg.name))} className="h-7 w-7 hover:bg-warning/10 text-warning-container/40 rounded" data-tooltip={`${t('apps.actions.clear', "Clear Data")} (adb shell pm clear)`} data-position="left">
-                                        <Eraser size={14} />
-                                    </Button>
-
-                                    <Button size="icon" variant="ghost" onClick={() => confirmUninstall(String(pkg.name))} className="h-7 w-7 hover:bg-error/10 text-error-container/60 rounded" data-tooltip={`${t('apps.actions.uninstall', "Uninstall")} (adb uninstall)`} data-position="left">
-                                        <Trash2 size={14} />
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
+                            );
+                        }}
                     />
                 )}
             </div>

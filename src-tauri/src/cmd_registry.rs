@@ -78,6 +78,7 @@ macro_rules! generate_robot_runner_handler {
             crate::files::fs_read_dir_names,
             crate::ai_context::get_ai_context,
             crate::adb::packages::get_installed_packages,
+            crate::adb::packages::get_app_icon,
             crate::adb::packages::uninstall_package,
             crate::adb::packages::enable_package,
             crate::adb::packages::disable_package,

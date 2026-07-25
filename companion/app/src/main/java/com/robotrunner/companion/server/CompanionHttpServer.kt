@@ -13,6 +13,14 @@ import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
+import android.util.Base64
+import java.io.ByteArrayOutputStream
 import com.robotrunner.companion.checkup.HardwareCheckupRunner
 import com.robotrunner.companion.checkup.PdfReportGenerator
 import com.robotrunner.companion.hardware.DisplayTestActivity
@@ -212,6 +220,21 @@ class CompanionHttpServer(
                     addProperty("last_redraw_timestamp", CompanionAccessibilityService.lastRedrawTimestamp)
                     addProperty("package_name", CompanionAccessibilityService.activePackageName ?: "")
                     addProperty("source", "companion_hardware")
+                }
+            }
+
+            "/apps" -> getInstalledAppsPayload()
+
+            "/app/icon" -> {
+                val params = session.parms
+                val pkg = params["package"] ?: params["pkg"] ?: ""
+                if (pkg.isNotEmpty()) {
+                    getAppIconPayload(pkg)
+                } else {
+                    JsonObject().apply {
+                        addProperty("status", "error")
+                        addProperty("message", "Package parameter is required")
+                    }
                 }
             }
 
@@ -599,6 +622,77 @@ class CompanionHttpServer(
         } catch (e: Throwable) {
             Log.w("CompanionHttpServer", "gfxinfo FPS extraction failed", e)
             0
+        }
+    }
+
+    private fun getInstalledAppsPayload(): JsonObject {
+        return try {
+            val pm = context.packageManager
+            val apps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+            val array = JsonArray()
+
+            for (app in apps) {
+                val obj = JsonObject().apply {
+                    addProperty("name", app.packageName)
+                    addProperty("label", app.loadLabel(pm).toString())
+                    addProperty("path", app.sourceDir ?: "")
+                    addProperty("is_system", (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0)
+                    addProperty("is_disabled", !app.enabled)
+
+                    var version = ""
+                    try {
+                        val pkgInfo = pm.getPackageInfo(app.packageName, 0)
+                        version = pkgInfo.versionName ?: ""
+                    } catch (_: Exception) {}
+                    addProperty("version", version)
+                }
+                array.add(obj)
+            }
+
+            JsonObject().apply {
+                addProperty("status", "ok")
+                addProperty("total", array.size())
+                add("apps", array)
+            }
+        } catch (e: Exception) {
+            JsonObject().apply {
+                addProperty("status", "error")
+                addProperty("message", e.message ?: "Failed to list applications")
+            }
+        }
+    }
+
+    private fun getAppIconPayload(packageName: String): JsonObject {
+        return try {
+            val pm = context.packageManager
+            val appInfo = pm.getApplicationInfo(packageName, 0)
+            val drawable = appInfo.loadIcon(pm)
+            val bitmap = if (drawable is BitmapDrawable) {
+                drawable.bitmap
+            } else {
+                val w = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96
+                val h = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 96
+                val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                val c = Canvas(b)
+                drawable.setBounds(0, 0, c.width, c.height)
+                drawable.draw(c)
+                b
+            }
+            val scaled = Bitmap.createScaledBitmap(bitmap, 96, 96, true)
+            val baos = ByteArrayOutputStream()
+            scaled.compress(Bitmap.CompressFormat.PNG, 90, baos)
+            val base64 = "data:image/png;base64," + Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+
+            JsonObject().apply {
+                addProperty("status", "ok")
+                addProperty("package", packageName)
+                addProperty("icon", base64)
+            }
+        } catch (e: Exception) {
+            JsonObject().apply {
+                addProperty("status", "error")
+                addProperty("message", e.message ?: "Failed to extract app icon")
+            }
         }
     }
 }

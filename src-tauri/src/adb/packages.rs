@@ -2,18 +2,61 @@ use crate::cmd_utils::{new_tokio_command, get_adb_program, format_adb_error};
 use tauri::AppHandle;
 use tauri::command;
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct PackageInfo {
-    name: String,
-    path: String,
-    version: String,
-    is_system: bool,
-    is_disabled: bool,
+    pub name: String,
+    pub label: Option<String>,
+    pub path: String,
+    pub version: String,
+    pub is_system: bool,
+    pub is_disabled: bool,
+    pub icon: Option<String>,
 }
 
 #[command]
 pub async fn get_installed_packages(app: AppHandle, device: String) -> Result<Vec<PackageInfo>, String> {
-    // 1. Get All Packages with Path (-f)
+    // 1. Try Companion Hybrid Bridge First (<20ms)
+    let comp_url = "http://127.0.0.1:9876/apps".to_string();
+    if let Ok(client) = reqwest::Client::builder().timeout(std::time::Duration::from_millis(600)).build() {
+        if let Ok(resp) = client.get(&comp_url).send().await {
+            if resp.status().is_success() {
+                if let Ok(val) = resp.json::<serde_json::Value>().await {
+                    if val.get("status").and_then(|s| s.as_str()) == Some("ok") {
+                        if let Some(apps_arr) = val.get("apps").and_then(|a| a.as_array()) {
+                            let mut packages: Vec<PackageInfo> = Vec::new();
+                            for a in apps_arr {
+                                let name = a.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                if name.is_empty() { continue; }
+                                let label = a.get("label").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                let path = a.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                let version = a.get("version").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                let is_system = a.get("is_system").and_then(|v| v.as_bool()).unwrap_or(false);
+                                let is_disabled = a.get("is_disabled").and_then(|v| v.as_bool()).unwrap_or(false);
+
+                                packages.push(PackageInfo {
+                                    name,
+                                    label,
+                                    path,
+                                    version,
+                                    is_system,
+                                    is_disabled,
+                                    icon: None,
+                                });
+                            }
+                            packages.sort_by(|a, b| {
+                                let label_a = a.label.as_deref().unwrap_or(&a.name);
+                                let label_b = b.label.as_deref().unwrap_or(&b.name);
+                                label_a.cmp(label_b)
+                            });
+                            return Ok(packages);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. ADB Fallback if Companion is absent or unavailable
     let output_all = run_adb(
         &app,
         device.clone(),
@@ -21,7 +64,6 @@ pub async fn get_installed_packages(app: AppHandle, device: String) -> Result<Ve
     )
     .await?;
 
-    // 2. Get Disabled Packages (-d)
     let output_disabled = run_adb(
         &app,
         device.clone(),
@@ -34,7 +76,6 @@ pub async fn get_installed_packages(app: AppHandle, device: String) -> Result<Ve
         .filter_map(|line| line.strip_prefix("package:").map(|s| s.trim().to_string()))
         .collect();
 
-    // 3. Get version names via dumpsys
     let output_dumpsys = run_adb(
         &app,
         device.clone(),
@@ -65,7 +106,6 @@ pub async fn get_installed_packages(app: AppHandle, device: String) -> Result<Ve
 
     for line in output_all.lines() {
         if let Some(record) = line.strip_prefix("package:") {
-            // Format: /path/to/apk=com.package.name
             if let Some((path, name)) = record.rsplit_once('=') {
                 let name = name.trim().to_string();
                 let path = path.trim().to_string();
@@ -79,19 +119,39 @@ pub async fn get_installed_packages(app: AppHandle, device: String) -> Result<Ve
 
                 packages.push(PackageInfo {
                     name,
+                    label: None,
                     path,
                     version,
                     is_system,
                     is_disabled,
+                    icon: None,
                 });
             }
         }
     }
 
-    // Sort by name
     packages.sort_by(|a, b| a.name.cmp(&b.name));
 
     Ok(packages)
+}
+
+#[command]
+pub async fn get_app_icon(_app: AppHandle, _device: String, package: String) -> Result<String, String> {
+    let comp_url = format!("http://127.0.0.1:9876/app/icon?package={}", package);
+    if let Ok(client) = reqwest::Client::builder().timeout(std::time::Duration::from_millis(800)).build() {
+        if let Ok(resp) = client.get(&comp_url).send().await {
+            if resp.status().is_success() {
+                if let Ok(val) = resp.json::<serde_json::Value>().await {
+                    if val.get("status").and_then(|s| s.as_str()) == Some("ok") {
+                        if let Some(icon) = val.get("icon").and_then(|v| v.as_str()) {
+                            return Ok(icon.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Err("App icon not available".to_string())
 }
 
 #[command]
