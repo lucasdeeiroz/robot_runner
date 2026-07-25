@@ -81,6 +81,14 @@ As seguintes diretrizes arquiteturais e técnicas são estritamente obrigatória
 - **Pareamento ADB Wireless (Android 11+)**: O backend Rust oferece `adb_pair_device` que auto-executa `adb pair IP:PORT CODE` seguido de `adb connect IP:PORT` sem necessidade de cabo USB.
 - **Painel Fleet Health**: O `HomeSubTab.tsx` consulta periodicamente `get_fleet_health` em Rust para apresentar o status de saúde consolidado (Companion 🟢/🟡/⚪, Bateria %, Temp °C, IP Wi-Fi e RAM) de todos os dispositivos conectados na frota.
 
+---
+
+## 12. Auditoria Instantânea e Aceleração Transparente de Checkup (Checkup & Fase 11)
+- **Aceleração Transparente Sob o Capô (Zero Duplicação de UI)**: O Companion acelera diretamente a execução das rotinas existentes de auditoria do `CheckupSubTab.tsx` sem criar novas seções visuais duplicadas na UI.
+- **`fetchDeviceProperties` (<15ms)**: As buscas de propriedades do sistema (`getprop`) priorizam a consulta ao endpoint `/device/info` do Companion em RAM em **<15ms**, recorrendo ao ADB `getprop` apenas se o Companion estiver desconectado.
+- **`runSingleUiTextCheck` (<10ms)**: A verificação de textos em telas (`UiTextCheckConfig`) consulta diretamente o endpoint `/xml` do `CompanionAccessibilityService` em **<10ms**, eliminando o atraso de ~2.0s do `uiautomator dump` do ADB.
+- **`runAdditionalChecks` (<15ms)**: Os testes de Memória (`/proc/meminfo`) e Armazenamento (`/data`) utilizam os dados locais em RAM de `/checkup/run` do Companion quando ativo, reduzindo requisições seriais do ADB.
+
 
 
 
