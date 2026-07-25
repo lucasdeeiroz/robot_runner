@@ -2,6 +2,18 @@ use crate::adb::shell::execute_adb_with_recovery;
 use crate::errors::{AppError, AppResult};
 use std::time::Duration;
 use tauri::{command, AppHandle};
+use std::sync::Mutex;
+use std::collections::HashSet;
+use std::sync::LazyLock;
+
+static ACTIVE_FORWARDS: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
+
+pub fn invalidate_forward(device: &str, port: u16) {
+    let key = format!("{}:{}", device, port);
+    if let Ok(mut set) = ACTIVE_FORWARDS.lock() {
+        set.remove(&key);
+    }
+}
 
 #[command]
 pub async fn check_companion_installed(app: AppHandle, device: String) -> AppResult<bool> {
@@ -28,6 +40,15 @@ pub async fn start_companion_forward(
 ) -> AppResult<u16> {
     let l_port = local_port.unwrap_or(9876);
     let r_port = remote_port.unwrap_or(9876);
+    let key = format!("{}:{}", device, l_port);
+
+    {
+        if let Ok(set) = ACTIVE_FORWARDS.lock() {
+            if set.contains(&key) {
+                return Ok(l_port);
+            }
+        }
+    }
 
     let args = vec![
         "forward".to_string(),
@@ -42,6 +63,9 @@ pub async fn start_companion_forward(
     eprintln!("[Companion Rust] ADB forward result: stdout='{}', stderr='{}', status={}", stdout.trim(), stderr.trim(), output.status);
 
     if output.status.success() {
+        if let Ok(mut set) = ACTIVE_FORWARDS.lock() {
+            set.insert(key);
+        }
         Ok(l_port)
     } else {
         Err(AppError::AdbError(format!(
@@ -58,6 +82,7 @@ pub async fn stop_companion_forward(
     local_port: Option<u16>,
 ) -> AppResult<()> {
     let l_port = local_port.unwrap_or(9876);
+    invalidate_forward(&device, l_port);
     let args = vec![
         "forward".to_string(),
         "--remove".to_string(),
