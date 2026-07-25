@@ -111,6 +111,7 @@ async fn get_device_stats_internal(
     let mut companion_stats: Option<DeviceStats> = None;
 
     // 🚀 Companion Telemetry Bridge (Sub-10ms for Hardware & Battery & Foreground)
+    let _ = crate::companion::start_companion_forward(app.clone(), device.to_string(), Some(9876), Some(9876)).await;
     let mut comp_url = String::from("http://127.0.0.1:9876/telemetry");
     if let Some(pkg) = &package {
         if !pkg.is_empty() {
@@ -118,7 +119,7 @@ async fn get_device_stats_internal(
         }
     }
 
-    if let Ok(c) = reqwest::Client::builder().timeout(Duration::from_millis(400)).build() {
+    if let Ok(c) = reqwest::Client::builder().timeout(Duration::from_millis(1200)).build() {
         if let Ok(resp) = c.get(&comp_url).send().await {
             if resp.status().is_success() {
                 if let Ok(json_text) = resp.text().await {
@@ -952,9 +953,10 @@ pub struct HardwareFrameDelta {
 }
 
 #[tauri::command]
-pub async fn get_companion_frame_delta(_app: AppHandle, device: String) -> Result<HardwareFrameDelta, String> {
+pub async fn get_companion_frame_delta(app: AppHandle, device: String) -> Result<HardwareFrameDelta, String> {
+    let _ = crate::companion::start_companion_forward(app.clone(), device.clone(), Some(9876), Some(9876)).await;
     let comp_url = "http://127.0.0.1:9876/frame-delta".to_string();
-    if let Ok(c) = reqwest::Client::builder().timeout(Duration::from_millis(400)).build() {
+    if let Ok(c) = reqwest::Client::builder().timeout(Duration::from_millis(1200)).build() {
         if let Ok(resp) = c.get(&comp_url).send().await {
             if resp.status().is_success() {
                 if let Ok(val) = resp.json::<serde_json::Value>().await {

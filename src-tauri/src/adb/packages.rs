@@ -15,43 +15,52 @@ pub struct PackageInfo {
 
 #[command]
 pub async fn get_installed_packages(app: AppHandle, device: String) -> Result<Vec<PackageInfo>, String> {
-    // 1. Try Companion Hybrid Bridge First (<20ms)
-    let comp_url = "http://127.0.0.1:9876/apps".to_string();
-    if let Ok(client) = reqwest::Client::builder().timeout(std::time::Duration::from_millis(600)).build() {
-        if let Ok(resp) = client.get(&comp_url).send().await {
-            if resp.status().is_success() {
-                if let Ok(val) = resp.json::<serde_json::Value>().await {
-                    if val.get("status").and_then(|s| s.as_str()) == Some("ok") {
-                        if let Some(apps_arr) = val.get("apps").and_then(|a| a.as_array()) {
-                            let mut packages: Vec<PackageInfo> = Vec::new();
-                            for a in apps_arr {
-                                let name = a.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                                if name.is_empty() { continue; }
-                                let label = a.get("label").and_then(|v| v.as_str()).map(|s| s.to_string());
-                                let path = a.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                                let version = a.get("version").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                                let is_system = a.get("is_system").and_then(|v| v.as_bool()).unwrap_or(false);
-                                let is_disabled = a.get("is_disabled").and_then(|v| v.as_bool()).unwrap_or(false);
+    // 1. Ensure ADB port forwarding is active for target device
+    let _ = crate::companion::start_companion_forward(app.clone(), device.clone(), Some(9876), Some(9876)).await;
 
-                                packages.push(PackageInfo {
-                                    name,
-                                    label,
-                                    path,
-                                    version,
-                                    is_system,
-                                    is_disabled,
-                                    icon: None,
+    // 2. Try Companion Hybrid Bridge First (<20ms) with retry and generous timeout
+    let comp_url = "http://127.0.0.1:9876/apps".to_string();
+    if let Ok(client) = reqwest::Client::builder().timeout(std::time::Duration::from_millis(2500)).build() {
+        for attempt in 0..2 {
+            if let Ok(resp) = client.get(&comp_url).send().await {
+                if resp.status().is_success() {
+                    if let Ok(val) = resp.json::<serde_json::Value>().await {
+                        if val.get("status").and_then(|s| s.as_str()) == Some("ok") {
+                            if let Some(apps_arr) = val.get("apps").and_then(|a| a.as_array()) {
+                                let mut packages: Vec<PackageInfo> = Vec::new();
+                                for a in apps_arr {
+                                    let name = a.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                    if name.is_empty() { continue; }
+                                    let label = a.get("label").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                    let path = a.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                    let version = a.get("version").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                    let is_system = a.get("is_system").and_then(|v| v.as_bool()).unwrap_or(false);
+                                    let is_disabled = a.get("is_disabled").and_then(|v| v.as_bool()).unwrap_or(false);
+                                    let icon = a.get("icon").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+                                    packages.push(PackageInfo {
+                                        name,
+                                        label,
+                                        path,
+                                        version,
+                                        is_system,
+                                        is_disabled,
+                                        icon,
+                                    });
+                                }
+                                packages.sort_by(|a, b| {
+                                    let label_a = a.label.as_deref().unwrap_or(&a.name);
+                                    let label_b = b.label.as_deref().unwrap_or(&b.name);
+                                    label_a.cmp(label_b)
                                 });
+                                return Ok(packages);
                             }
-                            packages.sort_by(|a, b| {
-                                let label_a = a.label.as_deref().unwrap_or(&a.name);
-                                let label_b = b.label.as_deref().unwrap_or(&b.name);
-                                label_a.cmp(label_b)
-                            });
-                            return Ok(packages);
                         }
                     }
                 }
+            }
+            if attempt == 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(150)).await;
             }
         }
     }
@@ -136,9 +145,10 @@ pub async fn get_installed_packages(app: AppHandle, device: String) -> Result<Ve
 }
 
 #[command]
-pub async fn get_app_icon(_app: AppHandle, _device: String, package: String) -> Result<String, String> {
+pub async fn get_app_icon(app: AppHandle, device: String, package: String) -> Result<String, String> {
+    let _ = crate::companion::start_companion_forward(app.clone(), device.clone(), Some(9876), Some(9876)).await;
     let comp_url = format!("http://127.0.0.1:9876/app/icon?package={}", package);
-    if let Ok(client) = reqwest::Client::builder().timeout(std::time::Duration::from_millis(800)).build() {
+    if let Ok(client) = reqwest::Client::builder().timeout(std::time::Duration::from_millis(2000)).build() {
         if let Ok(resp) = client.get(&comp_url).send().await {
             if resp.status().is_success() {
                 if let Ok(val) = resp.json::<serde_json::Value>().await {

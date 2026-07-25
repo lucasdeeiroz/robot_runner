@@ -126,8 +126,9 @@ pub async fn get_connected_devices(app: AppHandle) -> Result<Vec<Device>, String
 
                 // Try Companion HTTP bridge for live telemetry (<10ms)
                 if is_companion_installed == Some(true) {
+                    let _ = crate::companion::start_companion_forward(app_clone.clone(), udid.clone(), Some(9876), Some(9876)).await;
                     let comp_url = "http://127.0.0.1:9876/device/info".to_string();
-                    if let Ok(client) = reqwest::Client::builder().timeout(std::time::Duration::from_millis(500)).build() {
+                    if let Ok(client) = reqwest::Client::builder().timeout(std::time::Duration::from_millis(1500)).build() {
                         if let Ok(resp) = client.get(&comp_url).send().await {
                             if resp.status().is_success() {
                                 if let Ok(val) = resp.json::<serde_json::Value>().await {
@@ -234,7 +235,7 @@ pub async fn adb_pair_device(app: AppHandle, ip: String, port: String, code: Str
 
 #[tauri::command]
 pub async fn get_fleet_health(app: AppHandle) -> Result<Vec<FleetDeviceHealth>, String> {
-    let devices = get_connected_devices(app).await?;
+    let devices = get_connected_devices(app.clone()).await?;
     let mut health_list = Vec::new();
 
     for dev in devices {
@@ -250,8 +251,9 @@ pub async fn get_fleet_health(app: AppHandle) -> Result<Vec<FleetDeviceHealth>, 
         let mut ram_avail_mb = dev.ram_used.zip(dev.ram_total).map(|(u, t)| ((t.saturating_sub(u)) / (1024 * 1024)) as i32).unwrap_or(0);
         let mut android_version = dev.android_version.unwrap_or_default();
 
+        let _ = crate::companion::start_companion_forward(app.clone(), udid.clone(), Some(9876), Some(9876)).await;
         let comp_url = "http://127.0.0.1:9876/device/info".to_string();
-        if let Ok(client) = reqwest::Client::builder().timeout(std::time::Duration::from_millis(600)).build() {
+        if let Ok(client) = reqwest::Client::builder().timeout(std::time::Duration::from_millis(1500)).build() {
             if let Ok(resp) = client.get(&comp_url).send().await {
                 if resp.status().is_success() {
                     if let Ok(val) = resp.json::<serde_json::Value>().await {

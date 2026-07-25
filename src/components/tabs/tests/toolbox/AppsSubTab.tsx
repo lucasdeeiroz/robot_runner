@@ -14,6 +14,7 @@ import { Button } from "@/components/atoms/Button";
 import { Input } from "@/components/atoms/Input";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { SplitButton } from "@/components/molecules/SplitButton";
+import { useCompanion } from "@/hooks/useCompanion";
 
 interface PackageInfo {
     name: string;
@@ -35,6 +36,7 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
     const { sessions, activeSessionId } = useTestSessions();
     const activeSession = sessions.find(s => s.runId === activeSessionId);
     const activeDevice = activeSession?.deviceUdid;
+    const { status: companionStatus } = useCompanion(activeDevice || '');
 
     const [packages, setPackages] = useState<PackageInfo[]>([]);
     const [loading, setLoading] = useState(false);
@@ -98,6 +100,15 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
         try {
             const list = await invoke<PackageInfo[]>("get_installed_packages", { device: activeDevice });
             setPackages(list);
+            const initialIcons: Record<string, string> = {};
+            list.forEach(p => {
+                if (p.icon) {
+                    initialIcons[p.name] = p.icon;
+                }
+            });
+            if (Object.keys(initialIcons).length > 0) {
+                setIconMap(prev => ({ ...initialIcons, ...prev }));
+            }
         } catch (e) {
             feedback.toast.error("apps.fetch_error", e);
         } finally {
@@ -109,7 +120,14 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
         if (!isTestRunning || allowActionsDuringTest) {
             fetchPackages();
         }
-    }, [activeDevice, isTestRunning, allowActionsDuringTest]); // Don't auto-fetch if test running unless allowed, but let user manually refresh if they really want via button
+    }, [activeDevice, isTestRunning, allowActionsDuringTest]);
+
+    // When Companion finishes connecting, automatically re-fetch if packages were loaded without Companion labels
+    useEffect(() => {
+        if (companionStatus === 'connected' && (!isTestRunning || allowActionsDuringTest)) {
+            fetchPackages();
+        }
+    }, [companionStatus]);
 
     const friendlyNames = useMemo(() => calculateUniqueLabels(packages), [packages]);
 
