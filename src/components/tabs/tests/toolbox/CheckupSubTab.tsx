@@ -41,49 +41,93 @@ export function matchesFilterPattern(text: string, pattern: string): boolean {
     return text.startsWith(trimmed) || text.includes(trimmed);
 }
 
-export function extractTextsFromXml(xmlString: string): string[] {
-    if (!xmlString) return [];
+export function extractTextsFromXml(xmlOrJsonString: string): string[] {
+    if (!xmlOrJsonString) return [];
     const texts: string[] = [];
     const seen = new Set<string>();
 
-    try {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(xmlString, 'text/xml');
-        const elements = doc.querySelectorAll('*');
-        elements.forEach(el => {
-            const text = el.getAttribute('text')?.trim();
-            const contentDesc = el.getAttribute('content-desc')?.trim();
-            if (text && text.length > 0 && !seen.has(text)) {
-                seen.add(text);
-                texts.push(text);
+    const addText = (val: any) => {
+        if (typeof val === 'string') {
+            const trimmed = val.trim();
+            if (trimmed.length > 0 && !seen.has(trimmed)) {
+                seen.add(trimmed);
+                texts.push(trimmed);
             }
-            if (contentDesc && contentDesc.length > 0 && !seen.has(contentDesc)) {
-                seen.add(contentDesc);
-                texts.push(contentDesc);
-            }
-        });
-    } catch (e) {
-        const textMatches = xmlString.match(/text="([^"]+)"/g);
-        const descMatches = xmlString.match(/content-desc="([^"]+)"/g);
-        if (textMatches) {
-            textMatches.forEach(m => {
-                const val = m.substring(6, m.length - 1).trim();
-                if (val && !seen.has(val)) {
-                    seen.add(val);
-                    texts.push(val);
-                }
-            });
         }
-        if (descMatches) {
-            descMatches.forEach(m => {
-                const val = m.substring(14, m.length - 1).trim();
-                if (val && !seen.has(val)) {
-                    seen.add(val);
-                    texts.push(val);
+    };
+
+    const trimmedInput = xmlOrJsonString.trim();
+
+    // 1. Check if input is JSON (from Companion /xml or /ui-tree REST API)
+    if (trimmedInput.startsWith('{') || trimmedInput.startsWith('[')) {
+        try {
+            const parsed = JSON.parse(trimmedInput);
+
+            // If JSON contains nested raw XML string (e.g. { xml: "..." })
+            if (typeof parsed.xml === 'string' && parsed.xml.trim().length > 0) {
+                return extractTextsFromXml(parsed.xml);
+            }
+
+            // Recursive JSON walker for Companion UI Tree node objects
+            const extractFromJson = (obj: any) => {
+                if (!obj || typeof obj !== 'object') return;
+                if (Array.isArray(obj)) {
+                    obj.forEach(extractFromJson);
+                    return;
                 }
-            });
+                for (const key of Object.keys(obj)) {
+                    const val = obj[key];
+                    const lowerKey = key.toLowerCase();
+                    if (lowerKey === 'text' || lowerKey === 'contentdesc' || lowerKey === 'content-desc' || lowerKey === 'contentdescription' || lowerKey === 'label' || lowerKey === 'title' || lowerKey === 'value' || lowerKey === 'name') {
+                        addText(val);
+                    }
+                    if (typeof val === 'object') {
+                        extractFromJson(val);
+                    }
+                }
+            };
+
+            extractFromJson(parsed);
+            if (texts.length > 0) return texts;
+        } catch (_) {
+            // Not JSON, continue to XML
         }
     }
+
+    // 2. DOMParser for standard XML (uiautomator dump or Companion raw XML)
+    try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(xmlOrJsonString, 'text/xml');
+        const elements = doc.querySelectorAll('*');
+        elements.forEach(el => {
+            addText(el.getAttribute('text'));
+            addText(el.getAttribute('content-desc'));
+            addText(el.getAttribute('label'));
+            addText(el.getAttribute('name'));
+            addText(el.getAttribute('title'));
+            addText(el.getAttribute('value'));
+        });
+    } catch (e) {
+        console.warn("DOMParser error during UI text extraction", e);
+    }
+
+    // 3. Regex Fallback for malformed XML or text/content-desc attributes
+    if (texts.length === 0) {
+        const textMatches = xmlOrJsonString.match(/text="([^"]+)"/g);
+        const descMatches = xmlOrJsonString.match(/content-desc="([^"]+)"/g);
+        const labelMatches = xmlOrJsonString.match(/label="([^"]+)"/g);
+
+        if (textMatches) {
+            textMatches.forEach(m => addText(m.substring(6, m.length - 1)));
+        }
+        if (descMatches) {
+            descMatches.forEach(m => addText(m.substring(14, m.length - 1)));
+        }
+        if (labelMatches) {
+            labelMatches.forEach(m => addText(m.substring(7, m.length - 1)));
+        }
+    }
+
     return texts;
 }
 
@@ -143,7 +187,7 @@ const checkupCacheMap = new Map<string, CheckupCacheEntry>();
 export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDuringTest }: CheckupSubTabProps) => {
     const { t } = useTranslation();
     const { settings } = useSettings();
-    const { status: companionStatus, deviceInfo: companionInfo } = useCompanion(selectedDevice);
+    const { status: companionStatus } = useCompanion(selectedDevice);
     const cachedCheckup = selectedDevice ? checkupCacheMap.get(selectedDevice) : undefined;
 
     const [isLoading, setIsLoading] = useState(false);
@@ -281,7 +325,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 } else if (rawAct.startsWith('shell ')) {
                     args = rawAct.split(/\s+/);
                 } else {
-                    args = ['shell', 'am', 'start', '-n', rawAct];
+                    const safeAct = rawAct.includes('$') ? rawAct.replace(/\$/g, '\\$') : rawAct;
+                    args = ['shell', 'am', 'start', '-n', safeAct];
                 }
                 await invoke('run_adb_command', { device: selectedDevice, args });
                 const delay = check.delayMs || 1500;
@@ -289,11 +334,14 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             }
 
             let xmlContent = '';
-            if (companionStatus === 'connected' && companionInfo?.isAccessibilityEnabled) {
+            if (companionStatus === 'connected') {
                 try {
-                    const res = await fetch('http://127.0.0.1:9876/xml');
-                    if (res.ok) {
-                        xmlContent = await res.text();
+                    const treeRes = await fetch('http://127.0.0.1:9876/ui-tree');
+                    if (treeRes.ok) {
+                        const text = await treeRes.text();
+                        if (text.includes('nodes') || text.includes('text') || text.includes('status')) {
+                            xmlContent = text;
+                        }
                     }
                 } catch (_) {}
             }
@@ -1405,17 +1453,32 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 try {
                     if (check.activity && check.activity.trim()) {
                         const rawAct = check.activity.trim();
+                        const safeAct = rawAct.includes('$') ? rawAct.replace(/\$/g, '\\$') : rawAct;
                         const args = rawAct.startsWith('am start')
                             ? ['shell', ...rawAct.split(/\s+/)]
-                            : (rawAct.startsWith('shell ') ? rawAct.split(/\s+/) : ['shell', 'am', 'start', '-n', rawAct]);
+                            : (rawAct.startsWith('shell ') ? rawAct.split(/\s+/) : ['shell', 'am', 'start', '-n', safeAct]);
                         await invoke('run_adb_command', { device: selectedDevice, args });
                         await new Promise(r => setTimeout(r, check.delayMs || 1500));
                     }
-                    const dumpPath = '/sdcard/window_dump.xml';
-                    try {
-                        await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'uiautomator', 'dump', dumpPath] });
-                    } catch (e) { }
-                    const xmlContent: string = await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'cat', dumpPath] });
+                    let xmlContent = '';
+                    if (companionStatus === 'connected') {
+                        try {
+                            const treeRes = await fetch('http://127.0.0.1:9876/ui-tree');
+                            if (treeRes.ok) {
+                                const text = await treeRes.text();
+                                if (text.includes('nodes') || text.includes('text') || text.includes('status')) {
+                                    xmlContent = text;
+                                }
+                            }
+                        } catch (_) {}
+                    }
+                    if (!xmlContent) {
+                        const dumpPath = '/sdcard/window_dump.xml';
+                        try {
+                            await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'uiautomator', 'dump', dumpPath] });
+                        } catch (e) { }
+                        xmlContent = await invoke('run_adb_command', { device: selectedDevice, args: ['shell', 'cat', dumpPath] });
+                    }
                     const extractedTexts = extractTextsFromXml(xmlContent);
                     return {
                         ...check,
