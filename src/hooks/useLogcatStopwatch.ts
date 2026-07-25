@@ -9,6 +9,14 @@ export interface StopwatchLap {
     deltaMs: number;
 }
 
+export interface HardwareFrameDelta {
+    tti_ms: number;
+    last_touch_timestamp: number;
+    last_redraw_timestamp: number;
+    package_name: string;
+    source: string;
+}
+
 interface StopwatchCacheEntry {
     laps: StopwatchLap[];
     isStopwatchRunning: boolean;
@@ -47,6 +55,22 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
     const [isStopwatchRunning, setIsStopwatchRunning] = useState(() => cached?.isStopwatchRunning ?? false);
     const [newKeyword, setNewKeyword] = useState("");
     const [startTime, setStartTime] = useState<number | null>(() => cached?.startTime ?? null);
+    const [hardwareFrameDelta, setHardwareFrameDelta] = useState<HardwareFrameDelta | null>(null);
+
+    useEffect(() => {
+        if (isStopwatchRunning && selectedDevice) {
+            const interval = setInterval(() => {
+                invoke<HardwareFrameDelta>('get_companion_frame_delta', { device: selectedDevice })
+                    .then((data) => {
+                        if (data && data.source === 'companion_hardware') {
+                            setHardwareFrameDelta(data);
+                        }
+                    })
+                    .catch(console.error);
+            }, 2000);
+            return () => clearInterval(interval);
+        }
+    }, [isStopwatchRunning, selectedDevice]);
 
     // Sync cache on state change
     useEffect(() => {
@@ -167,6 +191,7 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
         keywords,
         newKeyword,
         setNewKeyword,
-        startTime
+        startTime,
+        hardwareFrameDelta
     };
 }

@@ -1154,7 +1154,10 @@ export const es = {
                 scanner_payload: "Contenido del código de barras...",
                 scanner_visualizer: "Visualizador de Código Virtual",
                 scanner_tip1: "Apunta el dispositivo hacia la pantalla. Asegúrate de que el cronómetro esté en marcha y que las palabras clave correctas estén configuradas en el panel derecho.",
-                scanner_tip2: "La primera palabra clave capturada inicia el temporizador (0ms). Las siguientes coincidencias mostrarán el delta de hardware exacto."
+                scanner_tip2: "La primera palabra clave capturada inicia el temporizador (0ms). Las siguientes coincidencias mostrarán el delta de hardware exacto.",
+                tti_badge: "🎯 Hardware TTI: +{{tti}}ms",
+                tti_ready: "🎯 Hardware TTI: Activo",
+                tti_tooltip: "Latencia de redibujado de la interfaz con precisión en milisegundos mediante el Companion"
             },
             auto: "Auto",
             na: "N/D",

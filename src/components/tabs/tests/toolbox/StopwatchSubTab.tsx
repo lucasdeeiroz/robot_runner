@@ -116,6 +116,7 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
         handleRemoveLap,
         handleToggleStopwatch,
         keywords,
+        hardwareFrameDelta,
     } = useLogcatStopwatch(selectedDevice, selectedPackage);
 
     const isActionDisabled = isTestRunning && !allowActionsDuringTest;
@@ -148,8 +149,11 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
             csvContent += `${i + 1},`;
             savedRounds.forEach((r, roundIndex) => {
                 const lap = r.laps[i];
-                const deltaStr = lap ? `+${lap.deltaMs}ms` : '-';
-                csvContent += `${deltaStr}${roundIndex < savedRounds.length - 1 ? ',' : ''}`;
+                if (lap) {
+                    csvContent += `${lap.deltaMs}ms${roundIndex < savedRounds.length - 1 ? ',' : ''}`;
+                } else {
+                    csvContent += `-${roundIndex < savedRounds.length - 1 ? ',' : ''}`;
+                }
             });
             csvContent += "\n";
         }
@@ -164,7 +168,7 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute("download", `stopwatch_export_${Date.now()}.csv`);
+        link.setAttribute("download", `stopwatch_benchmark_${Date.now()}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -183,6 +187,17 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
                 warning={isActionDisabled ? t('common.actions_disabled_during_test') : undefined}
                 actions={
                     <div className="flex gap-2 items-center">
+                        {hardwareFrameDelta && (
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20 mr-2" title={t('performance.stopwatch.tti_tooltip', 'Millisecond-accurate UI redraw latency from Companion Hardware')}>
+                                <Zap size={13} className="text-primary" />
+                                <span>
+                                    {hardwareFrameDelta.tti_ms > 0
+                                        ? t('performance.stopwatch.tti_badge', '🎯 Hardware TTI: +{{tti}}ms', { tti: hardwareFrameDelta.tti_ms })
+                                        : t('performance.stopwatch.tti_ready', '🎯 Hardware TTI: Active')
+                                    }
+                                </span>
+                            </div>
+                        )}
                         <div className="flex items-center bg-surface-variant/20 rounded-lg p-1 mr-4 border border-outline-variant/30">
                             <Button
                                 onClick={() => setMode('standard')}

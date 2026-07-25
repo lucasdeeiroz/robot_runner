@@ -61,3 +61,10 @@ As seguintes diretrizes arquiteturais e técnicas são estritamente obrigatória
 - **Isolamento de Processos Unprivileged**: O Companion (app Android regular) tem permissão total para ler telemetria global de hardware (RAM total/usada, nível e temperatura de bateria, status de carregamento e atividade em primeiro plano). No entanto, devido às restrições do SELinux/Android Sandbox, um processo de app não possui privilégios de sistema (`android.permission.DUMP`) nem visibilidade de `pidof`/procfs para consultar PIDs e `gfxinfo` de **pacientes de terceiros** (ex: `com.positivo.casainteligente`).
 - **Regra da Ponte Híbrida**: O Rust (`stats.rs`) consulta primeiro o Companion via HTTP `/telemetry`. Se o app alvo for de terceiros e o Companion retornar métricas de app nulas/zeradas (ou se a CPU global reportar `0%` devido a bloqueios de procfs em Knox/Android 16), o backend Rust deve complementar **unicamente** as métricas ausentes (CPU global e `app_stats` por pacote) disparando uma chamada leve do ADB (`top -b -n 1 && dumpsys meminfo <pkg> && dumpsys gfxinfo <pkg> && pidof <pkg>`), mantendo o payload consolidado como `telemetry_source: "companion"`.
 
+---
+
+## 9. Motor de Benchmark TTI & Deltas de Frame de Hardware (Fase 8)
+- **Captura Nível Hardware de Redraw**: O `CompanionAccessibilityService` escuta os eventos `TYPE_WINDOW_CONTENT_CHANGED` (redesenho de tela) e `TYPE_VIEW_CLICKED` (toque na interface).
+- **Regra do TTI de Precisão**: O tempo de resposta da interface (TTI / Time to Interactive) é calculado no Kotlin pela diferença em milissegundos entre `lastTouchTimestamp` e `lastRedrawTimestamp`, sem sofrer latências de cabo USB ou transporte ADB. O Rust consulta `/frame-delta` e expõe a métrica para o `StopwatchSubTab.tsx`, fornecendo benchmarks reais de hardware (`🎯 Hardware TTI: +Xms`).
+
+

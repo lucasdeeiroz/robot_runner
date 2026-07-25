@@ -941,3 +941,48 @@ fn parse_app_fps_from_string(device: &str, package: &str, output: &str) -> Optio
 
     None
 }
+
+#[derive(Debug, serde::Serialize, Clone)]
+pub struct HardwareFrameDelta {
+    pub tti_ms: u64,
+    pub last_touch_timestamp: u64,
+    pub last_redraw_timestamp: u64,
+    pub package_name: String,
+    pub source: String,
+}
+
+#[tauri::command]
+pub async fn get_companion_frame_delta(_app: AppHandle, device: String) -> Result<HardwareFrameDelta, String> {
+    let comp_url = "http://127.0.0.1:9876/frame-delta".to_string();
+    if let Ok(c) = reqwest::Client::builder().timeout(Duration::from_millis(400)).build() {
+        if let Ok(resp) = c.get(&comp_url).send().await {
+            if resp.status().is_success() {
+                if let Ok(val) = resp.json::<serde_json::Value>().await {
+                    if val.get("status").and_then(|s| s.as_str()) == Some("ok") {
+                        let tti_ms = val.get("tti_ms").and_then(|v| v.as_u64()).unwrap_or(0);
+                        let last_touch_timestamp = val.get("last_touch_timestamp").and_then(|v| v.as_u64()).unwrap_or(0);
+                        let last_redraw_timestamp = val.get("last_redraw_timestamp").and_then(|v| v.as_u64()).unwrap_or(0);
+                        let package_name = val.get("package_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                        let source = val.get("source").and_then(|v| v.as_str()).unwrap_or("companion_hardware").to_string();
+
+                        return Ok(HardwareFrameDelta {
+                            tti_ms,
+                            last_touch_timestamp,
+                            last_redraw_timestamp,
+                            package_name,
+                            source,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(HardwareFrameDelta {
+        tti_ms: 0,
+        last_touch_timestamp: 0,
+        last_redraw_timestamp: 0,
+        package_name: "".to_string(),
+        source: "desktop_clock".to_string(),
+    })
+}

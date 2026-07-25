@@ -204,6 +204,17 @@ class CompanionHttpServer(
                 }
             }
 
+            "/frame-delta" -> {
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    addProperty("tti_ms", CompanionAccessibilityService.lastFrameRedrawDeltaMs)
+                    addProperty("last_touch_timestamp", CompanionAccessibilityService.lastTouchTimestamp)
+                    addProperty("last_redraw_timestamp", CompanionAccessibilityService.lastRedrawTimestamp)
+                    addProperty("package_name", CompanionAccessibilityService.activePackageName ?: "")
+                    addProperty("source", "companion_hardware")
+                }
+            }
+
             "/checkup/run" -> {
                 val result = checkupRunner.runLocalCheckup()
                 JsonObject().apply {

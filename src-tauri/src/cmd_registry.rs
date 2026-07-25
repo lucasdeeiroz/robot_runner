@@ -55,6 +55,7 @@ macro_rules! generate_robot_runner_handler {
             crate::adb::stats::stop_process_monitor_stream,
             crate::adb::stats::get_battery_audit,
             crate::adb::stats::reset_battery_stats,
+            crate::adb::stats::get_companion_frame_delta,
             crate::adb::scrcpy::open_scrcpy,
             crate::adb::media::save_screenshot,
             crate::adb::media::start_screen_recording,

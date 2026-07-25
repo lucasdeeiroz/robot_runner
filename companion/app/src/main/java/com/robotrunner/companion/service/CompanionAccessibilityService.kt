@@ -23,6 +23,10 @@ class CompanionAccessibilityService : AccessibilityService() {
         private const val MAX_RECENT_EVENTS = 50
         val recentEvents = ConcurrentLinkedQueue<CompanionEvent>()
         var activePackageName: String? = null
+
+        @Volatile var lastTouchTimestamp: Long = 0
+        @Volatile var lastRedrawTimestamp: Long = 0
+        @Volatile var lastFrameRedrawDeltaMs: Long = 0
     }
 
     override fun onServiceConnected() {
@@ -61,16 +65,42 @@ class CompanionAccessibilityService : AccessibilityService() {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
                 val className = event.className?.toString() ?: ""
                 val packageName = event.packageName?.toString() ?: ""
-                if (className.contains("Dialog") || className.contains("Alert")) {
-                    val evt = CompanionEvent(
-                        type = "dialog",
-                        packageName = packageName,
-                        message = "Dialog window opened: $className",
-                        timestamp = System.currentTimeMillis()
-                    )
-                    recentEvents.add(evt)
-                    if (recentEvents.size > MAX_RECENT_EVENTS) {
-                        recentEvents.poll()
+                val evt = CompanionEvent(
+                    type = if (className.contains("Dialog") || className.contains("Alert")) "dialog" else "window_state",
+                    packageName = packageName,
+                    message = "Window state changed: $className",
+                    timestamp = System.currentTimeMillis()
+                )
+                recentEvents.add(evt)
+                if (recentEvents.size > MAX_RECENT_EVENTS) {
+                    recentEvents.poll()
+                }
+            }
+            AccessibilityEvent.TYPE_VIEW_CLICKED,
+            AccessibilityEvent.TYPE_VIEW_SELECTED,
+            AccessibilityEvent.TYPE_VIEW_FOCUSED,
+            AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED,
+            AccessibilityEvent.TYPE_VIEW_SCROLLED -> {
+                val packageName = event.packageName?.toString() ?: ""
+                lastTouchTimestamp = System.currentTimeMillis()
+                val evt = CompanionEvent(
+                    type = "touch",
+                    packageName = packageName,
+                    message = "User interaction event registered on ${event.className}",
+                    timestamp = lastTouchTimestamp
+                )
+                recentEvents.add(evt)
+                if (recentEvents.size > MAX_RECENT_EVENTS) {
+                    recentEvents.poll()
+                }
+            }
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
+                val now = System.currentTimeMillis()
+                lastRedrawTimestamp = now
+                if (lastTouchTimestamp > 0 && now >= lastTouchTimestamp) {
+                    val delta = now - lastTouchTimestamp
+                    if (delta in 1..10000) {
+                        lastFrameRedrawDeltaMs = delta
                     }
                 }
             }
@@ -87,6 +117,7 @@ class CompanionAccessibilityService : AccessibilityService() {
     }
 
     fun performTap(x: Float, y: Float): Boolean {
+        lastTouchTimestamp = System.currentTimeMillis()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             val path = Path().apply {
                 moveTo(x, y)
@@ -106,6 +137,7 @@ class CompanionAccessibilityService : AccessibilityService() {
         action: String = "click",
         textValue: String? = null
     ): Boolean {
+        lastTouchTimestamp = System.currentTimeMillis()
         var root = rootInActiveWindow
         if (root == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             try {
