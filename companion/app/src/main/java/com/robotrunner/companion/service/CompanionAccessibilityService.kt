@@ -364,35 +364,40 @@ class CompanionAccessibilityService : AccessibilityService() {
     }
 
     private fun traverseNode(node: AccessibilityNodeInfo, array: JsonArray, depth: Int) {
-        val nodeObj = JsonObject()
-        nodeObj.addProperty("className", node.className?.toString() ?: "")
-        nodeObj.addProperty("packageName", node.packageName?.toString() ?: "")
-        nodeObj.addProperty("text", node.text?.toString() ?: "")
-        nodeObj.addProperty("contentDescription", node.contentDescription?.toString() ?: "")
-        nodeObj.addProperty("resourceId", node.viewIdResourceName ?: "")
-        nodeObj.addProperty("isClickable", node.isClickable)
-        nodeObj.addProperty("isEnabled", node.isEnabled)
-        nodeObj.addProperty("isFocused", node.isFocused)
-        nodeObj.addProperty("isScrollable", node.isScrollable)
-        nodeObj.addProperty("depth", depth)
+        try {
+            val nodeObj = JsonObject()
+            nodeObj.addProperty("className", node.className?.toString() ?: "")
+            nodeObj.addProperty("packageName", node.packageName?.toString() ?: "")
+            nodeObj.addProperty("text", node.text?.toString() ?: "")
+            nodeObj.addProperty("contentDescription", node.contentDescription?.toString() ?: "")
+            nodeObj.addProperty("resourceId", node.viewIdResourceName ?: "")
+            nodeObj.addProperty("isClickable", node.isClickable)
+            nodeObj.addProperty("isEnabled", node.isEnabled)
+            nodeObj.addProperty("isFocused", node.isFocused)
+            nodeObj.addProperty("isScrollable", node.isScrollable)
+            nodeObj.addProperty("depth", depth)
 
-        val rect = android.graphics.Rect()
-        node.getBoundsInScreen(rect)
-        val boundsObj = JsonObject().apply {
-            addProperty("left", rect.left)
-            addProperty("top", rect.top)
-            addProperty("right", rect.right)
-            addProperty("bottom", rect.bottom)
-        }
-        nodeObj.add("bounds", boundsObj)
-
-        array.add(nodeObj)
-
-        for (i in 0 until node.childCount) {
-            val child = node.getChild(i)
-            if (child != null) {
-                traverseNode(child, array, depth + 1)
+            val rect = android.graphics.Rect()
+            node.getBoundsInScreen(rect)
+            val boundsObj = JsonObject().apply {
+                addProperty("left", rect.left)
+                addProperty("top", rect.top)
+                addProperty("right", rect.right)
+                addProperty("bottom", rect.bottom)
             }
+            nodeObj.add("bounds", boundsObj)
+
+            array.add(nodeObj)
+
+            val childCount = try { node.childCount } catch (e: Exception) { 0 }
+            for (i in 0 until childCount) {
+                val child = try { node.getChild(i) } catch (e: Exception) { null }
+                if (child != null) {
+                    traverseNode(child, array, depth + 1)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("CompanionAccessibility", "Error traversing AccessibilityNodeInfo", e)
         }
     }
 }

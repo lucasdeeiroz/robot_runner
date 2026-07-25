@@ -18,6 +18,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.robotrunner.companion.hardware.HardwareSpecsProvider
+import com.robotrunner.companion.inspector.UiInspectorEngine
 import com.robotrunner.companion.logcat.LogcatStreamer
 import com.robotrunner.companion.service.CompanionAccessibilityService
 import com.robotrunner.companion.stopwatch.RedrawStopwatchEngine
@@ -29,6 +30,7 @@ class FloatingHudService : Service() {
         const val MODE_PERFORMANCE = "PERFORMANCE"
         const val MODE_STOPWATCH = "STOPWATCH"
         const val MODE_LOGCAT = "LOGCAT"
+        const val MODE_INSPECTOR = "INSPECTOR"
 
         @Volatile
         var isRunning = false
@@ -119,9 +121,9 @@ class FloatingHudService : Service() {
         val perfBtn = TextView(this).apply {
             text = "PERF"
             setTextColor(if (activeMode == MODE_PERFORMANCE) Color.parseColor("#FF38BDF8") else Color.GRAY)
-            textSize = 10f
+            textSize = 9.5f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(8, 4, 8, 4)
+            setPadding(6, 4, 6, 4)
             setOnClickListener {
                 activeMode = MODE_PERFORMANCE
                 updateMetrics()
@@ -129,11 +131,11 @@ class FloatingHudService : Service() {
         }
 
         val stopBtn = TextView(this).apply {
-            text = "STOPWATCH"
+            text = "TIMER"
             setTextColor(if (activeMode == MODE_STOPWATCH) Color.parseColor("#FF38BDF8") else Color.GRAY)
-            textSize = 10f
+            textSize = 9.5f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(8, 4, 8, 4)
+            setPadding(6, 4, 6, 4)
             setOnClickListener {
                 activeMode = MODE_STOPWATCH
                 updateMetrics()
@@ -141,13 +143,25 @@ class FloatingHudService : Service() {
         }
 
         val logcatBtn = TextView(this).apply {
-            text = "LOGCAT"
+            text = "LOGS"
             setTextColor(if (activeMode == MODE_LOGCAT) Color.parseColor("#FF38BDF8") else Color.GRAY)
-            textSize = 10f
+            textSize = 9.5f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(8, 4, 8, 4)
+            setPadding(6, 4, 6, 4)
             setOnClickListener {
                 activeMode = MODE_LOGCAT
+                updateMetrics()
+            }
+        }
+
+        val inspectBtn = TextView(this).apply {
+            text = "INSPECT"
+            setTextColor(if (activeMode == MODE_INSPECTOR) Color.parseColor("#FF38BDF8") else Color.GRAY)
+            textSize = 9.5f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setPadding(6, 4, 6, 4)
+            setOnClickListener {
+                activeMode = MODE_INSPECTOR
                 updateMetrics()
             }
         }
@@ -155,6 +169,7 @@ class FloatingHudService : Service() {
         modeSelectorRow.addView(perfBtn)
         modeSelectorRow.addView(stopBtn)
         modeSelectorRow.addView(logcatBtn)
+        modeSelectorRow.addView(inspectBtn)
         layout.addView(modeSelectorRow)
 
         // Dynamic Metrics / Log TextView
@@ -162,16 +177,15 @@ class FloatingHudService : Service() {
             id = View.generateViewId()
             text = "Initializing HUD..."
             setTextColor(Color.WHITE)
-            textSize = 11f
+            textSize = 10.5f
             typeface = android.graphics.Typeface.MONOSPACE
         }
         layout.addView(metricsTv)
 
         // Stopwatch Quick Actions Row
         val stopwatchActionsRow = LinearLayout(this).apply {
-            id = View.generateViewId()
             orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 8, 0, 0)
+            setPadding(0, 6, 0, 0)
             visibility = if (activeMode == MODE_STOPWATCH) View.VISIBLE else View.GONE
         }
 
@@ -215,6 +229,27 @@ class FloatingHudService : Service() {
         stopwatchActionsRow.addView(recBtn)
         stopwatchActionsRow.addView(lapBtn)
         layout.addView(stopwatchActionsRow)
+
+        // Inspector Quick Actions Row
+        val inspectorActionsRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 6, 0, 0)
+            visibility = if (activeMode == MODE_INSPECTOR) View.VISIBLE else View.GONE
+        }
+
+        val captureUiBtn = TextView(this).apply {
+            text = "[🔍 Capture Screen UI]"
+            setTextColor(Color.parseColor("#FF38BDF8"))
+            textSize = 10f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setOnClickListener {
+                UiInspectorEngine.captureActiveUiTree()
+                updateMetrics()
+            }
+        }
+
+        inspectorActionsRow.addView(captureUiBtn)
+        layout.addView(inspectorActionsRow)
 
         hudView = layout
 
@@ -269,19 +304,23 @@ class FloatingHudService : Service() {
             val modeRow = layout.getChildAt(1) as? LinearLayout
             val metricsTv = layout.getChildAt(2) as? TextView ?: return
             val stopwatchActionsRow = layout.getChildAt(3) as? LinearLayout
+            val inspectorActionsRow = layout.getChildAt(4) as? LinearLayout
 
             // Update Mode Selector Highlight
             modeRow?.let { row ->
                 val perfTv = row.getChildAt(0) as? TextView
                 val stopTv = row.getChildAt(1) as? TextView
                 val logcatTv = row.getChildAt(2) as? TextView
+                val inspectTv = row.getChildAt(3) as? TextView
 
                 perfTv?.setTextColor(if (activeMode == MODE_PERFORMANCE) Color.parseColor("#FF38BDF8") else Color.GRAY)
                 stopTv?.setTextColor(if (activeMode == MODE_STOPWATCH) Color.parseColor("#FF38BDF8") else Color.GRAY)
                 logcatTv?.setTextColor(if (activeMode == MODE_LOGCAT) Color.parseColor("#FF38BDF8") else Color.GRAY)
+                inspectTv?.setTextColor(if (activeMode == MODE_INSPECTOR) Color.parseColor("#FF38BDF8") else Color.GRAY)
             }
 
             stopwatchActionsRow?.visibility = if (activeMode == MODE_STOPWATCH) View.VISIBLE else View.GONE
+            inspectorActionsRow?.visibility = if (activeMode == MODE_INSPECTOR) View.VISIBLE else View.GONE
 
             when (activeMode) {
                 MODE_PERFORMANCE -> {
@@ -310,6 +349,17 @@ class FloatingHudService : Service() {
                             "[${msg.level.name.take(1)}] ${msg.tag}: ${msg.message.take(35)}"
                         }
                         metricsTv.text = logText
+                    }
+                }
+                MODE_INSPECTOR -> {
+                    val captured = UiInspectorEngine.getCapturedElementsSnapshot()
+                    if (captured.isEmpty()) {
+                        metricsTv.text = "Inspector: Tap [Capture Screen UI]\nto inspect target app elements."
+                    } else {
+                        val topItem = captured.firstOrNull { it.name.isNotBlank() }
+                        val nameStr = topItem?.name ?: "Element"
+                        val locStr = topItem?.accessibilityId?.ifBlank { topItem.resourceId }?.ifBlank { topItem.xpath } ?: ""
+                        metricsTv.text = "Captured: ${captured.size} interactive nodes\nTop: $nameStr\nLoc: ${locStr.take(30)}"
                     }
                 }
             }

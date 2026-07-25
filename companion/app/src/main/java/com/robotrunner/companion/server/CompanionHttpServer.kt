@@ -341,6 +341,22 @@ class CompanionHttpServer(
                 }
             }
 
+            "/inspector/tree" -> {
+                val elements = com.robotrunner.companion.inspector.UiInspectorEngine.captureActiveUiTree()
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    add("elements", gson.toJsonTree(elements))
+                }
+            }
+
+            "/inspector/map" -> {
+                val elements = com.robotrunner.companion.inspector.UiInspectorEngine.getCapturedElementsSnapshot()
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    add("elements", gson.toJsonTree(elements))
+                }
+            }
+
             "/device/info" -> getDeviceInfoPayload()
 
             "/checkup/run" -> {

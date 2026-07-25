@@ -171,4 +171,13 @@
     <string name="btn_export_html_report">Export HTML Audit Report</string>
     <string name="label_pass_rate">PASS RATE</string>
     <string name="msg_report_exported">Audit report saved to Downloads: %1$s</string>
+    <!-- Phase 7 Strings -->
+    <string name="tab_inspector">Inspector</string>
+    <string name="header_floating_hud_inspector">🖥️ Floating UI Inspector HUD Overlay</string>
+    <string name="desc_floating_hud_inspector">Inspect target app UI elements and multi-locators over active windows.</string>
+    <string name="header_ui_inspector">🔍 On-Device Floating UI Inspector &amp; Element Mapper</string>
+    <string name="desc_ui_inspector">Capture sub-10ms UI trees, generate multi-selectors, and export local UI element maps.</string>
+    <string name="btn_capture_ui">Capture Screen UI</string>
+    <string name="btn_export_ui_map">Export UI Map JSON</string>
+    <string name="msg_ui_map_exported">UI Element Map saved to Downloads: %1$s</string>
 </resources>
