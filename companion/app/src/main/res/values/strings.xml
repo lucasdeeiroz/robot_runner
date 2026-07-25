@@ -193,4 +193,18 @@
     <string name="label_total_actions">TOTAL ACTIONS</string>
     <string name="label_dead_ends">DEAD ENDS</string>
     <string name="msg_dfs_map_exported">DFS UI Element Map saved to Downloads: %1$s</string>
+    <!-- Phase 9 Strings (Diagnostics & PDF Audit) -->
+    <string name="header_pos_hardware_checklist">🖨️ POS &amp; Hardware Diagnostics Checklist</string>
+    <string name="header_ui_text_verification">🔤 UI Text Verification &amp; Golden File Check</string>
+    <string name="desc_ui_text_verification">Verify visible UI texts against Golden Files (golden_*.json) to detect text drift.</string>
+    <string name="btn_print_test_receipt">Print Test Receipt</string>
+    <string name="btn_verify_ui_text">Verify Screen Text vs Golden</string>
+    <string name="btn_export_golden_json">Export Golden File JSON</string>
+    <string name="header_pdf_audit_report">📄 Technical Audit PDF Report</string>
+    <string name="desc_pdf_audit_report">Generate certified PDF technical report for hardware specs, POS status, and UI text audit.</string>
+    <string name="btn_generate_pdf_audit">Generate PDF Audit Report</string>
+    <string name="btn_share_pdf_report">Share PDF Report</string>
+    <string name="msg_golden_file_exported">Golden File JSON saved to Downloads: %1$s</string>
+    <string name="msg_pdf_report_generated">PDF Technical Audit Report generated: %1$s</string>
+    <string name="msg_receipt_printed">POS Thermal receipt printed successfully!</string>
 </resources>

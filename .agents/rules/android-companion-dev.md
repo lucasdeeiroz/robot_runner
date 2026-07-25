@@ -136,9 +136,20 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 13. Continuous Learning & Rule Maintenance Instruction
+## 13. Offline Hardware Diagnostics, UI Text Verification & PDF Audit Rules
+
+1. **Golden File Schema Compatibility**:
+   - Golden Files generated on device (`golden_*.json`) must conform strictly to `version 2.0` schema, exporting clean `id`, `text`, and `description` properties compatible with Desktop assertions.
+
+2. **Native PDF Canvas Layout & Thread Isolation**:
+   - Technical audit PDF reports (`audit_report_*.pdf`) are rendered via `android.graphics.pdf.PdfDocument` on `Dispatchers.IO`. Always compute Y-offset bounds dynamically (`y += 18f`) to prevent text overlapping across document sections.
+
+---
+
+## 14. Continuous Learning & Rule Maintenance Instruction
 
 > **IMPORTANT**: As new features, optimizations, or Android SDK workarounds are implemented in `companion/`, the **Android Companion Engineer** profile MUST update and append new rules directly to this document.
+
 
 
 

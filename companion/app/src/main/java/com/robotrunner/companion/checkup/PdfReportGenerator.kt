@@ -16,7 +16,7 @@ import java.util.Locale
 
 class PdfReportGenerator(private val context: Context) {
 
-    fun generatePdfReport(result: LocalCheckupResult): File? {
+    fun generatePdfReport(result: LocalCheckupResult, uiTextResult: UiTextVerificationResult? = null): File? {
         val pdfDocument = PdfDocument()
         val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4 Size (595x842 pt)
         val page = pdfDocument.startPage(pageInfo)
@@ -49,7 +49,7 @@ class PdfReportGenerator(private val context: Context) {
         val dateStr = sdf.format(Date(result.timestamp))
         paint.color = Color.parseColor("#64748B")
         paint.textSize = 10f
-        canvas.drawText("Generated: $dateStr", 420f, 65f, paint)
+        canvas.drawText("Generated: $dateStr", 400f, 65f, paint)
 
         var y = 120f
 
@@ -96,7 +96,7 @@ class PdfReportGenerator(private val context: Context) {
         drawRow("Power Source / Charging", "${result.batteryPlugType} (${if (result.isCharging) "Charging" else "Discharging"})")
         y += 15f
 
-        // Section 3: Memory & Storage
+        // Section 3: Memory & Storage Stats
         drawSectionHeader("3. Memory & Storage Stats")
         val freeRamMb = result.freeRamBytes / (1024 * 1024)
         val totalRamMb = result.totalRamBytes / (1024 * 1024)
@@ -112,13 +112,23 @@ class PdfReportGenerator(private val context: Context) {
         drawRow("POS Thermal Printer", if (result.isPrinterSupported) "${result.printerVendor} (Paper: ${if (result.isPrinterHasPaper) "OK" else "Empty"})" else "Not Supported")
         drawRow("NFC Reader", if (result.isNfcSupported) (if (result.isNfcEnabled) "Enabled & Active" else "Disabled") else "Not Supported")
         drawRow("Accessibility Inspection Service", if (result.isAccessibilityEnabled) "Active (Sub-10ms UI Inspection)" else "Disabled")
-        y += 30f
+        y += 15f
+
+        // Section 5: UI Text Audit & Golden File Verification
+        if (uiTextResult != null) {
+            drawSectionHeader("5. UI Text Audit & Golden File Verification")
+            drawRow("Screen Name", uiTextResult.screenName)
+            drawRow("Text Match Score", "${uiTextResult.matchPercentage}% (${uiTextResult.totalMatched} / ${uiTextResult.totalExpected})")
+            drawRow("Missing Strings", "${uiTextResult.missingTexts.size} strings missing")
+            drawRow("Unexpected Strings", "${uiTextResult.unexpectedTexts.size} drift strings")
+            y += 15f
+        }
 
         // Footer
         paint.color = Color.parseColor("#94A3B8")
         paint.textSize = 9f
         paint.typeface = Typeface.DEFAULT
-        canvas.drawText("Robot Runner Mobile Companion • Certified Automated Test Report", 30f, 810f, paint)
+        canvas.drawText("Robot Runner Mobile Companion • Certified Technical Audit PDF Report", 30f, 810f, paint)
 
         pdfDocument.finishPage(page)
 
@@ -127,7 +137,7 @@ class PdfReportGenerator(private val context: Context) {
             val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             if (!downloadDir.exists()) downloadDir.mkdirs()
 
-            val fileName = "RobotRunner_Checkup_${System.currentTimeMillis()}.pdf"
+            val fileName = "audit_report_${System.currentTimeMillis()}.pdf"
             val pdfFile = File(downloadDir, fileName)
             val outputStream = FileOutputStream(pdfFile)
             pdfDocument.writeTo(outputStream)

@@ -385,6 +385,25 @@ class CompanionHttpServer(
                 }
             }
 
+            "/golden/verify" -> {
+                val verification = com.robotrunner.companion.checkup.UiTextVerifier.verifyActiveScreenText()
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    add("verification", gson.toJsonTree(verification))
+                }
+            }
+
+            "/checkup/pdf" -> {
+                val checkup = checkupRunner.runLocalCheckup()
+                val uiText = com.robotrunner.companion.checkup.UiTextVerifier.verifyActiveScreenText()
+                val pdfGen = com.robotrunner.companion.checkup.PdfReportGenerator(context)
+                val pdfFile = pdfGen.generatePdfReport(checkup, uiText)
+                JsonObject().apply {
+                    addProperty("status", if (pdfFile != null) "ok" else "error")
+                    addProperty("filePath", pdfFile?.absolutePath ?: "")
+                }
+            }
+
             "/device/info" -> getDeviceInfoPayload()
 
             "/checkup/run" -> {

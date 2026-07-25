@@ -193,4 +193,18 @@
     <string name="label_total_actions">ACCIONES TOTALES</string>
     <string name="label_dead_ends">CALLEJONES SIN SALIDA</string>
     <string name="msg_dfs_map_exported">Mapa DFS de UI guardado en Descargas: %1$s</string>
+    <!-- Phase 9 Strings (Diagnostics & PDF Audit ES) -->
+    <string name="header_pos_hardware_checklist">🖨️ Lista de Verificación de Diagnóstico POS y Hardware</string>
+    <string name="header_ui_text_verification">🔤 Verificación de Texto de UI y Archivos Golden</string>
+    <string name="desc_ui_text_verification">Verifique los textos visibles en pantalla contra archivos Golden (golden_*.json) para detectar divergencias.</string>
+    <string name="btn_print_test_receipt">Imprimir Recibo de Prueba</string>
+    <string name="btn_verify_ui_text">Verificar Texto de Pantalla vs Golden</string>
+    <string name="btn_export_golden_json">Exportar Archivo Golden JSON</string>
+    <string name="header_pdf_audit_report">📄 Informe de Auditoría Técnica PDF</string>
+    <string name="desc_pdf_audit_report">Genere un informe técnico certificado en PDF con especificaciones de hardware, estado POS y auditoría de texto.</string>
+    <string name="btn_generate_pdf_audit">Generar Informe PDF de Auditoría</string>
+    <string name="btn_share_pdf_report">Compartir Informe PDF</string>
+    <string name="msg_golden_file_exported">Archivo Golden JSON guardado en Descargas: %1$s</string>
+    <string name="msg_pdf_report_generated">Informe de Auditoría PDF generado: %1$s</string>
+    <string name="msg_receipt_printed">¡Recibo térmico impreso con éxito!</string>
 </resources>

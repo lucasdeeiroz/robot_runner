@@ -88,6 +88,10 @@ class HardwareCheckupRunner(private val context: Context) {
             isAccessibilityEnabled = CompanionAccessibilityService.isRunning
         )
     }
+
+    fun printTestReceipt(): Boolean {
+        return printerHelper.printTestReceipt()
+    }
 }
 
 data class LocalCheckupResult(
