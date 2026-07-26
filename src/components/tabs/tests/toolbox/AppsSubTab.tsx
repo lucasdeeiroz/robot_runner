@@ -45,6 +45,7 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
     const [search, setSearch] = useState("");
     const [showSystem, setShowSystem] = useState(false);
     const [sortBy, setSortBy] = useState<'name' | 'package'>('name');
+    const [reinstall, setReinstall] = useState(true);
     const [downgrade, setDowngrade] = useState(false);
     const [grantPermissions, setGrantPermissions] = useState(false);
     const [allowTest, setAllowTest] = useState(false);
@@ -381,6 +382,12 @@ export function AppsSubTab({ isTestRunning = false, allowActionsDuringTest = fal
                                 icon: <Upload size={14} />
                             }}
                             secondaryActions={[
+                                {
+                                    label: t('apps.actions.reinstall', 'Reinstall'),
+                                    type: 'checkbox',
+                                    checked: reinstall,
+                                    onClick: () => setReinstall(prev => !prev)
+                                },
                                 {
                                     label: t('apps.actions.allow_downgrade', 'Downgrade (-d)'),
                                     type: 'checkbox',

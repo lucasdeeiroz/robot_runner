@@ -190,6 +190,7 @@ export const es = {
                 sort_by_name: "Ordenar por Nombre",
                 sort_by_package: "Ordenar por Paquete",
                 refresh: "Actualizar Lista",
+                reinstall: "Permitir Reinstalación (-r)",
                 allow_downgrade: "Permitir Downgrade (-d)",
                 grant_permissions: "Conceder Permisos (-g)",
                 allow_test: "Permitir APKs de Prueba (-t)",

@@ -21,6 +21,14 @@ To achieve the best results, use the correct profile/instructions file for your 
 *   **Best For:** Autonomous execution, autonomous testing, repository-wide searches, and proactive bug fixing.
 *   **Why:** Antigravity operates agentically with direct access to terminal commands (`cargo check`, `npm run dev`), `grep_search`, and direct file modifications. It is designed to act as an independent developer pair.
 
+### 4. Desktop Architect (Tauri v2 / Rust / React / ADB)
+*   **File:** [`desktop-architect.md`](./desktop-architect.md)
+*   **Best For:** Tauri v2 async backend architecture in Rust, React + TS DevTools frontend, ADB device orchestration, batch IPC streaming, and Companion P2P pairing.
+
+### 5. Android Companion Engineer (Kotlin / Jetpack Compose / Accessibility)
+*   **File:** [`android-companion-engineer.md`](./android-companion-engineer.md)
+*   **Best For:** Native Android development in Kotlin, Jetpack Compose, `AccessibilityService` screen inspection, NanoHTTPd REST server, on-device BDD execution, and POS hardware diagnostics.
+
 ---
 
 ## Modular Skills (Contextual Rules)

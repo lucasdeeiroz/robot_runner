@@ -190,7 +190,7 @@ object HardwareSpecsProvider {
             val enabledServices = am?.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK) ?: emptyList()
             for (service in enabledServices) {
                 val info = service.resolveInfo?.serviceInfo
-                if (info?.packageName == context.packageName && info?.name?.contains("CompanionAccessibilityService") == true) {
+                if (info?.packageName == context.packageName && info.name?.contains("CompanionAccessibilityService") == true) {
                     return true
                 }
             }

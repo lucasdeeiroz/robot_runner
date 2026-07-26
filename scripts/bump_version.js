@@ -63,6 +63,21 @@ const files = [
         path: path.join(rootDir, 'package-lock.json'),
         regex: /("":\s*\{\s*"name":\s*"robot_runner",\s*"version":\s*)"[^"]+"/,
         replacement: `$1"${versionToUse}"`
+    },
+    {
+        path: path.join(rootDir, 'package-lock.json'),
+        regex: /("":\s*\{\s*"name":\s*"robot_runner",\s*"version":\s*)"[^"]+"/,
+        replacement: `$1"${versionToUse}"`
+    },
+    {
+        path: path.join(rootDir, 'companion', 'app', 'build.gradle.kts'),
+        regex: /versionCode\s*=\s*\d+/,
+        replacement: `versionCode = ${major * 10000 + minor * 100 + patch}`
+    },
+    {
+        path: path.join(rootDir, 'companion', 'app', 'build.gradle.kts'),
+        regex: /versionName\s*=\s*"[^"]+"/,
+        replacement: `versionName = "${versionToUse}"`
     }
 ];
 
@@ -74,7 +89,7 @@ files.forEach(file => {
     try {
         if (fs.existsSync(file.path)) {
             let content = fs.readFileSync(file.path, 'utf8');
-            
+
             // Special handling for tauri.conf.json to disable MSI for alpha tags
             if (file.path.endsWith('tauri.conf.json')) {
                 const tauriConf = JSON.parse(content);

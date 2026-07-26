@@ -194,12 +194,16 @@ pub async fn install_package(
     app: AppHandle,
     device: String,
     path: String,
+    reinstall: Option<bool>,
     downgrade: Option<bool>,
     grant_permissions: Option<bool>,
     allow_test: Option<bool>,
     install_sdcard: Option<bool>,
 ) -> Result<String, String> {
-    let mut args = vec!["install", "-r"];
+    let mut args = vec!["install"];
+    if reinstall.unwrap_or(true) {
+        args.push("-r");
+    }
     if downgrade.unwrap_or(false) {
         args.push("-d");
     }
