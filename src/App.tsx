@@ -39,13 +39,13 @@ function AppContent() {
   const [activePage, setActivePage] = useState("home");
   const { t, i18n } = useTranslation();
   const { settings, updateSetting, checkSystemVersions, systemCheckStatus, loading: settings_loading, checkForAppUpdate } = useSettings();
-  const { user, loading: auth_loading } = useAuth();
+  const { user, skippedLogin, loading: auth_loading } = useAuth();
 
   // Initialize Remote Config once authenticated (now handled by RemoteConfigProvider)
 
   // State to track if we should show the overlay or if it has been dismissed/handled
   const [initialCheckDismissed, setInitialCheckDismissed] = useState(false);
-  const [initialSubTab, setInitialSubTab] = useState<'tests' | 'connect' | 'inspector' | undefined>(undefined);
+  const [initialSubTab, setInitialSubTab] = useState<'tests' | 'inspector' | 'mapper' | 'ai_generator' | undefined>(undefined);
 
   // Initial check moved to dependence on settings_loading
 
@@ -272,7 +272,7 @@ function AppContent() {
     );
   }
 
-  if (!user) {
+  if (!user && !skippedLogin) {
     return <LoginPage />;
   }
 

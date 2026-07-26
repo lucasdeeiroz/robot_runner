@@ -17,8 +17,10 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   loginLoading: boolean;
+  skippedLogin: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  skipLogin: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,6 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [skippedLogin, setSkippedLogin] = useState(() => localStorage.getItem('skippedLogin') === 'true');
 
   useEffect(() => {
     if (!auth) {
@@ -44,7 +47,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       clearTimeout(safetyTimer);
       setUser(user);
-      setUserTargeting(user?.email || null);
+      
+      const isSkipped = localStorage.getItem('skippedLogin') === 'true';
+      if (!user && isSkipped) {
+        setUserTargeting('noLogin');
+      } else {
+        setUserTargeting(user?.email || null);
+      }
+      
       setLoading(false);
     });
 
@@ -120,6 +130,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    localStorage.removeItem('skippedLogin');
+    setSkippedLogin(false);
     if (!auth) return;
     try {
       await firebaseSignOut(auth);
@@ -129,8 +141,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const skipLogin = () => {
+    localStorage.setItem('skippedLogin', 'true');
+    setSkippedLogin(true);
+    setUserTargeting('noLogin');
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, loginLoading, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={{ user, loading, loginLoading, skippedLogin, signInWithGoogle, signOut, skipLogin }}>
       {children}
     </AuthContext.Provider>
   );

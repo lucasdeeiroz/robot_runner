@@ -23,16 +23,23 @@ import { useDeviceViewport } from '@/hooks/useDeviceViewport';
 import { DeviceViewport } from '@/components/organisms/DeviceViewport';
 
 
+import { RecordingPane, RecorderOptions, RecordingStep } from '@/components/organisms/RecordingPane';
+
 interface InspectorSubTabProps {
     selectedDevice: string;
     isActive: boolean;
     isTestRunning?: boolean;
 }
 
-import { RecordingPane, RecorderOptions, RecordingStep } from '@/components/organisms/RecordingPane';
-
+interface InspectorCacheEntry {
+    isRecordingMode: boolean;
+    recordedSteps: RecordingStep[];
+    recorderOptions: RecorderOptions;
+}
+const inspectorCacheMap = new Map<string, InspectorCacheEntry>();
 
 export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = false }: InspectorSubTabProps) {
+    const cachedInspector = selectedDevice ? inspectorCacheMap.get(selectedDevice) : undefined;
     const { t, i18n } = useTranslation();
     const {
         screenshot,
@@ -104,15 +111,26 @@ export function InspectorSubTab({ selectedDevice, isActive, isTestRunning = fals
     const [isSearchFocused, setIsSearchFocused] = useState(false);
 
     // Recorder State
-    const [isRecordingMode, setIsRecordingMode] = useState(false);
-    const [recordedSteps, setRecordedSteps] = useState<RecordingStep[]>([]);
-    const [recorderOptions, setRecorderOptions] = useState<RecorderOptions>({
+    const [isRecordingMode, setIsRecordingMode] = useState(() => cachedInspector?.isRecordingMode ?? false);
+    const [recordedSteps, setRecordedSteps] = useState<RecordingStep[]>(() => cachedInspector?.recordedSteps ?? []);
+    const [recorderOptions, setRecorderOptions] = useState<RecorderOptions>(() => cachedInspector?.recorderOptions ?? {
         duration: 500,
         offsetX: 0,
         offsetY: 0,
         startOffset: 20,
         endOffset: 80
     });
+
+    // Sync cache
+    useEffect(() => {
+        if (selectedDevice) {
+            inspectorCacheMap.set(selectedDevice, {
+                isRecordingMode,
+                recordedSteps,
+                recorderOptions
+            });
+        }
+    }, [selectedDevice, isRecordingMode, recordedSteps, recorderOptions]);
 
     // Locator Editing State
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);

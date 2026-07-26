@@ -101,7 +101,16 @@ pub async fn call_claude_code_cli(
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     
-    if output.status.success() {
+    let trimmed_stdout = stdout.trim();
+    let is_stdout_json = !trimmed_stdout.is_empty() && (
+        trimmed_stdout.contains("\"reply\"") || 
+        trimmed_stdout.contains("\"actions\"") || 
+        trimmed_stdout.contains("\"result\"") || 
+        trimmed_stdout.contains("\"type\"") ||
+        (trimmed_stdout.starts_with('{') && trimmed_stdout.ends_with('}'))
+    );
+
+    if output.status.success() || is_stdout_json {
         Ok(stdout)
     } else {
         let mut error_msg = if !stderr.is_empty() {

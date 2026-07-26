@@ -273,16 +273,23 @@ pub async fn get_xml_dump(app_handle: AppHandle, device_id: String, web_url: Opt
     let mut attempts = 0;
     let max_attempts = 4;
 
+    let dump_targets = [
+        "/sdcard/ui_diag.xml",
+        "/data/local/tmp/ui_diag.xml",
+    ];
+
     loop {
         attempts += 1;
 
+        let target_path = dump_targets[(attempts - 1) % dump_targets.len()];
+        let shell_cmd = format!("uiautomator dump {} >/dev/null 2>&1 && cat {} && rm -f {}", target_path, target_path, target_path);
+
         let mut cmd = new_tokio_command(&adb_program);
-        // Use exact suggested safe command: dump to sdcard and cat in one go
         cmd.args(&[
             "-s",
             &device_id,
             "shell",
-            "uiautomator dump /sdcard/ui_diag.xml >/dev/null && cat /sdcard/ui_diag.xml",
+            &shell_cmd,
         ]);
 
         match cmd.output().await {

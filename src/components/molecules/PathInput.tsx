@@ -12,6 +12,7 @@ interface PathInputProps extends Omit<InputProps, 'onChange' | 'onSelect'> {
     dialogTitle?: string;
     directory?: boolean;
     extensions?: string[];
+    readOnly?: boolean;
 }
 
 export function PathInput({
@@ -21,6 +22,7 @@ export function PathInput({
     directory = true,
     extensions,
     disabled,
+    readOnly = false,
     ...props
 }: PathInputProps) {
     const { t } = useTranslation();
@@ -49,7 +51,8 @@ export function PathInput({
                 <Input
                     {...props}
                     value={value}
-                    readOnly
+                    onChange={(e) => onSelect(e.target.value)}
+                    readOnly={readOnly}
                     disabled={disabled}
                     className="font-mono text-xs sm:text-sm"
                 />

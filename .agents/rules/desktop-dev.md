@@ -14,11 +14,13 @@ Performance: Dado o recurso de Screen Mirroring e Live Logs, minimize o overhead
 
 2. Gerenciamento de Processos e Dispositivos:
 
-Ciclo de Vida do ADB: Garanta que os comandos enviados via Rust tratem desconexões abruptas de dispositivos.
+Ciclo de Vida do ADB: Garanta que os comandos enviados via Rust tratem desconexões abruptas de dispositivos. Ao executar chamadas periódicas via `adb shell` para monitorar o dispositivo (ex: `top`, `dumpsys`), evite flags que forcem amostragens repetidas com delays no lado do dispositivo (ex: use `top -b -n 1` em vez de `top -b -n 2 -d 0.5`). Mantenha intervalos de polling conservadores (>= 3000ms) para minimizar a criação de processos `adb.exe` e overhead no SO host (Windows).
 
 Test Runner: Ao lidar com o modo de arquivo/pasta e arquivos .args, assegure-se de que os caminhos (paths) sejam tratados de forma agnóstica ao SO (Windows/Linux/macOS).
 
 Logs em Tempo Real: Implemente streams eficientes entre o processo do Appium/Robot e a UI do React para evitar vazamento de memória.
+
+Gerenciamento de Processos em Sub-abas Voláteis: NUNCA encerre processos em segundo plano no Rust (ex: sessões de logcat) simplesmente porque uma sub-aba da interface foi desmontada ao trocar de guia. Os processos em Rust devem persistir em segundo plano até que o dispositivo seja alterado, a sessão seja finalizada ou o usuário interrompa a ação explicitamente.
 
 3. UX para QA:
 

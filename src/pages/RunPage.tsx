@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { Play, Wifi, ScanEye, PlayCircle } from "lucide-react";
+import { Map, Sparkles, ScanEye, Play, PlayCircle } from "lucide-react";
 import { PageHeader } from "@/components/organisms/PageHeader";
-import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 import { TestsSubTab } from "@/components/tabs/run/TestsSubTab";
-import { ConnectSubTab } from "@/components/tabs/run/ConnectSubTab";
 import { InspectorSubTab } from "@/components/tabs/run/InspectorSubTab";
+import { MapperSubTab } from "@/components/tabs/run/MapperSubTab";
+import { AIGeneratorSubTab } from "@/components/tabs/run/AIGeneratorSubTab";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { useDevices } from '@/lib/deviceStore'; // Import Global Store
 
@@ -18,7 +18,7 @@ import { TabItem } from "@/components/molecules/Tabs";
 import { TabBar } from "@/components/organisms/TabBar";
 import { DeviceSelector } from "@/components/molecules/DeviceSelector";
 
-type TabType = 'tests' | 'connect' | 'inspector';
+type TabType = 'tests' | 'inspector' | 'mapper' | 'ai_generator';
 
 interface RunPageProps {
     onNavigate?: (page: string) => void;
@@ -47,16 +47,16 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
 
     const [activeTab, setActiveTab] = useState<TabType>(() => {
         if (initialTab && !(initialTab === 'tests' && isLauncherDisabled) && !(initialTab === 'inspector' && isInspectorDisabled)) return initialTab;
-        if (isLauncherDisabled) return 'connect';
+        if (isLauncherDisabled) return 'inspector';
         return 'tests';
     });
 
     // Safety check if status updates later
     useEffect(() => {
         if (activeTab === 'tests' && isLauncherDisabled) {
-            setActiveTab('connect');
+            setActiveTab('inspector');
         } else if (activeTab === 'inspector' && isInspectorDisabled) {
-            setActiveTab('connect');
+            setActiveTab('mapper');
         }
     }, [systemCheckStatus, settings.usageMode, activeTab]);
 
@@ -64,9 +64,9 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
     useEffect(() => {
         if (initialTab) {
             if (initialTab === 'tests' && isLauncherDisabled) {
-                setActiveTab('connect');
+                setActiveTab('inspector');
             } else if (initialTab === 'inspector' && isInspectorDisabled) {
-                setActiveTab('connect');
+                setActiveTab('mapper');
             } else {
                 setActiveTab(initialTab);
             }
@@ -76,7 +76,7 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
     useEffect(() => {
         const handleNavigateSubTab = (e: Event) => {
             const detail = (e as CustomEvent).detail;
-            if (detail && (detail === 'tests' || detail === 'connect' || detail === 'inspector')) {
+            if (detail && (detail === 'tests' || detail === 'inspector' || detail === 'mapper' || detail === 'ai_generator')) {
                 setActiveTab(detail as TabType);
             }
         };
@@ -87,8 +87,9 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
     // Define Tabs
     const tabs: TabItem[] = [
         ...(settings.usageMode === 'explorer' ? [] : [{ id: 'tests', label: !isNarrow ? t('run_tab.launcher') : '', icon: Play, tooltip: isNarrow ? t('run_tab.launcher') : undefined }]),
-        { id: 'connect', label: !isNarrow ? t('run_tab.connect') : '', icon: Wifi, tooltip: isNarrow ? t('run_tab.connect') : undefined },
         { id: 'inspector', label: !isNarrow ? t('run_tab.inspector') : '', icon: ScanEye, tooltip: isNarrow ? t('run_tab.inspector') : undefined },
+        { id: 'mapper', label: !isNarrow ? t('dashboard.tabs.mapper', "Mapper") : '', icon: Map, tooltip: isNarrow ? t('dashboard.tabs.mapper', "Mapper") : undefined },
+        { id: 'ai_generator', label: !isNarrow ? t('dashboard.tabs.scenarios', "Scenarios") : '', icon: Sparkles, tooltip: isNarrow ? t('dashboard.tabs.scenarios', "Scenarios") : undefined },
     ];
 
     // Global Device State
@@ -164,23 +165,36 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
 
             {/* Main Content Area */}
             <div className="flex-1 min-h-0 bg-surface p-4 relative z-10 rounded-2xl border border-outline-variant/30 flex flex-col">
-                {settings.usageMode !== 'explorer' && (
-                    <div className={clsx("h-full flex-1 min-h-0", activeTab === 'tests' ? "flex flex-col" : "hidden")}>
+                {settings.usageMode !== 'explorer' && activeTab === 'tests' && (
+                    <div className="h-full flex-1 min-h-0 flex flex-col">
                         <TestsSubTab selectedDevices={selectedDevices} devices={devices} onNavigate={onNavigate} />
                     </div>
                 )}
 
-                <div className={clsx("h-full flex-1 min-h-0", activeTab === 'connect' ? "flex flex-col" : "hidden")}>
-                    <ConnectSubTab onDeviceConnected={loadDevices} selectedDevice={selectedDevices[0]} />
-                </div>
+                {activeTab === 'inspector' && (
+                    <div className="h-full flex-1 min-h-0 flex flex-col">
+                        <InspectorSubTab
+                            selectedDevice={selectedDevices[0] || ""}
+                            isActive={true}
+                            isTestRunning={selectedDevices[0] ? busyDeviceIds.includes(selectedDevices[0]) : false}
+                        />
+                    </div>
+                )}
 
-                <div className={clsx("h-full flex-1 min-h-0", activeTab === 'inspector' ? "flex flex-col" : "hidden")}>
-                    <InspectorSubTab
-                        selectedDevice={selectedDevices[0] || ""}
-                        isActive={activeTab === 'inspector'}
-                        isTestRunning={selectedDevices[0] ? busyDeviceIds.includes(selectedDevices[0]) : false}
-                    />
-                </div>
+                {activeTab === 'mapper' && (
+                    <div className="h-full flex-1 min-h-0 flex flex-col">
+                        <MapperSubTab
+                            isActive={true}
+                            selectedDeviceId={selectedDevices[0] || null}
+                        />
+                    </div>
+                )}
+
+                {activeTab === 'ai_generator' && (
+                    <div className="h-full flex-1 min-h-0 flex flex-col">
+                        <AIGeneratorSubTab onNavigate={onNavigate} />
+                    </div>
+                )}
             </div>
         </div >
     );

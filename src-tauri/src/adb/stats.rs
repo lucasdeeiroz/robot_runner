@@ -107,7 +107,7 @@ async fn get_device_stats_internal(
     device: &str,
     package: Option<String>,
 ) -> Result<DeviceStats, String> {
-    let mut script = String::from("dumpsys battery; echo ___S\"EP\"___; cat /proc/meminfo || dumpsys meminfo; echo ___S\"EP\"___; top -b -n 2 -d 0.5; echo ___S\"EP\"___; dumpsys window displays; echo ___S\"EP\"___; dumpsys power");
+    let mut script = String::from("dumpsys battery; echo ___S\"EP\"___; cat /proc/meminfo || dumpsys meminfo; echo ___S\"EP\"___; top -b -n 1; echo ___S\"EP\"___; dumpsys window displays; echo ___S\"EP\"___; dumpsys power");
     
     if let Some(pkg) = &package {
         if !pkg.is_empty() {

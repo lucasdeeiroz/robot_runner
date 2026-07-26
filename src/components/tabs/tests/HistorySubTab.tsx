@@ -44,26 +44,43 @@ interface HistorySubTabProps {
     onNavigate?: (page: string) => void;
 }
 
+interface HistorySubTabCacheEntry {
+    history: TestLog[];
+    filterText: string;
+    filterPeriod: string;
+    groupBy: string;
+    filterDevice: string;
+    filterOS: string;
+    filterStatus: string;
+    countMethod: 'suites' | 'tests';
+    showCharts: boolean;
+    collapsedGroups: Record<string, boolean>;
+}
+const historySubTabCacheMap = new Map<string, HistorySubTabCacheEntry>();
+
 export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
     const { user } = useAuth();
     const { t } = useTranslation();
     const { settings, updateSetting, activeProfileId, profiles } = useSettings();
     const activeProfileName = profiles.find(p => p.id === activeProfileId)?.name || 'Default';
-    const [history, setHistory] = useState<TestLog[]>(getCachedHistory());
-    const [filterText, setFilterText] = useState("");
-    const [filterPeriod, setFilterPeriod] = useState("all_time");
-    const [groupBy, setGroupBy] = useState("none");
+    const cacheKey = activeProfileId || 'default';
+    const cached = historySubTabCacheMap.get(cacheKey);
+
+    const [history, setHistory] = useState<TestLog[]>(() => cached?.history ?? getCachedHistory());
+    const [filterText, setFilterText] = useState(() => cached?.filterText ?? "");
+    const [filterPeriod, setFilterPeriod] = useState(() => cached?.filterPeriod ?? "all_time");
+    const [groupBy, setGroupBy] = useState(() => cached?.groupBy ?? "none");
 
     // Novas variáveis de filtro
-    const [filterDevice, setFilterDevice] = useState("all");
-    const [filterOS, setFilterOS] = useState("all");
-    const [filterStatus, setFilterStatus] = useState("all");
+    const [filterDevice, setFilterDevice] = useState(() => cached?.filterDevice ?? "all");
+    const [filterOS, setFilterOS] = useState(() => cached?.filterOS ?? "all");
+    const [filterStatus, setFilterStatus] = useState(() => cached?.filterStatus ?? "all");
 
-    const [countMethod, setCountMethod] = useState<'suites' | 'tests'>('suites');
+    const [countMethod, setCountMethod] = useState<'suites' | 'tests'>(() => cached?.countMethod ?? 'suites');
 
-    const [showCharts, setShowCharts] = useState(false);
+    const [showCharts, setShowCharts] = useState(() => cached?.showCharts ?? false);
     const [loadingHistory, setLoadingHistory] = useState(false);
-    const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+    const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => cached?.collapsedGroups ?? {});
     const [selectedLog, setSelectedLog] = useState<TestLog | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -76,6 +93,29 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
     const [isHistoryNarrow, setIsHistoryNarrow] = useState(false);
     const abortControllerRef = useRef<AbortController | null>(null);
     const isFirstRun = useRef(true);
+    const prevParamsRef = useRef({
+        logsPath: settings.paths.logs,
+        userId: user?.uid,
+        profileName: activeProfileName,
+        framework: settings.automationFramework
+    });
+
+    // Sync cache
+    useEffect(() => {
+        historySubTabCacheMap.set(cacheKey, {
+            history,
+            filterText,
+            filterPeriod,
+            groupBy,
+            filterDevice,
+            filterOS,
+            filterStatus,
+            countMethod,
+            showCharts,
+            collapsedGroups
+        });
+        setCachedHistory(history);
+    }, [cacheKey, history, filterText, filterPeriod, groupBy, filterDevice, filterOS, filterStatus, countMethod, showCharts, collapsedGroups]);
 
     useEffect(() => {
         if (!historyContainerRef.current) return;
@@ -89,16 +129,32 @@ export function HistorySubTab({ onNavigate }: HistorySubTabProps) {
     }, []);
 
     useEffect(() => {
-        // Clear current history visually when path or user changes to prevent ghosting/duplication
-        setHistory([]);
-        setCachedHistory([]);
+        const currentParams = {
+            logsPath: settings.paths.logs,
+            userId: user?.uid,
+            profileName: activeProfileName,
+            framework: settings.automationFramework
+        };
 
-        const timer = setTimeout(() => {
-            loadHistory();
-            isFirstRun.current = false;
-        }, 150);
-        return () => clearTimeout(timer);
-    }, [settings.paths.logs, user, activeProfileName, settings.automationFramework]);
+        const hasChanged =
+            prevParamsRef.current.logsPath !== currentParams.logsPath ||
+            prevParamsRef.current.userId !== currentParams.userId ||
+            prevParamsRef.current.profileName !== currentParams.profileName ||
+            prevParamsRef.current.framework !== currentParams.framework;
+
+        if (hasChanged || history.length === 0) {
+            prevParamsRef.current = currentParams;
+            if (hasChanged) {
+                setHistory([]);
+                setCachedHistory([]);
+            }
+            const timer = setTimeout(() => {
+                loadHistory();
+                isFirstRun.current = false;
+            }, 150);
+            return () => clearTimeout(timer);
+        }
+    }, [settings.paths.logs, user?.uid, activeProfileName, settings.automationFramework]);
 
     const loadHistory = async (refresh: boolean = false) => {
         setLoadingHistory(true);

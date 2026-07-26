@@ -28,10 +28,42 @@ interface TestsSubTabProps {
 
 type SelectionMode = 'file' | 'folder' | 'args';
 
+interface TestsSubTabCacheEntry {
+    mode: SelectionMode;
+    lastPaths: Record<SelectionMode, string>;
+}
+const testsSubTabCacheMap = new Map<string, TestsSubTabCacheEntry>();
+
 export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTabProps) {
     const { settings, updateSetting, is_test_mode, activeProfileId, profiles } = useSettings();
     const { t } = useTranslation();
-    const [mode, setMode] = useState<SelectionMode>('file');
+    const cacheKey = activeProfileId || 'default';
+    const cached = testsSubTabCacheMap.get(cacheKey);
+
+    const [mode, setMode] = useState<SelectionMode>(() => cached?.mode ?? 'file');
+    const [lastPaths, setLastPaths] = useState<Record<SelectionMode, string>>(() => cached?.lastPaths ?? {
+        file: settings.paths.tests || '.',
+        folder: settings.paths.tests || '.',
+        args: settings.paths.suites || '.'
+    });
+
+    // Keep cache synchronized
+    useEffect(() => {
+        testsSubTabCacheMap.set(cacheKey, {
+            mode,
+            lastPaths
+        });
+    }, [cacheKey, mode, lastPaths]);
+
+    // Keep lastPaths synchronized when settings.paths change
+    useEffect(() => {
+        setLastPaths(prev => ({
+            ...prev,
+            file: settings.paths.tests || prev.file || '.',
+            folder: settings.paths.tests || prev.folder || '.',
+            args: settings.paths.suites || prev.args || '.'
+        }));
+    }, [settings.paths.tests, settings.paths.suites]);
     const [launchStatus, setLaunchStatus] = useState("");
     const [isLaunching, setIsLaunching] = useState(false);
     const [warningModal, setWarningModal] = useState<{ isOpen: boolean, message: string, showSettingsAction?: boolean }>({ isOpen: false, message: '', showSettingsAction: false });
@@ -550,9 +582,15 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     handleRunRef.current = handleRun;
 
     const getInitialPath = () => {
-        if (mode === 'args') return settings.paths.suites;
-        return settings.paths.tests || ".";
+        return lastPaths[mode] || (mode === 'args' ? settings.paths.suites : (settings.paths.tests || "."));
     };
+
+    const handlePathChange = useCallback((path: string) => {
+        setLastPaths(prev => ({
+            ...prev,
+            [mode]: path
+        }));
+    }, [mode]);
 
     const tabs = [
         {
@@ -620,6 +658,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                         selectionMode={mode === 'args' || mode === 'file' ? 'file' : 'directory'}
                         allowHideFooter={true}
                         onNavigate={onNavigate}
+                        onPathChange={handlePathChange}
                         renderEntryExtra={(entry, isSelected) => {
                             if (mode === 'file' && entry.name.endsWith('.robot')) {
                                 const item = items.find(i => i.path === entry.path);

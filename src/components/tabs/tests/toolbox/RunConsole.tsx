@@ -390,6 +390,9 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath,
                             throw new Error("Invalid format returned by AI for autonomous action");
                         }
                     } catch (e: any) {
+                        if (e?.isAuthError || (typeof e === 'string' && (e.includes('AUTH_ERROR') || e.includes('401')))) {
+                            throw e;
+                        }
                         if (attempt === 1) {
                             throw e; // Rethrow on the last attempt
                         }

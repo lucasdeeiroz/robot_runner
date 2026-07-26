@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { LogIn } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
-  const { signInWithGoogle, loginLoading } = useAuth();
+  const { signInWithGoogle, loginLoading, skipLogin } = useAuth();
   const { t } = useTranslation();
 
   return (
@@ -30,7 +30,7 @@ export const LoginPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="mt-8 space-y-4">
+        <div className="mt-8 flex flex-col gap-4">
           <Button
             onClick={signInWithGoogle}
             className="w-full flex items-center justify-center gap-3 py-6 text-lg font-semibold"
@@ -56,6 +56,14 @@ export const LoginPage: React.FC = () => {
               />
             </svg>
             {t('auth.sign_in_with_google')}
+          </Button>
+
+          <Button
+            onClick={skipLogin}
+            className="w-full flex items-center justify-center gap-3 py-4 text-base font-medium"
+            variant="ghost"
+          >
+            {t('auth.skip_login')}
           </Button>
         </div>
 

@@ -302,16 +302,19 @@ export function AiAgentPanel({ onNavigate }: AiAgentPanelProps) {
                     attempts++;
                     console.warn(`AI Agent Error (Attempt ${attempts} of ${maxAttempts}):`, error);
                     
-                    if (attempts < maxAttempts) {
-                        setMessages(prev => [...prev, {
-                            id: (Date.now() + Math.random()).toString(),
-                            role: 'agent',
-                            content: `*${t('ai_agent.retry_attempt', { defaultValue: `Connection failed. Retrying... (${attempts}/${maxAttempts})` })}*`
-                        }]);
-                        await new Promise(resolve => setTimeout(resolve, 2000 * attempts));
-                    } else {
+                    const errString = typeof error === 'string' ? error : (error?.message || String(error));
+                    const isAuthError = errString.includes('AUTH_ERROR') || errString.includes('401') || errString.includes('OAuth access token has expired') || errString.includes('Failed to authenticate');
+
+                    if (isAuthError || attempts >= maxAttempts) {
                         throw error;
                     }
+
+                    setMessages(prev => [...prev, {
+                        id: (Date.now() + Math.random()).toString(),
+                        role: 'agent',
+                        content: `*${t('ai_agent.retry_attempt', { defaultValue: `Connection failed. Retrying... (${attempts}/${maxAttempts})` })}*`
+                    }]);
+                    await new Promise(resolve => setTimeout(resolve, 2000 * attempts));
                 }
             }
 

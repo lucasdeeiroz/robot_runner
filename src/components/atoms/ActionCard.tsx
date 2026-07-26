@@ -33,9 +33,9 @@ export function ActionCard({
         <div
             onClick={onClick}
             className={clsx(
-                "relative rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md",
-                isVertical ? "p-6" : "p-4 flex items-center gap-4",
-                isVertical && centered ? "flex flex-col items-center justify-center text-center" : "",
+                "relative rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md h-full flex",
+                isVertical ? "p-6 flex-col" : "p-4 items-center gap-4",
+                isVertical && centered ? "items-center justify-center text-center" : "",
                 selected
                     ? "bg-primary/5 border-primary"
                     : "bg-surface border-outline-variant/30 hover:bg-surface-variant/30",
@@ -57,8 +57,8 @@ export function ActionCard({
                 </div>
             )}
             
-            <div className={clsx(isVertical ? "" : "flex-1")}>
-                <div className={clsx("flex items-center gap-2 mb-1", isVertical && centered ? "justify-center" : "")}>
+            <div className={clsx(isVertical ? "flex flex-col h-full" : "flex-1")}>
+                <div className={clsx("flex items-center gap-2 mb-1", isVertical ? "pr-8" : "", isVertical && centered ? "justify-center" : "")}>
                     <h3 className={clsx("font-bold text-on-surface", isVertical ? "text-lg" : "text-base")}>
                         {title}
                     </h3>
@@ -67,7 +67,7 @@ export function ActionCard({
                 <p className={clsx("text-on-surface-variant/80", isVertical ? "text-sm" : "text-xs")}>
                     {description}
                 </p>
-                {children && <div className="mt-4 w-full" onClick={e => e.stopPropagation()}>{children}</div>}
+                {children && <div className="mt-auto pt-4 w-full" onClick={e => e.stopPropagation()}>{children}</div>}
             </div>
             
             {selected && !isVertical && (

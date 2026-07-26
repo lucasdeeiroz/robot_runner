@@ -52,12 +52,17 @@ pub async fn save_screenshot(app: AppHandle, device: String, path: String) -> Re
         output.stdout
     };
 
+    let expanded_path = crate::cmd_utils::expand_env_vars(&path);
+    if let Some(parent) = std::path::Path::new(&expanded_path).parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+
     // Write buffer to file
-    let mut file = File::create(&path).map_err(|e| format!("Failed to create file: {}", e))?;
+    let mut file = File::create(&expanded_path).map_err(|e| format!("Failed to create file: {}", e))?;
     file.write_all(&bytes)
         .map_err(|e| format!("Failed to write to file: {}", e))?;
 
-    Ok(path)
+    Ok(expanded_path)
 }
 
 #[tauri::command]
@@ -133,6 +138,10 @@ pub async fn start_screen_recording(app: AppHandle, device: String) -> Result<St
 #[tauri::command]
 pub async fn stop_screen_recording(app: AppHandle, device: String, local_path: String) -> Result<String, String> {
     let program = get_adb_program(&app);
+    let expanded_local_path = crate::cmd_utils::expand_env_vars(&local_path);
+    if let Some(parent) = std::path::Path::new(&expanded_local_path).parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
     
     // 1. Send SIGINT (2) to screenrecord to make it finalize the MP4
     let mut cmd_kill = new_tokio_command(&program);
@@ -160,7 +169,7 @@ pub async fn stop_screen_recording(app: AppHandle, device: String, local_path: S
         &device,
         "pull",
         "/sdcard/robot_runner_rec.mp4",
-        &local_path,
+        &expanded_local_path,
     ]);
 
     let pull_output = cmd_pull
@@ -180,5 +189,5 @@ pub async fn stop_screen_recording(app: AppHandle, device: String, local_path: S
     cmd_rm.args(&["-s", &device, "shell", "rm", "/sdcard/robot_runner_rec.mp4"]);
     let _ = cmd_rm.output().await;
 
-    Ok(local_path)
+    Ok(expanded_local_path)
 }

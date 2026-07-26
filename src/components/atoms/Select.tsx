@@ -136,7 +136,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
                 {isOpen && (
                     <div className={twMerge(
                         "absolute left-0 min-w-full w-max max-w-xs md:max-w-md max-h-60 overflow-y-auto rounded-2xl border border-outline-variant/20 bg-surface/90 dark:bg-surface/95 backdrop-blur-xl shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-200 scrollbar-thin scrollbar-thumb-outline-variant/30",
-                        dropdownPosition === 'top' ? "bottom-full mb-2 origin-bottom" : "top-full mt-2 origin-top"
+                        dropdownPosition === 'top' ? "bottom-[calc(100%+8px)] origin-bottom" : "top-[calc(100%+8px)] origin-top"
                     )}>
                         {options.map((option) => {
                             const isSelected = String(option.value) === String(currentValue);

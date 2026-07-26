@@ -280,11 +280,13 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
     }
 
     return (
-        <div ref={containerRef} className="h-full flex-1 min-h-0 flex flex-col p-4 overflow-y-auto">
+        <div ref={containerRef} className="h-full flex-1 min-h-0 flex flex-col p-4 overflow-y-auto custom-scrollbar">
             <Section
                 title={t('performance.title')}
                 icon={Activity}
                 variant="transparent"
+                className="flex flex-col flex-1 min-h-0"
+                contentClassName="flex flex-col flex-1 min-h-0"
                 status={
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
@@ -434,7 +436,7 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
                         <p>{t('performance.loading')}</p>
                     </div>
                 ) : (
-                    <div className="space-y-6">
+                    <div className="flex flex-col flex-1 min-h-0 space-y-4">
                         {/* System Stats Section */}
                         <div>
                             <button
@@ -590,7 +592,7 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
                                 <span className="ml-1">{t('performance.battery_audit', 'Battery Audit')}</span>
                             </button>
                         </div>
-                        <div className={clsx("grid grid-cols-1 gap-4 animate-in fade-in duration-500", showProcessMonitor && showBatteryAudit && "lg:grid-cols-2")} >
+                        <div className={clsx("grid grid-cols-1 gap-4 animate-in fade-in duration-500 flex-1 min-h-0", showProcessMonitor && showBatteryAudit && "lg:grid-cols-2")} >
                             {/* Process Monitor */}
                             <div>
 
@@ -713,14 +715,14 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
                                             </>
                                         }
                                     >
-                                        <div className="flex flex-col h-[400px] w-full mt-2 overflow-y-auto custom-scrollbar">
+                                        <div className="flex flex-col h-[400px] w-full mt-2 overflow-hidden rounded-xl border border-outline-variant/30 bg-surface/30 backdrop-blur-sm">
                                             {isBatteryAuditLoading && !batteryAuditData ? (
-                                                <div className="flex-1 flex flex-col items-center justify-center border border-outline-variant/30 rounded-xl bg-surface/30">
+                                                <div className="flex-1 flex flex-col items-center justify-center">
                                                     <ExpressiveLoading size="sm" variant="circular" />
                                                 </div>
                                             ) : batteryAuditData ? (
-                                                <div className="flex flex-col gap-2">
-                                                    <div className="flex items-center gap-4 p-3 rounded-lg bg-surface-variant/30 border border-outline-variant/20 mb-2">
+                                                <div className="flex flex-col flex-1 min-h-0">
+                                                    <div className="flex items-center gap-4 p-3 border-b border-outline-variant/20 bg-surface-variant/10">
                                                         <div className="flex flex-col">
                                                             <span className="text-xs text-on-surface-variant/70 uppercase font-semibold">{t('performance.capacity', 'Capacity')}</span>
                                                             <span className="font-mono text-sm">{batteryAuditData.capacity} mAh</span>
@@ -732,9 +734,10 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
                                                     </div>
 
                                                     {batteryAuditData.apps.length > 0 ? (
-                                                        <div className="h-[400px] w-full">
+                                                        <div className="flex-1 min-h-0 w-full">
                                                             <Virtuoso
                                                                 data={batteryAuditData.apps}
+                                                                className="h-full w-full custom-scrollbar"
                                                                 itemContent={(i, app) => (
                                                                     <div key={i} className="flex flex-col p-3 rounded-lg border border-outline-variant/20 hover:border-primary/30 hover:bg-surface-variant/20 transition-all mb-2">
                                                                         <div className="flex items-center justify-between">

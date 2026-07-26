@@ -9,16 +9,66 @@ export interface StopwatchLap {
     deltaMs: number;
 }
 
+interface StopwatchCacheEntry {
+    laps: StopwatchLap[];
+    isStopwatchRunning: boolean;
+    startTime: number | null;
+}
+const stopwatchCacheMap = new Map<string, StopwatchCacheEntry>();
+
+function matchesWildcardKeyword(line: string, keyword: string): boolean {
+    if (!line || !keyword) return false;
+    const trimmedKw = keyword.trim();
+    if (!trimmedKw) return false;
+
+    if (trimmedKw.includes('*')) {
+        const regexStr = trimmedKw
+            .split('*')
+            .map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+            .join('.*');
+        try {
+            const regex = new RegExp(regexStr, 'i');
+            return regex.test(line);
+        } catch (e) {
+            return line.toLowerCase().includes(trimmedKw.toLowerCase());
+        }
+    }
+    return line.toLowerCase().includes(trimmedKw.toLowerCase());
+}
+
 export function useLogcatStopwatch(selectedDevice: string, selectedPackage: string) {
     const { settings } = useSettings();
+    const cached = selectedDevice ? stopwatchCacheMap.get(selectedDevice) : undefined;
 
     // Stopwatch State
     const keywords = settings.logcatKeywords || [];
-    const [laps, setLaps] = useState<StopwatchLap[]>([]);
+    const [laps, setLaps] = useState<StopwatchLap[]>(() => cached?.laps ?? []);
     const [deltaUnit, setDeltaUnit] = useState<'ms' | 's' | 'min' | 'h'>('ms');
-    const [isStopwatchRunning, setIsStopwatchRunning] = useState(false);
+    const [isStopwatchRunning, setIsStopwatchRunning] = useState(() => cached?.isStopwatchRunning ?? false);
     const [newKeyword, setNewKeyword] = useState("");
-    const [startTime, setStartTime] = useState<number | null>(null);
+    const [startTime, setStartTime] = useState<number | null>(() => cached?.startTime ?? null);
+
+    // Sync cache on state change
+    useEffect(() => {
+        if (selectedDevice) {
+            stopwatchCacheMap.set(selectedDevice, {
+                laps,
+                isStopwatchRunning,
+                startTime
+            });
+        }
+    }, [selectedDevice, laps, isStopwatchRunning, startTime]);
+
+    // Check backend status on mount
+    useEffect(() => {
+        if (selectedDevice) {
+            invoke<boolean>('is_logcat_active', { device: selectedDevice, sessionId: "stopwatch_tab" })
+                .then((active) => {
+                    if (active) setIsStopwatchRunning(true);
+                })
+                .catch(console.error);
+        }
+    }, [selectedDevice]);
 
     const handleRemoveLap = (index: number) => {
         setLaps(prev => {
@@ -82,7 +132,7 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
                         const lines = event.payload.lines;
                         for (const line of lines) {
                             for (const kw of keywords) {
-                                if (line.includes(kw)) {
+                                if (matchesWildcardKeyword(line, kw)) {
                                     setLaps(prev => {
                                         const now = performance.now();
                                         const timestamp = Date.now(); // Keep Date.now for UI display of time

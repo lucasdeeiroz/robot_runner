@@ -316,3 +316,47 @@ pub fn fs_read_dir_names(path: String) -> AppResult<Vec<String>> {
     }
     Ok(names)
 }
+
+#[command]
+pub fn get_portable_settings() -> AppResult<Option<String>> {
+    let cwd_path = std::path::Path::new("settings.json");
+    if cwd_path.exists() {
+        if let Ok(content) = fs::read_to_string(cwd_path) {
+            return Ok(Some(content));
+        }
+    }
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let exe_settings_path = exe_dir.join("settings.json");
+            if exe_settings_path.exists() {
+                if let Ok(content) = fs::read_to_string(exe_settings_path) {
+                    return Ok(Some(content));
+                }
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+#[command]
+pub fn save_portable_settings(content: String) -> AppResult<bool> {
+    let cwd_path = std::path::Path::new("settings.json");
+    if cwd_path.exists() {
+        fs::write(cwd_path, &content).map_err(|e| AppError::FileSystemError(e.to_string()))?;
+        return Ok(true);
+    }
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let exe_settings_path = exe_dir.join("settings.json");
+            if exe_settings_path.exists() {
+                fs::write(exe_settings_path, &content).map_err(|e| AppError::FileSystemError(e.to_string()))?;
+                return Ok(true);
+            }
+        }
+    }
+
+    Ok(false)
+}
