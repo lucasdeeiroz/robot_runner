@@ -4,7 +4,7 @@ trigger: always_on
 
 # Android Companion App (Kotlin) Development & Architecture Rules
 
-This document outlines mandatory architectural guidelines, performance standards, and code patterns for developing the native **Robot Runner Companion** application (`companion/`). If you find better, more efficient ways to implement the features you were asked to, feel free to enhance or complement this document.
+This document outlines mandatory architectural guidelines, performance standards, and code patterns for developing the native **Robot Runner Companion** application (`companion/`) and complements the android-companion-tech.md document. If you find better, more efficient ways to implement the features you were asked to, feel free to enhance or complement this document.
 
 ---
 
@@ -31,19 +31,6 @@ This document outlines mandatory architectural guidelines, performance standards
      - Priority 1: Native Android API (`ActivityManager`, `BatteryManager`, `PackageManager`).
      - Priority 2: Standard Shell commands (`dumpsys`, `getprop`).
      - Priority 3: Graceful fallback indicator (`N/A` or Restricted Mode) without crashing the app.
-
----
-
-## 3. UI/UX Design & Jetpack Compose Standards
-
-1. **Modern Dark Aesthetics**:
-   - Use Material3 with modern dark color palettes, subtle glassmorphism, and responsive layouts that adapt seamlessly across phone screens, tablets, and POS receipt screens (720p / 480p).
-
-2. **Non-Intrusive Floating Inspector**:
-   - The on-device UI Inspector floating overlay must be draggable, collapsible, and easily toggled off so it never blocks the user's manual app interaction.
-
-3. **Visible texts must be internationalized**:
-   - All texts visible to the user must be internationalized in `./companion/app/src/main/res/` for `values/`, `values-es/` and `values-pt`.
 
 ---
 
@@ -169,13 +156,3 @@ This document outlines mandatory architectural guidelines, performance standards
 ## 16. Continuous Learning & Rule Maintenance Instruction
 
 > **IMPORTANT**: As new features, optimizations, or Android SDK workarounds are implemented in `companion/`, the **Android Companion Engineer** profile MUST update and append new rules directly to this document.
-
-
-
-
-
-
-
-
-
-

@@ -23,6 +23,10 @@
     <string name="btn_share_pdf">Compartilhar Relatório</string>
     <string name="msg_checkup_completed">Checkup Offline Concluído</string>
     <string name="msg_pdf_exported">Relatório PDF salvo na pasta Downloads</string>
+    <string name="shortcut_hw_short">HW Checkup</string>
+    <string name="shortcut_hw_long">Iniciar Checkup de Hardware</string>
+    <string name="shortcut_p2p_short">P2P Bridge</string>
+    <string name="shortcut_p2p_long">Verificar Conectividade P2P</string>
 
     <!-- Phase 1 Strings (PT-BR) -->
     <string name="tab_dashboard">Painel</string>

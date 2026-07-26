@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    
+    <shortcut
+        android:shortcutId="shortcut_hardware_checkup"
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher_chromakey"
+        android:shortcutShortLabel="@string/shortcut_hw_short"
+        android:shortcutLongLabel="@string/shortcut_hw_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.robotrunner.companion"
+            android:targetClass="com.robotrunner.companion.MainActivity">
+            <extra android:name="shortcut_action" android:value="hardware_checkup" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="shortcut_p2p_bridge"
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher_chromakey"
+        android:shortcutShortLabel="@string/shortcut_p2p_short"
+        android:shortcutLongLabel="@string/shortcut_p2p_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.robotrunner.companion"
+            android:targetClass="com.robotrunner.companion.MainActivity">
+            <extra android:name="shortcut_action" android:value="p2p_bridge" />
+        </intent>
+    </shortcut>
+
+</shortcuts>
