@@ -14,8 +14,8 @@ android {
         applicationId = "com.robotrunner.companion"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "2.3.3-beta7"
+        versionCode = 300
+        versionName = "3.0.0-alpha1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

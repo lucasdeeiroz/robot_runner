@@ -72,7 +72,7 @@ const files = [
     {
         path: path.join(rootDir, 'companion', 'app', 'build.gradle.kts'),
         regex: /versionCode\s*=\s*\d+/,
-        replacement: `versionCode = ${major * 10000 + minor * 100 + patch}`
+        replacement: `versionCode = ${major * 100 + minor * 10 + patch}`
     },
     {
         path: path.join(rootDir, 'companion', 'app', 'build.gradle.kts'),
