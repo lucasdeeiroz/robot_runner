@@ -201,3 +201,14 @@ dist-ssr
 .agent
 .firebase/
 
+# Android / Gradle Companion
+companion/.gradle/
+companion/.idea/
+companion/build/
+companion/app/build/
+companion/local.properties
+companion/*/*.iml
+companion/*.iml
+companion/.cxx/
+companion/captures/
+
