@@ -166,13 +166,16 @@ object HardwareSpecsProvider {
         val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
         val sensors = sensorManager?.getSensorList(Sensor.TYPE_ALL) ?: emptyList()
 
+        val sensorItems = mutableListOf(
+            HardwareSpecItem(context.getString(R.string.spec_active_sensors), context.getString(R.string.sensors_registered_format, sensors.size))
+        )
+        sensors.forEach { sensor ->
+            sensorItems.add(HardwareSpecItem("Type ${sensor.type}", sensor.name))
+        }
         categories.add(
             HardwareSpecCategory(
                 categoryName = context.getString(R.string.category_sensors),
-                items = listOf(
-                    HardwareSpecItem(context.getString(R.string.spec_active_sensors), context.getString(R.string.sensors_registered_format, sensors.size)),
-                    HardwareSpecItem(context.getString(R.string.spec_sensor_list), sensors.take(6).joinToString(", ") { it.name } + if (sensors.size > 6) "..." else "")
-                )
+                items = sensorItems
             )
         )
 

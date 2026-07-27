@@ -58,3 +58,4 @@ The **Robot Runner Companion** is an agentic, native Android Accessibility & Har
 3. **Respect `windows` List Traversal**: On Android 16 / Samsung One UI 8.5 / DeX, fallback to `accessibilityService.windows` when `rootInActiveWindow` is null.
 4. **Micro-Timeouts on Rust Client**: Keep `reqwest` timeouts between 150ms and 1000ms. Never block host execution on localhost sockets.
 5. **Preserve ADB Dual-Bridge Fallback**: Always maintain silent fallback to ADB `get_xml_dump` and `screencap` if Companion is uninstalled or unreachable.
+6. **Updated Dependencies**: NEVER downgrade dependencies versions before trying to fix issues with current used release of them. If you don't find the fix within the current version, ask the user if he agrees with the downgrade.
