@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import packageJson from '../../package.json';
 
-export type CompanionStatus = 'disconnected' | 'connecting' | 'connected' | 'not_installed';
+export type CompanionStatus = 'disconnected' | 'connecting' | 'connected' | 'not_installed' | 'needs_update';
 
 export interface CompanionEventItem {
     type: string;
@@ -64,6 +65,11 @@ export function useCompanion(selectedDevice: string | null) {
             setIsInstalled(installed);
             if (!installed) {
                 setStatus('not_installed');
+            } else {
+                const installedVersion = await getCompanionVersion();
+                if (installedVersion !== packageJson.version && installedVersion !== null) {
+                    setStatus('needs_update');
+                }
             }
             return installed;
         } catch (e) {
@@ -71,6 +77,21 @@ export function useCompanion(selectedDevice: string | null) {
             setIsInstalled(false);
             setStatus('not_installed');
             return false;
+        }
+    }, [selectedDevice]);
+
+    const getCompanionVersion = useCallback(async () => {
+        if (!selectedDevice) return null;
+        try {
+            const version = await invoke<string>('get_app_version', {
+                device: selectedDevice,
+                package: 'com.robotrunner.companion'
+            });
+            // console.log("Versão do app:", version);
+            return version;
+        } catch (e) {
+            console.error("[useCompanion] Failed to get companion version:", e);
+            return null;
         }
     }, [selectedDevice]);
 

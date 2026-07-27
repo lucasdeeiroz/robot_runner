@@ -405,7 +405,7 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                 menus={
                     !isCompact && !isWebMode && (
                         <>
-                            {companionStatus === 'not_installed' && (
+                            {companionStatus === 'not_installed' ? (
                                 <Button
                                     onClick={handleDownloadCompanion}
                                     variant="ghost"
@@ -417,8 +417,19 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                     <Rocket size={14} className="text-primary animate-pulse" />
                                     <span>{t('apps.download_companion', 'Download Companion APK')}</span>
                                 </Button>
-                            )}
-                            {companionStatus !== 'not_installed' && (
+                            ) : companionStatus === 'needs_update' ? (
+                                <Button
+                                    onClick={handleDownloadCompanion}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 hover:bg-primary/20 border border-primary/30 rounded-xl py-1.5 px-3 transition-all h-auto"
+                                    data-tooltip={t('apps.update_companion_tooltip', { version: packageJson.version, defaultValue: `Update companion.apk from current release (v${packageJson.version})` })}
+                                    data-position="bottom"
+                                >
+                                    <Rocket size={14} className="text-primary animate-pulse" />
+                                    <span>{t('apps.update_companion', `Update Companion APK`)}</span>
+                                </Button>
+                            ) : (
                                 <CompanionBadge
                                     status={companionStatus}
                                     deviceInfo={companionInfo}

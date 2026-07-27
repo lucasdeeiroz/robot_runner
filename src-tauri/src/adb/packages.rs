@@ -165,6 +165,18 @@ pub async fn get_app_icon(app: AppHandle, device: String, package: String) -> Re
 }
 
 #[command]
+pub async fn get_app_version(app: AppHandle, device: String, package: String) -> Result<String, String> {
+    let output = run_adb(&app, device, vec!["shell", "dumpsys", "package", &package]).await?;
+    for line in output.lines() {
+        let trimmed_line = line.trim();
+        if let Some(version) = trimmed_line.strip_prefix("versionName=") {
+            return Ok(version.to_string());
+        }
+    }
+    Err(format!("A versão não pôde ser encontrada para o pacote: {}", package))
+}
+
+#[command]
 pub async fn uninstall_package(app: AppHandle, device: String, package: String) -> Result<String, String> {
     run_adb(&app, device, vec!["uninstall", &package]).await
 }
