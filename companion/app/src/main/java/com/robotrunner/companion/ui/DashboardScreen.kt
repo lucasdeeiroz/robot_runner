@@ -169,7 +169,7 @@ fun DashboardScreen(
                     // Top Sub-Tab Row Scoped to Current Bottom Section
                     when (currentSection) {
                         0 -> {
-                            TabRow(
+                            SecondaryTabRow(
                                 selectedTabIndex = subTabDashboard,
                                 containerColor = Color(0xFF1E293B),
                                 contentColor = Color(0xFF38BDF8),
@@ -187,7 +187,7 @@ fun DashboardScreen(
                             }
                         }
                         1 -> {
-                            TabRow(
+                            SecondaryTabRow(
                                 selectedTabIndex = subTabPerf,
                                 containerColor = Color(0xFF1E293B),
                                 contentColor = Color(0xFF38BDF8),
@@ -205,7 +205,7 @@ fun DashboardScreen(
                             }
                         }
                         2 -> {
-                            TabRow(
+                            SecondaryTabRow(
                                 selectedTabIndex = subTabAutomation,
                                 containerColor = Color(0xFF1E293B),
                                 contentColor = Color(0xFF38BDF8),
@@ -223,7 +223,7 @@ fun DashboardScreen(
                             }
                         }
                         3 -> {
-                            TabRow(
+                            SecondaryTabRow(
                                 selectedTabIndex = subTabTools,
                                 containerColor = Color(0xFF1E293B),
                                 contentColor = Color(0xFF38BDF8),
@@ -241,7 +241,7 @@ fun DashboardScreen(
                             }
                         }
                         4 -> {
-                            TabRow(
+                            SecondaryTabRow(
                                 selectedTabIndex = subTabSync,
                                 containerColor = Color(0xFF1E293B),
                                 contentColor = Color(0xFF38BDF8),
