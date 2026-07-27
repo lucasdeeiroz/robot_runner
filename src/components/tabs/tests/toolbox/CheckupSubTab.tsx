@@ -6,7 +6,7 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { tempDir, join } from '@tauri-apps/api/path';
 import { Button } from '@/components/atoms/Button';
-import { Upload, ShieldCheck, CheckCircle2, XCircle, Search, FileText, ListPlus, Info, Download, Filter, FilterX, Play, Plus, Trash2, Edit3, Tv } from 'lucide-react';
+import { Upload, ShieldCheck, CheckCircle2, XCircle, Search, FileText, ListPlus, Info, Download, Filter, FilterX, Play, Plus, Trash2, Edit3, Tv, Check } from 'lucide-react';
 import { Section } from '@/components/organisms/Section';
 import { Modal } from '@/components/organisms/Modal';
 import { ActionCard } from '@/components/atoms/ActionCard';
@@ -194,6 +194,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     const [comparisons, setComparisons] = useState<PropComparison[]>(() => cachedCheckup?.comparisons ?? []);
     const [devicePropsCache, setDevicePropsCache] = useState<Record<string, string>>(() => cachedCheckup?.devicePropsCache ?? {});
     const [filterDivergent, setFilterDivergent] = useState(false);
+    const [onlyFailures, setOnlyFailures] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [isSearchFocused, setIsSearchFocused] = useState(false);
 
@@ -343,7 +344,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                             xmlContent = text;
                         }
                     }
-                } catch (_) {}
+                } catch (_) { }
             }
 
             if (!xmlContent) {
@@ -697,7 +698,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         }
                     }
                 }
-            } catch (_) {}
+            } catch (_) { }
         }
         const deviceOutput: string = await invoke('run_adb_command', {
             device: targetDevice,
@@ -839,6 +840,45 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     }
 
                     setPackageComparisons(pkgComps);
+                }
+
+                // UI Text Checks Compare
+                if (goldenData.ui_text_checks) {
+                    const goldenUiChecks: any[] = goldenData.ui_text_checks;
+
+                    setUiTextChecks(prev => {
+                        const mergedChecks = [...prev];
+
+                        goldenUiChecks.forEach(goldenCheck => {
+                            // Try to match the imported check with an existing one in the UI by ID or Name
+                            const existingIndex = mergedChecks.findIndex(c => c.id === goldenCheck.id || c.name === goldenCheck.name);
+
+                            if (existingIndex >= 0) {
+                                // If the check already exists, update the expected texts (expectedTexts)
+                                mergedChecks[existingIndex] = {
+                                    ...mergedChecks[existingIndex],
+                                    expectedTexts: goldenCheck.expectedTexts || [],
+                                    // Reset old validation to force a new execution if necessary
+                                    isGoldenMatch: undefined,
+                                    status: 'idle'
+                                };
+                            } else {
+                                // If the check from the Golden does not exist in the current session, import it as a new test
+                                mergedChecks.push({
+                                    id: goldenCheck.id || `ui_check_${Date.now()}`,
+                                    name: goldenCheck.name,
+                                    activity: goldenCheck.activity,
+                                    delayMs: goldenCheck.delayMs || 1500,
+                                    enabled: goldenCheck.enabled !== undefined ? goldenCheck.enabled : true,
+                                    expectedTexts: goldenCheck.expectedTexts || [],
+                                    foundTexts: [],
+                                    status: 'idle'
+                                });
+                            }
+                        });
+
+                        return mergedChecks;
+                    });
                 }
 
                 toast.success(t('toolbox.checkup.golden_file_imported', 'Golden file imported successfully!'), { id: 'golden-import' });
@@ -994,7 +1034,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     const data = await resp.json();
                     if (data.status === 'ok') compCheckup = data.checkup;
                 }
-            } catch (_) {}
+            } catch (_) { }
         }
 
         const newResults: Record<string, any> = { ...initResults };
@@ -1309,16 +1349,47 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     const isMatch = c.isGoldenMatch;
                     const statusText = isMatch !== undefined ? (isMatch ? t('toolbox.checkup.status_match', 'Match') : t('toolbox.checkup.status_mismatch', 'Mismatch')) : (c.status === 'done' ? t('common.done', 'Done') : t('common.pending', 'Pending'));
                     const statusClass = isMatch !== undefined ? (isMatch ? 'success' : 'error') : 'info';
-                    const texts = c.foundTexts || c.expectedTexts || [];
-                    const textCount = texts.length;
-                    const textPreview = texts.slice(0, 6).join(', ');
 
+                    // Calcula o tamanho máximo para iterar
+                    const maxLen = Math.max(c.expectedTexts?.length || 0, c.foundTexts?.length || 0);
+                    let textsHtml = '';
+
+                    if (maxLen > 0) {
+                        // Cria uma mini-tabela embutida com scroll caso fique muito longa
+                        textsHtml += `<div style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px;">
+                            <table style="width: 100%; margin: 0; border: none; font-size: 0.85em;">
+                                <thead style="background: #f9f9f9; position: sticky; top: 0;">
+                                    <tr>
+                                        <th style="padding: 4px 8px; border-bottom: 1px solid #ddd;">${t('toolbox.checkup.expected', 'Expected')}</th>
+                                        <th style="padding: 4px 8px; border-bottom: 1px solid #ddd;">${t('toolbox.checkup.found', 'Found')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+
+                        for (let i = 0; i < maxLen; i++) {
+                            const exp = c.expectedTexts?.[i] || '-';
+                            const fnd = c.foundTexts?.[i] || '-';
+                            const match = exp === fnd;
+
+                            textsHtml += `
+                                <tr>
+                                    <td style="padding: 4px 8px; border-bottom: 1px solid #f1f5f9; word-break: break-all; color: #555;">${exp}</td>
+                                    <td style="padding: 4px 8px; border-bottom: 1px solid #f1f5f9; word-break: break-all;" class="${match ? 'success' : 'error'}">${fnd}</td>
+                                </tr>`;
+                        }
+
+                        textsHtml += `</tbody></table></div>`;
+                    } else {
+                        textsHtml = `<em>${t('toolbox.checkup.not_found', 'No texts found')}</em>`;
+                    }
+
+                    // Renderiza a linha principal da tabela (com alinhamento no topo para ficar arrumado)
                     html += `
                         <tr>
-                            <td><strong>${c.name}</strong></td>
-                            <td><code>${c.activity || '-'}</code></td>
-                            <td>${textCount} items: <code>${textPreview}${textCount > 6 ? '...' : ''}</code></td>
-                            <td class="${statusClass}">${statusText}</td>
+                            <td style="vertical-align: center;"><strong>${c.name}</strong></td>
+                            <td style="vertical-align: center;"><code>${c.activity || '-'}</code></td>
+                            <td style="vertical-align: center; padding: 0.25rem;">${textsHtml}</td>
+                            <td style="vertical-align: center;" class="${statusClass}">${statusText}</td>
                         </tr>
                     `;
                 });
@@ -1470,7 +1541,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                     xmlContent = text;
                                 }
                             }
-                        } catch (_) {}
+                        } catch (_) { }
                     }
                     if (!xmlContent) {
                         const dumpPath = '/sdcard/window_dump.xml';
@@ -1584,7 +1655,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     };
 
     const filteredComparisons = comparisons.filter(c => {
-        if (filterDivergent && c.isMatch) return false;
+        if ((filterDivergent || onlyFailures) && c.isMatch) return false;
         if (searchQuery && !c.key.toLowerCase().includes(searchQuery.toLowerCase())) return false;
         return true;
     });
@@ -1737,6 +1808,19 @@ ${html}`;
                     contentClassName="flex-1 flex flex-col md:flex-row gap-4 min-h-0 p-2 overflow-x-auto"
                     menus={
                         <>
+                            <Button
+                                onClick={() => setOnlyFailures(!onlyFailures)}
+                                variant="ghost"
+                                size="icon"
+                                className={clsx(
+                                    "w-8 h-8 rounded-full",
+                                    onlyFailures ? "text-primary hover:text-primary/80" : "text-on-surface-variant/80 hover:text-primary"
+                                )}
+                                data-tooltip={t('toolbox.checkup.onlyFailures', 'Only Failures')}
+                                data-position="left"
+                            >
+                                {onlyFailures ? <Check size={14} /> : <XCircle size={14} />}
+                            </Button>
                             <Button
                                 variant="ghost"
                                 size="icon"
@@ -1946,7 +2030,13 @@ ${html}`;
                                 </Button>
                             }
                         >
-                            {standardChecks.map(check => (
+                            {standardChecks.filter(check => {
+                                if (!onlyFailures) return true;
+                                if (checkResults[check.id]?.goldenExpected !== undefined) {
+                                    return !checkResults[check.id]?.isGoldenMatch;
+                                }
+                                return check.status === 'incorrect';
+                            }).map(check => (
                                 <div key={check.id} className="flex flex-col p-4 rounded-xl border border-outline-variant/30 bg-surface-variant/10 backdrop-blur-md hover:bg-surface-variant/20 transition-all shadow-sm text-sm">
                                     <div className="flex justify-between items-center mb-1 gap-2">
                                         <span className="font-medium text-on-surface leading-tight drop-shadow-sm">{check.name}</span>
@@ -2010,7 +2100,14 @@ ${html}`;
                                 </Button>
                             }
                         >
-                            {additionalChecks.map(check => (
+                            {additionalChecks.filter(check => {
+                                if (!onlyFailures) return true;
+                                if (additionalCheckResults[check.id]?.goldenExpected !== undefined) {
+                                    return !additionalCheckResults[check.id]?.isGoldenMatch;
+                                }
+                                // Testes adicionais só "falham" se der erro de execução (pois não possuem asserts booleanos nativos)
+                                return additionalCheckResults[check.id]?.found === t('toolbox.checkup.error_exec', 'Execution error');
+                            }).map(check => (
                                 <div key={check.id} className="flex flex-col p-4 rounded-xl border border-outline-variant/30 bg-surface-variant/10 backdrop-blur-md hover:bg-surface-variant/20 transition-all shadow-sm text-sm">
                                     <div className="flex justify-between items-center mb-1 gap-2">
                                         <span className="font-medium text-on-surface leading-tight drop-shadow-sm">{check.name}</span>
@@ -2088,7 +2185,7 @@ ${html}`;
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {packageComparisons.map(c => (
+                                            {packageComparisons.filter(c => !onlyFailures || !c.isMatch).map(c => (
                                                 <tr key={c.name} className="border-b border-outline-variant/10 hover:bg-surface-variant/20 transition-colors">
                                                     <td className="p-3 font-mono text-[11px] text-on-surface break-words">{c.name}</td>
                                                     <td className="p-3 font-mono text-[11px] text-on-surface-variant break-words">{c.goldenVersion || '-'}</td>
@@ -2152,7 +2249,7 @@ ${html}`;
                             </div>
                         }
                     >
-                        {uiTextChecks.map(check => (
+                        {uiTextChecks.filter(check => !onlyFailures || check.isGoldenMatch === false).map(check => (
                             <div key={check.id} className="p-3 rounded-xl border border-outline-variant/30 bg-surface-variant/10 flex flex-col gap-2 text-sm">
                                 <div className="flex items-center justify-between gap-2">
                                     <div className="flex items-center gap-2 overflow-hidden">
@@ -2214,18 +2311,39 @@ ${html}`;
                                     </div>
                                 )}
 
-                                {(check.foundTexts || check.expectedTexts) && (
-                                    <div className="text-xs bg-surface/50 p-2 rounded-lg border border-outline-variant/20 flex flex-col gap-1 font-mono text-[11px] max-h-24 overflow-y-auto">
-                                        {check.expectedTexts && check.expectedTexts.length > 0 && (
-                                            <div className="text-on-surface-variant/80">
-                                                <strong>{t('toolbox.checkup.expected', 'Expected')} ({check.expectedTexts.length}):</strong> {check.expectedTexts.slice(0, 6).join(', ')}{check.expectedTexts.length > 6 ? '...' : ''}
-                                            </div>
-                                        )}
-                                        {check.foundTexts && check.foundTexts.length > 0 && (
-                                            <div className="text-primary">
-                                                <strong>{t('toolbox.checkup.found', 'Found')} ({check.foundTexts.length}):</strong> {check.foundTexts.slice(0, 6).join(', ')}{check.foundTexts.length > 6 ? '...' : ''}
-                                            </div>
-                                        )}
+                                {((check.foundTexts && check.foundTexts?.length > 0) || (check.expectedTexts && check.expectedTexts?.length > 0)) && (
+                                    <div className="text-xs bg-surface/50 p-2 rounded-lg border border-outline-variant/20 flex flex-col font-mono text-[11px] max-h-48 overflow-y-auto">
+
+                                        {/* Table Header */}
+                                        <div className="grid grid-cols-2 gap-4 border-b border-outline-variant/30 pb-1 mb-1 font-bold text-on-surface-variant">
+                                            <div>{t('toolbox.checkup.expected', 'Expected')} ({check.expectedTexts?.length || 0})</div>
+                                            <div>{t('toolbox.checkup.found', 'Found')} ({check.foundTexts?.length || 0})</div>
+                                        </div>
+
+                                        {/* Comparison Rows */}
+                                        {Array.from({ length: Math.max(check.expectedTexts?.length || 0, check.foundTexts?.length || 0) }).map((_, index) => {
+                                            const expected = check.expectedTexts?.[index] || '-';
+                                            const found = check.foundTexts?.[index] || '-';
+
+                                            // Validation logic: If equal, it's a success (green), if different, it's an error (red)
+                                            const isMatch = expected === found;
+
+                                            // Validation if both texts do not end with ':'
+                                            const isValidTexts = !expected.endsWith(':') && !found.endsWith(':');
+                                            return (
+                                                <div key={index} className="grid grid-cols-2 gap-4 border-b border-outline-variant/10 last:border-0 py-1">
+                                                    {/* Expected Column */}
+                                                    <div className="text-on-surface-variant/80 break-words">
+                                                        {expected}
+                                                    </div>
+
+                                                    {/* Found Column (With conditional color) */}
+                                                    <div className={`break-words ${!isValidTexts ? 'text-on-surface-variant/80' : isMatch ? 'text-green-500 font-semibold' : 'text-red-500 font-semibold'}`}>
+                                                        {found}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
