@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { AlignLeft, Terminal, Cpu, Cast, FileText, StopCircle, RefreshCcw, Camera, Video, Square, LayoutGrid, Minimize2, Maximize2, Package, Globe, Activity, Timer, ShieldCheck } from "lucide-react";
+import { AlignLeft, Terminal, Cpu, Cast, FileText, StopCircle, RefreshCcw, Camera, Video, Square, LayoutGrid, Minimize2, Maximize2, Package, Globe, Activity, Timer, ShieldCheck, Rocket } from "lucide-react";
 import clsx from "clsx";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettings } from "@/lib/settings";
 import { logEvent } from "@/lib/analytics";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import packageJson from "../../../../../package.json";
 import { LogcatSubTab } from "./LogcatSubTab";
 // import { DmesgSubTab } from "./DmesgSubTab";
 import { AppsSubTab } from "./AppsSubTab";
@@ -295,6 +297,25 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
         recordingSaver.clearFeedback();
     };
 
+    const handleDownloadCompanion = async () => {
+        try {
+            let version = packageJson.version || '2.3.3';
+            try {
+                const { getVersion } = await import('@tauri-apps/api/app');
+                const v = await getVersion();
+                if (v) version = v;
+            } catch (_) { }
+
+            const tag = version.startsWith('v') ? version : `v${version}`;
+            const downloadUrl = `https://github.com/lucasdeeiroz/robot_runner/releases/download/${tag}/companion.apk`;
+
+            feedback.toast.raw.success(t('apps.downloading_companion', { version: tag, defaultValue: `Downloading companion.apk (${tag})...` }));
+            await openUrl(downloadUrl);
+        } catch (e) {
+            feedback.toast.raw.error(t('apps.error.download_companion_failed', { defaultValue: 'Failed to open download link' }), e);
+        }
+    };
+
     return (
         <div ref={containerRef} className={clsx(
             "h-full flex-1 min-h-0 flex flex-col space-y-4 pointer-events-auto relative z-10 bg-surface",
@@ -384,13 +405,28 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                 menus={
                     !isCompact && !isWebMode && (
                         <>
-                            <CompanionBadge
-                                status={companionStatus}
-                                deviceInfo={companionInfo}
-                                showBattery={true}
-                                onConnect={connectCompanion}
-                                onLaunch={launchCompanion}
-                            />
+                            {companionStatus === 'not_installed' && (
+                                <Button
+                                    onClick={handleDownloadCompanion}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 hover:bg-primary/20 border border-primary/30 rounded-xl py-1.5 px-3 transition-all h-auto"
+                                    data-tooltip={t('apps.download_companion_tooltip', { version: packageJson.version, defaultValue: `Download companion.apk from current release (v${packageJson.version})` })}
+                                    data-position="bottom"
+                                >
+                                    <Rocket size={14} className="text-primary animate-pulse" />
+                                    <span>{t('apps.download_companion', 'Download Companion APK')}</span>
+                                </Button>
+                            )}
+                            {companionStatus !== 'not_installed' && (
+                                <CompanionBadge
+                                    status={companionStatus}
+                                    deviceInfo={companionInfo}
+                                    showBattery={true}
+                                    onConnect={connectCompanion}
+                                    onLaunch={launchCompanion}
+                                />
+                            )}
                             <Button
                                 variant="ghost"
                                 size="icon"
