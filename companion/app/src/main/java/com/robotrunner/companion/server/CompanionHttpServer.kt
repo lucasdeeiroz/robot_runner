@@ -49,6 +49,7 @@ class CompanionHttpServer(
         val method = session.method
         Log.i("CompanionHttpServer", "Received ${method.name} request for $uri")
         requestCount++
+        com.robotrunner.companion.sync.ThemeSyncManager.heartbeat()
         onStatusChangedListener?.invoke()
 
         if (uri == "/screenshot/fast" || uri == "/screenshot/720p") {
@@ -428,6 +429,41 @@ class CompanionHttpServer(
                 JsonObject().apply {
                     addProperty("status", "ok")
                     add("peers", gson.toJsonTree(peers))
+                }
+            }
+
+            "/sync/theme" -> {
+                try {
+                    val map = HashMap<String, String>()
+                    session.parseBody(map)
+                    val postData = map["postData"]
+                    val json = gson.fromJson(postData, JsonObject::class.java)
+                    
+                    val theme = json?.get("theme")?.asString ?: "dark"
+                    val primaryColor = json?.get("primaryColor")?.asString
+                    val userName = json?.get("userName")?.asString
+                    val userEmail = json?.get("userEmail")?.asString
+                    val userPhotoBase64 = json?.get("userPhotoBase64")?.asString
+                    val logoBase64 = json?.get("logoBase64")?.asString
+
+                    com.robotrunner.companion.sync.ThemeSyncManager.updateTheme(
+                        theme = theme,
+                        primaryColor = primaryColor,
+                        userName = userName,
+                        userEmail = userEmail,
+                        userPhotoBase64 = userPhotoBase64,
+                        logoBase64 = logoBase64
+                    )
+                    
+                    JsonObject().apply {
+                        addProperty("status", "ok")
+                        addProperty("message", "Theme synced successfully")
+                    }
+                } catch (e: Exception) {
+                    JsonObject().apply {
+                        addProperty("status", "error")
+                        addProperty("message", e.message ?: "Failed to parse theme sync body")
+                    }
                 }
             }
 

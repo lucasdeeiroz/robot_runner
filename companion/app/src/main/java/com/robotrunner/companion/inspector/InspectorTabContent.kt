@@ -52,7 +52,7 @@ fun InspectorTabContent() {
         // Overlay HUD Toggle Header Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Row(
@@ -67,12 +67,12 @@ fun InspectorTabContent() {
                         text = stringResource(id = R.string.header_floating_hud_inspector),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = stringResource(id = R.string.desc_floating_hud_inspector),
                         fontSize = 11.sp,
-                        color = Color(0xFF94A3B8)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -115,7 +115,7 @@ fun InspectorTabContent() {
         // Active Screen Capture Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -123,12 +123,12 @@ fun InspectorTabContent() {
                     text = stringResource(id = R.string.header_ui_inspector),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = stringResource(id = R.string.desc_ui_inspector),
                     fontSize = 11.sp,
-                    color = Color(0xFF94A3B8)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -179,11 +179,11 @@ fun InspectorTabContent() {
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Color(0xFF6366F1),
-                unfocusedBorderColor = Color(0xFF334155),
-                focusedContainerColor = Color(0xFF0F172A),
-                unfocusedContainerColor = Color(0xFF0F172A),
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
             ),
             shape = RoundedCornerShape(10.dp),
             singleLine = true
@@ -200,7 +200,7 @@ fun InspectorTabContent() {
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -208,7 +208,7 @@ fun InspectorTabContent() {
                     text = "Captured Interactive Elements (${filteredElements.size})",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -239,7 +239,7 @@ fun InspectedElementCard(
     onCopyLocator: (String) -> Unit
 ) {
     Surface(
-        color = Color(0xFF0F172A),
+        color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(10.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -255,7 +255,7 @@ fun InspectedElementCard(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            Text(text = "Class: ${element.className}", fontSize = 10.5.sp, color = Color(0xFF94A3B8))
+            Text(text = "Class: ${element.className}", fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             if (element.accessibilityId.isNotBlank()) {
                 LocatorRow(label = "accessibilityId", locator = element.accessibilityId, onCopy = onCopyLocator)
@@ -280,7 +280,7 @@ fun LocatorRow(label: String, locator: String, onCopy: (String) -> Unit) {
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(text = label, fontSize = 9.sp, color = Color(0xFFC084FC), fontWeight = FontWeight.Bold)
-            Text(text = locator, fontSize = 10.5.sp, color = Color.White, fontFamily = FontFamily.Monospace)
+            Text(text = locator, fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurface, fontFamily = FontFamily.Monospace)
         }
         IconButton(
             onClick = { onCopy(locator) },

@@ -58,7 +58,7 @@ fun ShellConsoleTabContent() {
             text = stringResource(id = R.string.shell_header_templates),
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(bottom = 6.dp)
         )
 
@@ -75,13 +75,13 @@ fun ShellConsoleTabContent() {
                         commandInput = template.command
                         execute(template.command)
                     },
-                    label = { Text(text = template.label, fontSize = 11.sp, color = Color.White) },
+                    label = { Text(text = template.label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface) },
                     colors = SuggestionChipDefaults.suggestionChipColors(
-                        containerColor = Color(0xFF1E293B)
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
                     ),
                     border = SuggestionChipDefaults.suggestionChipBorder(
                         enabled = true,
-                        borderColor = Color(0xFF334155)
+                        borderColor = MaterialTheme.colorScheme.outlineVariant
                     )
                 )
             }
@@ -101,11 +101,11 @@ fun ShellConsoleTabContent() {
                 modifier = Modifier.weight(1f),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color(0xFF6366F1),
-                    unfocusedBorderColor = Color(0xFF334155),
-                    focusedContainerColor = Color(0xFF0F172A),
-                    unfocusedContainerColor = Color(0xFF0F172A),
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                 ),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true
@@ -123,7 +123,7 @@ fun ShellConsoleTabContent() {
                 if (isRunning) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(16.dp),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         strokeWidth = 2.dp
                     )
                 } else {
@@ -137,7 +137,7 @@ fun ShellConsoleTabContent() {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF1E293B), RoundedCornerShape(6.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
                     .padding(horizontal = 10.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -157,7 +157,7 @@ fun ShellConsoleTabContent() {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "Console Output", fontSize = 12.sp, color = Color(0xFF94A3B8))
+            Text(text = "Console Output", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 TextButton(
@@ -193,7 +193,7 @@ fun ShellConsoleTabContent() {
                 .weight(1f),
             color = Color(0xFF060911),
             shape = RoundedCornerShape(8.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B))
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
         ) {
             SelectionContainer {
                 Box(

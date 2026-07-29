@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { readFile } from '@tauri-apps/plugin-fs';
 import packageJson from '../../package.json';
+import { useSettings } from '../lib/settings';
+import { useAuth } from '../lib/authStore';
 
 export type CompanionStatus = 'disconnected' | 'connecting' | 'connected' | 'not_installed' | 'needs_update';
 
@@ -53,6 +56,8 @@ export function useCompanion(selectedDevice: string | null) {
     const [deviceInfo, setDeviceInfo] = useState<CompanionDeviceInfo | null>(null);
     const [recentEvents, setRecentEvents] = useState<CompanionEventItem[]>([]);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const { settings } = useSettings();
+    const { user } = useAuth();
 
     const checkInstallation = useCallback(async () => {
         if (!selectedDevice) {
@@ -184,10 +189,73 @@ export function useCompanion(selectedDevice: string | null) {
         }
     }, []);
 
+    const syncTheme = useCallback(async (
+        theme: string, 
+        primaryColor: string, 
+        userName?: string, 
+        userEmail?: string,
+        userPhotoBase64?: string,
+        logoBase64?: string,
+        port = 9876
+    ) => {
+        try {
+            const payload = {
+                theme,
+                primaryColor,
+                userName,
+                userEmail,
+                userPhotoBase64,
+                logoBase64
+            };
+            const rawJson = await invoke<string>('trigger_companion_action', { 
+                port, 
+                endpoint: '/sync/theme',
+                payload: JSON.stringify(payload)
+            });
+            return JSON.parse(rawJson);
+        } catch (e) {
+            console.error("[useCompanion] Failed to sync theme:", e);
+            return null;
+        }
+    }, []);
+
     const connectCompanion = useCallback(async () => {
         if (!selectedDevice) return;
         setStatus('connecting');
         console.log("[useCompanion] Connecting to Companion on device:", selectedDevice);
+
+        // Prepare Logo Base64
+        let logoBase64: string | undefined = undefined;
+        const logoPath = settings.theme === 'light' ? settings.customLogoLight : settings.customLogoDark;
+        if (logoPath) {
+            try {
+                if (logoPath.startsWith('data:')) {
+                    logoBase64 = logoPath.split(',')[1];
+                } else {
+                    let data: Uint8Array | null = null;
+                    try {
+                        data = await readFile(logoPath);
+                    } catch (e) {
+                        if (logoPath.includes('/')) {
+                            data = await readFile(logoPath.replace(/\//g, '\\'));
+                        }
+                    }
+                    if (data) {
+                        const uint8Array = new Uint8Array(data);
+                        let binaryString = '';
+                        // Process in chunks to avoid maximum call stack size and string concat bottleneck
+                        const chunkSize = 8192;
+                        for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                            const chunk = uint8Array.subarray(i, i + chunkSize);
+                            binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+                        }
+                        logoBase64 = btoa(binaryString);
+                    }
+                }
+            } catch (e) {
+                console.warn("[useCompanion] Failed to load logo base64:", e);
+            }
+        }
 
         try {
             const installed = await checkInstallation();
@@ -216,6 +284,16 @@ export function useCompanion(selectedDevice: string | null) {
             const success = await fetchDeviceStats(port);
             if (success) {
                 console.log("[useCompanion] Companion connected successfully!");
+                // Sync theme and user info on initial connection
+                syncTheme(
+                    settings.theme, 
+                    settings.primaryColor || '#6366F1', 
+                    (user?.displayName || user?.email) ?? undefined, 
+                    user?.email ?? undefined, 
+                    user?.photoURL ?? undefined, 
+                    logoBase64, 
+                    port
+                );
                 if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                 pollIntervalRef.current = setInterval(() => {
                     fetchDeviceStats(port);
@@ -229,6 +307,15 @@ export function useCompanion(selectedDevice: string | null) {
                         const retrySuccess = await fetchDeviceStats(port);
                         if (retrySuccess) {
                             console.log("[useCompanion] Companion connected successfully after silent launch!");
+                            syncTheme(
+                                settings.theme, 
+                                settings.primaryColor || '#6366F1', 
+                                (user?.displayName || user?.email) ?? undefined, 
+                                user?.email ?? undefined, 
+                                user?.photoURL ?? undefined, 
+                                logoBase64,
+                                port
+                            );
                             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                             pollIntervalRef.current = setInterval(() => {
                                 fetchDeviceStats(port);
@@ -246,7 +333,7 @@ export function useCompanion(selectedDevice: string | null) {
             console.error("[useCompanion] Connection error:", err);
             setStatus('disconnected');
         }
-    }, [selectedDevice, checkInstallation, fetchDeviceStats, fetchRecentEvents]);
+    }, [selectedDevice, checkInstallation, fetchDeviceStats, fetchRecentEvents, syncTheme, settings.theme, settings.primaryColor, user]);
 
     const launchCompanion = useCallback(async () => {
         if (!selectedDevice) return;
@@ -260,6 +347,53 @@ export function useCompanion(selectedDevice: string | null) {
             console.error("[useCompanion] Failed to launch companion app:", e);
         }
     }, [selectedDevice, connectCompanion]);
+
+    useEffect(() => {
+        if (status === 'connected') {
+            const logoPath = settings.theme === 'light' ? settings.customLogoLight : settings.customLogoDark;
+            const syncThemeWithLogo = async () => {
+                let logoBase64: string | undefined = undefined;
+                if (logoPath) {
+                    try {
+                        if (logoPath.startsWith('data:')) {
+                            logoBase64 = logoPath.split(',')[1];
+                        } else {
+                            let data: Uint8Array | null = null;
+                            try {
+                                data = await readFile(logoPath);
+                            } catch (e) {
+                                if (logoPath.includes('/')) {
+                                    data = await readFile(logoPath.replace(/\//g, '\\'));
+                                }
+                            }
+                            if (data) {
+                                const uint8Array = new Uint8Array(data);
+                                let binaryString = '';
+                                const chunkSize = 8192;
+                                for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                                    const chunk = uint8Array.subarray(i, i + chunkSize);
+                                    binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+                                }
+                                logoBase64 = btoa(binaryString);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("[useCompanion] Failed to load logo base64 in useEffect:", e);
+                    }
+                }
+                
+                syncTheme(
+                    settings.theme, 
+                    settings.primaryColor || '#6366F1', 
+                    (user?.displayName || user?.email) ?? undefined, 
+                    user?.email ?? undefined, 
+                    user?.photoURL ?? undefined,
+                    logoBase64
+                );
+            };
+            syncThemeWithLogo();
+        }
+    }, [settings.theme, settings.primaryColor, settings.customLogoLight, settings.customLogoDark, user, status, syncTheme]);
 
     const triggerAction = useCallback(async (endpoint: string, payload?: any) => {
         try {
@@ -350,6 +484,7 @@ export function useCompanion(selectedDevice: string | null) {
         performNodeAction,
         fetchArtifacts,
         fetchFleetPeers,
-        pushPayload
+        pushPayload,
+        syncTheme
     };
 }

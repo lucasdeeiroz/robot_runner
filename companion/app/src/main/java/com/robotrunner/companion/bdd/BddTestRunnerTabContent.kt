@@ -50,7 +50,7 @@ fun BddTestRunnerTabContent() {
         // Suite Controls Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -58,12 +58,12 @@ fun BddTestRunnerTabContent() {
                     text = stringResource(id = R.string.header_bdd_runner),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = stringResource(id = R.string.desc_bdd_runner),
                     fontSize = 11.sp,
-                    color = Color(0xFF94A3B8)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -139,7 +139,7 @@ fun BddTestRunnerTabContent() {
             val passRate = if (rep.totalScenarios > 0) (rep.passedScenarios * 100) / rep.totalScenarios else 0
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(14.dp)
             ) {
                 Row(
@@ -150,12 +150,12 @@ fun BddTestRunnerTabContent() {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(text = "SUITE SUMMARY", fontSize = 10.sp, color = Color(0xFF94A3B8), fontWeight = FontWeight.Bold)
+                        Text(text = "SUITE SUMMARY", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
                         Text(
                             text = "Passed: ${rep.passedScenarios}/${rep.totalScenarios} Scenarios",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
@@ -167,7 +167,7 @@ fun BddTestRunnerTabContent() {
                             text = "$passRate% PASS RATE",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                     }
@@ -178,7 +178,7 @@ fun BddTestRunnerTabContent() {
         // Live Execution Console Stream
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -186,7 +186,7 @@ fun BddTestRunnerTabContent() {
                     text = "Gherkin Scenario Stream",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -206,7 +206,7 @@ fun BddTestRunnerTabContent() {
 @Composable
 fun ScenarioItemBox(scenario: BddScenario) {
     Surface(
-        color = Color(0xFF0F172A),
+        color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(10.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -216,7 +216,7 @@ fun ScenarioItemBox(scenario: BddScenario) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = scenario.title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(text = scenario.title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 Text(
                     text = scenario.status.name,
                     fontSize = 10.sp,
@@ -246,7 +246,7 @@ fun StepRow(step: BddStep) {
         StepStatus.FAILED -> Color(0xFFEF4444)
         StepStatus.RUNNING -> Color(0xFF38BDF8)
         StepStatus.SKIPPED -> Color(0xFF64748B)
-        else -> Color(0xFF94A3B8)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     Row(
@@ -271,7 +271,7 @@ fun StepRow(step: BddStep) {
         )
         Text(
             text = "${step.action} ${step.targetLocator ?: ""} ${step.textValue ?: ""}",
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
             modifier = Modifier.weight(1f)

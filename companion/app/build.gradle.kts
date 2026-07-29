@@ -63,6 +63,13 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     
+    // Image Loading
+    implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation("io.coil-kt:coil-svg:2.6.0")
+    
+    // Material Icons
+    implementation("androidx.compose.material:material-icons-core")
+    
     // Material 3 (Essencial para as cores dinâmicas e UI Moderna do Android 16)
     implementation("androidx.compose.material3:material3")
     implementation("com.google.android.material:material:1.14.0")

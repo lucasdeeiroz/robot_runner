@@ -14,6 +14,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -72,6 +73,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
 
         // Log uncaught exceptions
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
@@ -192,7 +194,7 @@ fun CompanionAppUI(
     MaterialTheme(
         colorScheme = darkColorScheme(
             primary = Color(0xFF6366F1),
-            surface = Color(0xFF0F172A),
+            surface = MaterialTheme.colorScheme.surface,
             background = Color(0xFF090D16)
         )
     ) {
@@ -216,12 +218,12 @@ fun CompanionAppUI(
                         text = stringResource(id = R.string.app_name),
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = "Mobile Companion Agent",
                         fontSize = 13.sp,
-                        color = Color(0xFF94A3B8)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -231,7 +233,7 @@ fun CompanionAppUI(
                         .fillMaxWidth()
                         .padding(vertical = 12.dp),
                     shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp),
@@ -255,27 +257,27 @@ fun CompanionAppUI(
                             } else "Server Stopped",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSurface
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
-                        HorizontalDivider(color = Color(0xFF334155))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Spacer(modifier = Modifier.height(12.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(text = "ADB Port", color = Color(0xFF94A3B8), fontSize = 13.sp)
-                            Text(text = "$port", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "ADB Port", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                            Text(text = "$port", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(text = "Device IP", color = Color(0xFF94A3B8), fontSize = 13.sp)
-                            Text(text = ipAddress, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "Device IP", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                            Text(text = ipAddress, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

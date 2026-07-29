@@ -52,7 +52,7 @@ fun PerformanceTabContent() {
         // Overlay HUD Toggle Header Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Row(
@@ -67,12 +67,12 @@ fun PerformanceTabContent() {
                         text = stringResource(id = R.string.header_floating_hud),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = stringResource(id = R.string.desc_floating_hud),
                         fontSize = 11.sp,
-                        color = Color(0xFF94A3B8)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -113,7 +113,7 @@ fun PerformanceTabContent() {
         // Real-Time CPU Trend Chart Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -125,7 +125,7 @@ fun PerformanceTabContent() {
                         text = stringResource(id = R.string.chart_cpu_title),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = "${latestSample?.cpuUsagePercent?.toInt() ?: 0}%",
@@ -148,7 +148,7 @@ fun PerformanceTabContent() {
         // Real-Time RAM Trend Chart Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -160,7 +160,7 @@ fun PerformanceTabContent() {
                         text = stringResource(id = R.string.chart_ram_title),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = "${latestSample?.ramUsedMb ?: 0} MB",
@@ -193,7 +193,7 @@ fun PerformanceLineChart(
         modifier = Modifier
             .fillMaxWidth()
             .height(120.dp)
-            .background(Color(0xFF0F172A), RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -202,12 +202,15 @@ fun PerformanceLineChart(
             val width = size.width
             val height = size.height
             val stepX = width / (dataPoints.size - 1)
+            
+            val verticalPadding = 3.dp.toPx()
+            val availableHeight = height - (verticalPadding * 2)
 
             val path = Path()
             dataPoints.forEachIndexed { index, value ->
                 val normY = (value / maxY).coerceIn(0f, 1f)
                 val x = index * stepX
-                val y = height - (normY * height)
+                val y = verticalPadding + (availableHeight - (normY * availableHeight))
 
                 if (index == 0) {
                     path.moveTo(x, y)

@@ -83,11 +83,11 @@ fun PackageManagerTabContent() {
                 .padding(bottom = 8.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Color(0xFF6366F1),
-                unfocusedBorderColor = Color(0xFF334155),
-                focusedContainerColor = Color(0xFF0F172A),
-                unfocusedContainerColor = Color(0xFF0F172A),
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
             ),
             shape = RoundedCornerShape(10.dp),
             singleLine = true
@@ -143,7 +143,7 @@ fun PackageManagerTabContent() {
     selectedApp?.let { app ->
         ModalBottomSheet(
             onDismissRequest = { selectedApp = null },
-            containerColor = Color(0xFF0F172A)
+            containerColor = MaterialTheme.colorScheme.surface
         ) {
             Column(
                 modifier = Modifier
@@ -166,10 +166,10 @@ fun PackageManagerTabContent() {
                         Box(
                             modifier = Modifier
                                 .size(54.dp)
-                                .background(Color(0xFF334155), CircleShape),
+                                .background(MaterialTheme.colorScheme.outlineVariant, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = app.appName.take(1), color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(text = app.appName.take(1), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -180,12 +180,12 @@ fun PackageManagerTabContent() {
                             text = app.appName,
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = app.packageName,
                             fontSize = 12.sp,
-                            color = Color(0xFF94A3B8)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             text = stringResource(id = R.string.label_version, app.versionName, app.versionCode),
@@ -214,7 +214,7 @@ fun PackageManagerTabContent() {
                         Button(
                             onClick = { PackageManagerHelper.openAppDetails(context, app.packageName) },
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155))
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Text(text = stringResource(id = R.string.action_app_details), fontSize = 12.sp)
                         }
@@ -283,7 +283,7 @@ fun PackageManagerTabContent() {
                     text = stringResource(id = R.string.header_permissions),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -301,7 +301,7 @@ fun PackageManagerTabContent() {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(Color(0xFF1E293B), RoundedCornerShape(6.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
                                     .padding(horizontal = 10.dp, vertical = 6.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
@@ -309,7 +309,7 @@ fun PackageManagerTabContent() {
                                 Text(
                                     text = perm.permissionName.substringAfterLast('.'),
                                     fontSize = 11.sp,
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text(
@@ -337,7 +337,7 @@ fun AppItemRow(app: AppInfo, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(10.dp)
     ) {
         Row(
@@ -354,10 +354,10 @@ fun AppItemRow(app: AppInfo, onClick: () -> Unit) {
                 Box(
                     modifier = Modifier
                         .size(42.dp)
-                        .background(Color(0xFF334155), CircleShape),
+                        .background(MaterialTheme.colorScheme.outlineVariant, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = app.appName.take(1), color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(text = app.appName.take(1), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -368,12 +368,12 @@ fun AppItemRow(app: AppInfo, onClick: () -> Unit) {
                     text = app.appName,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = app.packageName,
                     fontSize = 11.sp,
-                    color = Color(0xFF94A3B8)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -381,14 +381,14 @@ fun AppItemRow(app: AppInfo, onClick: () -> Unit) {
 
             // Badge
             Surface(
-                color = if (app.isSystemApp) Color(0xFF334155) else Color(0xFF4338CA),
+                color = if (app.isSystemApp) MaterialTheme.colorScheme.outlineVariant else Color(0xFF4338CA),
                 shape = RoundedCornerShape(4.dp)
             ) {
                 Text(
                     text = if (app.isSystemApp) stringResource(id = R.string.label_system_badge) else stringResource(id = R.string.label_user_badge),
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                 )
             }

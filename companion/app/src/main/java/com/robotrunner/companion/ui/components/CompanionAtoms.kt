@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun CompanionCard(
     modifier: Modifier = Modifier,
-    backgroundColor: Color = Color(0xFF1E293B),
+    backgroundColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     cornerRadius: Dp = 18.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -57,7 +57,7 @@ fun CompanionSectionHeader(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = title,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = fontSize,
                 fontWeight = FontWeight.Bold
             )
@@ -90,8 +90,8 @@ fun CompanionActionButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    containerColor: Color = Color(0xFF6366F1),
-    contentColor: Color = Color.White,
+    containerColor: Color = MaterialTheme.colorScheme.primary,
+    contentColor: Color = MaterialTheme.colorScheme.onPrimary,
     isOutlined: Boolean = false,
     enabled: Boolean = true
 ) {

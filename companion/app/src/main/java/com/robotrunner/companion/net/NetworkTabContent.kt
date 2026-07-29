@@ -57,7 +57,7 @@ fun NetworkTabContent(
         // Section 1: Wireless ADB Pairing Assistant
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -65,12 +65,12 @@ fun NetworkTabContent(
                     text = stringResource(id = R.string.header_wireless_adb),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = stringResource(id = R.string.desc_wireless_adb),
                     fontSize = 12.sp,
-                    color = Color(0xFF94A3B8)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -85,11 +85,11 @@ fun NetworkTabContent(
                         Text(
                             text = stringResource(id = R.string.label_pairing_pin),
                             fontSize = 11.sp,
-                            color = Color(0xFF94A3B8)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Surface(
-                            color = Color(0xFF0F172A),
+                            color = MaterialTheme.colorScheme.surface,
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -124,7 +124,7 @@ fun NetworkTabContent(
                         Text(
                             text = stringResource(id = R.string.label_pairing_port),
                             fontSize = 11.sp,
-                            color = Color(0xFF94A3B8)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         OutlinedTextField(
@@ -132,11 +132,11 @@ fun NetworkTabContent(
                             onValueChange = { pairingPortInput = it },
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = Color(0xFF6366F1),
-                                unfocusedBorderColor = Color(0xFF334155),
-                                focusedContainerColor = Color(0xFF0F172A),
-                                unfocusedContainerColor = Color(0xFF0F172A),
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                             ),
                             shape = RoundedCornerShape(8.dp),
                             singleLine = true
@@ -150,7 +150,7 @@ fun NetworkTabContent(
                 Text(
                     text = stringResource(id = R.string.label_pairing_cmd),
                     fontSize = 11.sp,
-                    color = Color(0xFF94A3B8)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Surface(
@@ -199,7 +199,7 @@ fun NetworkTabContent(
         // Section 2: Active Network Interfaces Inspector
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -207,7 +207,7 @@ fun NetworkTabContent(
                     text = stringResource(id = R.string.header_net_interfaces),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -227,7 +227,7 @@ fun NetworkTabContent(
         // Section 3: REST Server Engine Manager
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -235,7 +235,7 @@ fun NetworkTabContent(
                     text = stringResource(id = R.string.header_rest_control),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -255,7 +255,7 @@ fun NetworkTabContent(
                         Text(
                             text = stringResource(id = R.string.subtext_server_ip, ipAddress),
                             fontSize = 12.sp,
-                            color = Color(0xFF94A3B8)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -289,7 +289,7 @@ fun NetworkTabContent(
 @Composable
 fun NetworkInterfaceRow(iface: NetworkInterfaceItem) {
     Surface(
-        color = Color(0xFF0F172A),
+        color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(8.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -314,7 +314,7 @@ fun NetworkInterfaceRow(iface: NetworkInterfaceItem) {
                     text = iface.interfaceType.name,
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                 )
             }
@@ -326,7 +326,7 @@ fun NetworkInterfaceRow(iface: NetworkInterfaceItem) {
                     text = iface.name,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "IPv4: ${iface.ipv4}",
@@ -339,7 +339,7 @@ fun NetworkInterfaceRow(iface: NetworkInterfaceItem) {
                         text = "IPv6: ${iface.ipv6}",
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = Color(0xFF94A3B8)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

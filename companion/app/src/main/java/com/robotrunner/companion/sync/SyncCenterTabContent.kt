@@ -61,7 +61,7 @@ fun SyncCenterTabContent() {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
@@ -71,7 +71,7 @@ fun SyncCenterTabContent() {
                 ) {
                     Text(
                         text = stringResource(id = R.string.header_sync_center),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.weight(1f)
@@ -93,7 +93,7 @@ fun SyncCenterTabContent() {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = stringResource(id = R.string.desc_sync_center),
-                    color = Color(0xFF94A3B8),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
                 Spacer(modifier = Modifier.height(14.dp))
@@ -128,7 +128,7 @@ fun SyncCenterTabContent() {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
@@ -138,7 +138,7 @@ fun SyncCenterTabContent() {
                 ) {
                     Text(
                         text = stringResource(id = R.string.header_fleet_radar),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.weight(1f)
@@ -150,7 +150,7 @@ fun SyncCenterTabContent() {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = stringResource(id = R.string.desc_fleet_radar),
-                    color = Color(0xFF94A3B8),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -173,7 +173,7 @@ fun SyncCenterTabContent() {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         peers.forEach { peer ->
                             Surface(
-                                color = Color(0xFF0F172A),
+                                color = MaterialTheme.colorScheme.surface,
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -183,8 +183,8 @@ fun SyncCenterTabContent() {
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column {
-                                        Text(text = "${peer.manufacturer} ${peer.model}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        Text(text = "IP: ${peer.ipAddress}:${peer.port}", color = Color(0xFF94A3B8), fontSize = 10.sp)
+                                        Text(text = "${peer.manufacturer} ${peer.model}", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text(text = "IP: ${peer.ipAddress}:${peer.port}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
                                     }
                                     Surface(
                                         color = Color(0xFF22C55E).copy(alpha = 0.2f),
@@ -210,19 +210,19 @@ fun SyncCenterTabContent() {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = stringResource(id = R.string.header_artifact_vault),
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "${artifacts.size} artifacts stored in Downloads",
-                    color = Color(0xFF94A3B8),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -252,7 +252,7 @@ fun SyncCenterTabContent() {
                             }
 
                             Surface(
-                                color = Color(0xFF0F172A),
+                                color = MaterialTheme.colorScheme.surface,
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -278,7 +278,7 @@ fun SyncCenterTabContent() {
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
                                                 text = item.name,
-                                                color = Color.White,
+                                                color = MaterialTheme.colorScheme.onSurface,
                                                 fontSize = 11.5.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 maxLines = 1,

@@ -1,16 +1,24 @@
 package com.robotrunner.companion.ui
 
+import coil.compose.AsyncImage
+import coil.ImageLoader
+import coil.decode.SvgDecoder
+import coil.request.ImageRequest
+
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.*
@@ -36,6 +44,17 @@ import com.robotrunner.companion.shell.ShellConsoleTabContent
 import com.robotrunner.companion.stopwatch.StopwatchTabContent
 import com.robotrunner.companion.sync.SyncCenterTabContent
 import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Info
 
 @Composable
 fun DashboardScreen(
@@ -53,89 +72,248 @@ fun DashboardScreen(
     var subTabAutomation by remember { mutableIntStateOf(0) }
     var subTabTools by remember { mutableIntStateOf(0) }
     var subTabSync by remember { mutableIntStateOf(0) }
+    
+    var profileMenuExpanded by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
-    MaterialTheme(
-        colorScheme = darkColorScheme(
-            primary = Color(0xFF6366F1),
+    val themeState by com.robotrunner.companion.sync.ThemeSyncManager.themeState.collectAsState()
+    
+    val primaryColorVal = try {
+        themeState.primaryColor?.let { Color(android.graphics.Color.parseColor(it)) } ?: Color(0xFF6366F1)
+    } catch (e: Exception) { Color(0xFF6366F1) }
+
+    val isDark = themeState.theme == "dark"
+    val colorScheme = if (isDark) {
+        darkColorScheme(
+            primary = primaryColorVal,
             secondary = Color(0xFF38BDF8),
             surface = Color(0xFF0F172A),
             background = Color(0xFF090D16),
-            surfaceVariant = Color(0xFF1E293B)
+            surfaceVariant = Color(0xFF1E293B),
+            onSurface = Color.White,
+            onSurfaceVariant = Color(0xFF94A3B8)
         )
+    } else {
+        lightColorScheme(
+            primary = primaryColorVal,
+            secondary = Color(0xFF0284C7),
+            surface = Color(0xFFF8FAFC),
+            background = Color(0xFFF1F5F9),
+            surfaceVariant = Color(0xFFE2E8F0),
+            onSurface = Color(0xFF0F172A),
+            onSurfaceVariant = Color(0xFF475569)
+        )
+    }
+
+    MaterialTheme(
+        colorScheme = colorScheme
     ) {
         Scaffold(
             bottomBar = {
-                NavigationBar(
-                    containerColor = Color(0xFF0F172A),
-                    contentColor = Color.White
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(colorScheme.surface)
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                        .windowInsetsPadding(WindowInsets.navigationBars),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    NavigationBarItem(
-                        selected = currentSection == 0,
-                        onClick = { currentSection = 0 },
-                        icon = { Text("📊", fontSize = 16.sp) },
-                        label = { Text(stringResource(id = R.string.nav_dashboard), fontSize = 10.sp, maxLines = 1) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color(0xFF38BDF8),
-                            selectedTextColor = Color(0xFF38BDF8),
-                            indicatorColor = Color(0xFF1E293B),
-                            unselectedIconColor = Color(0xFF64748B),
-                            unselectedTextColor = Color(0xFF64748B)
+                    when (currentSection) {
+                        0 -> {
+                            PillTabBar(
+                                tabs = listOf(
+                                    stringResource(id = R.string.tab_dashboard),
+                                    stringResource(id = R.string.tab_hardware_specs),
+                                    "Network"
+                                ),
+                                selectedIndex = subTabDashboard,
+                                onTabSelected = { subTabDashboard = it }
+                            )
+                        }
+                        1 -> {
+                            PillTabBar(
+                                tabs = listOf("UI Inspector", "Explorer", "BDD Runner"),
+                                selectedIndex = subTabAutomation,
+                                onTabSelected = { subTabAutomation = it }
+                            )
+                        }
+                        2 -> {
+                            PillTabBar(
+                                tabs = listOf("Performance", "Stopwatch", "Logcat"),
+                                selectedIndex = subTabPerf,
+                                onTabSelected = { subTabPerf = it }
+                            )
+                        }
+                        3 -> {
+                            PillTabBar(
+                                tabs = listOf("Apps", "Shell", stringResource(id = R.string.tab_diagnostics)),
+                                selectedIndex = subTabTools,
+                                onTabSelected = { subTabTools = it }
+                            )
+                        }
+                        4 -> {
+                            PillTabBar(
+                                tabs = listOf(stringResource(id = R.string.tab_sync_center)),
+                                selectedIndex = subTabSync,
+                                onTabSelected = { subTabSync = it }
+                            )
+                        }
+                    }
+                }
+            },
+            topBar = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(colorScheme.surface)
+                        .windowInsetsPadding(WindowInsets.statusBars)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (!themeState.logoBase64.isNullOrEmpty()) {
+                                val imageLoader = remember(context) {
+                                    ImageLoader.Builder(context)
+                                        .components { add(SvgDecoder.Factory()) }
+                                        .build()
+                                }
+                                    
+                                val logoBytes = remember(themeState.logoBase64) {
+                                    try {
+                                        android.util.Base64.decode(themeState.logoBase64, android.util.Base64.DEFAULT)
+                                    } catch (e: Exception) { null }
+                                }
+
+                                if (logoBytes != null) {
+                                    AsyncImage(
+                                        model = logoBytes,
+                                        contentDescription = "Logo",
+                                        imageLoader = imageLoader,
+                                        modifier = Modifier.height(28.dp)
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    text = stringResource(id = R.string.app_name),
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colorScheme.onSurface
+                                )
+                            }
+                        }
+
+                        Box {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .background(colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .clickable { profileMenuExpanded = true }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                if (!themeState.userPhotoBase64.isNullOrEmpty()) {
+                                    AsyncImage(
+                                        model = themeState.userPhotoBase64,
+                                        contentDescription = "User",
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                    )
+                                } else {
+                                    androidx.compose.material3.Icon(
+                                        imageVector = Icons.Default.AccountCircle,
+                                        contentDescription = "User",
+                                        modifier = Modifier.size(24.dp),
+                                        tint = colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            
+                            MaterialTheme(
+                                shapes = MaterialTheme.shapes.copy(extraSmall = RoundedCornerShape(16.dp))
+                            ) {
+                                DropdownMenu(
+                                    expanded = profileMenuExpanded,
+                                    onDismissRequest = { profileMenuExpanded = false },
+                                    modifier = Modifier.background(colorScheme.surface)
+                                ) {
+                                    DropdownMenuItem(
+                                    text = { Text("Configurações", color = colorScheme.onSurface) },
+                                    leadingIcon = { 
+                                        androidx.compose.material3.Icon(
+                                            imageVector = Icons.Default.Settings,
+                                            contentDescription = null,
+                                            tint = colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    onClick = {
+                                        currentSection = 3
+                                        profileMenuExpanded = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Sobre", color = colorScheme.onSurface) },
+                                    leadingIcon = { 
+                                        androidx.compose.material3.Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    onClick = {
+                                        currentSection = 4
+                                        profileMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                    
+                    TabRow(
+                        selectedTabIndex = if (currentSection > 2) -1 else currentSection,
+                        containerColor = colorScheme.surface,
+                        contentColor = primaryColorVal,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp, horizontal = 16.dp)
+                            .clip(RoundedCornerShape(16.dp)),
+                        divider = {},
+                        indicator = {}
+                    ) {
+                        val tabs = listOf(
+                            "Início" to Icons.Default.Home,
+                            "Executar" to Icons.Default.PlayArrow,
+                            "Testes" to Icons.Default.List
                         )
-                    )
-                    NavigationBarItem(
-                        selected = currentSection == 1,
-                        onClick = { currentSection = 1 },
-                        icon = { Text("⚡", fontSize = 16.sp) },
-                        label = { Text(stringResource(id = R.string.nav_performance), fontSize = 10.sp, maxLines = 1) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color(0xFF38BDF8),
-                            selectedTextColor = Color(0xFF38BDF8),
-                            indicatorColor = Color(0xFF1E293B),
-                            unselectedIconColor = Color(0xFF64748B),
-                            unselectedTextColor = Color(0xFF64748B)
-                        )
-                    )
-                    NavigationBarItem(
-                        selected = currentSection == 2,
-                        onClick = { currentSection = 2 },
-                        icon = { Text("🧪", fontSize = 16.sp) },
-                        label = { Text(stringResource(id = R.string.nav_automation), fontSize = 10.sp, maxLines = 1) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color(0xFF38BDF8),
-                            selectedTextColor = Color(0xFF38BDF8),
-                            indicatorColor = Color(0xFF1E293B),
-                            unselectedIconColor = Color(0xFF64748B),
-                            unselectedTextColor = Color(0xFF64748B)
-                        )
-                    )
-                    NavigationBarItem(
-                        selected = currentSection == 3,
-                        onClick = { currentSection = 3 },
-                        icon = { Text("🛠️", fontSize = 16.sp) },
-                        label = { Text(stringResource(id = R.string.nav_tools), fontSize = 10.sp, maxLines = 1) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color(0xFF38BDF8),
-                            selectedTextColor = Color(0xFF38BDF8),
-                            indicatorColor = Color(0xFF1E293B),
-                            unselectedIconColor = Color(0xFF64748B),
-                            unselectedTextColor = Color(0xFF64748B)
-                        )
-                    )
-                    NavigationBarItem(
-                        selected = currentSection == 4,
-                        onClick = { currentSection = 4 },
-                        icon = { Text("🔄", fontSize = 16.sp) },
-                        label = { Text(stringResource(id = R.string.nav_sync), fontSize = 10.sp, maxLines = 1) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color(0xFF38BDF8),
-                            selectedTextColor = Color(0xFF38BDF8),
-                            indicatorColor = Color(0xFF1E293B),
-                            unselectedIconColor = Color(0xFF64748B),
-                            unselectedTextColor = Color(0xFF64748B)
-                        )
-                    )
+                        tabs.forEachIndexed { index, (label, icon) ->
+                            Tab(
+                                selected = currentSection == index,
+                                onClick = { currentSection = index },
+                                modifier = Modifier
+                                    .padding(horizontal = 4.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(if (currentSection == index) primaryColorVal.copy(alpha = 0.15f) else Color.Transparent),
+                                text = { 
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        androidx.compose.material3.Icon(
+                                            imageVector = icon,
+                                            contentDescription = label,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(label, fontSize = 13.sp, fontWeight = if (currentSection == index) FontWeight.Bold else FontWeight.Medium)
+                                    }
+                                },
+                                selectedContentColor = primaryColorVal,
+                                unselectedContentColor = colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
         ) { innerPadding ->
@@ -143,117 +321,9 @@ fun DashboardScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .background(Color(0xFF090D16))
+                    .background(colorScheme.background)
             ) {
-                // Header Banner
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFF0F172A))
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = stringResource(id = R.string.app_name),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Text(
-                        text = stringResource(id = R.string.subtitle_agent),
-                        fontSize = 11.sp,
-                        color = Color(0xFF94A3B8)
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
 
-                    // Top Sub-Tab Row Scoped to Current Bottom Section
-                    when (currentSection) {
-                        0 -> {
-                            SecondaryTabRow(
-                                selectedTabIndex = subTabDashboard,
-                                containerColor = Color(0xFF1E293B),
-                                contentColor = Color(0xFF38BDF8),
-                                modifier = Modifier.height(40.dp)
-                            ) {
-                                Tab(selected = subTabDashboard == 0, onClick = { subTabDashboard = 0 }) {
-                                    Text(stringResource(id = R.string.tab_dashboard), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                                Tab(selected = subTabDashboard == 1, onClick = { subTabDashboard = 1 }) {
-                                    Text(stringResource(id = R.string.tab_hardware_specs), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                                Tab(selected = subTabDashboard == 2, onClick = { subTabDashboard = 2 }) {
-                                    Text("Network", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                            }
-                        }
-                        1 -> {
-                            SecondaryTabRow(
-                                selectedTabIndex = subTabPerf,
-                                containerColor = Color(0xFF1E293B),
-                                contentColor = Color(0xFF38BDF8),
-                                modifier = Modifier.height(40.dp)
-                            ) {
-                                Tab(selected = subTabPerf == 0, onClick = { subTabPerf = 0 }) {
-                                    Text("Performance", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                                Tab(selected = subTabPerf == 1, onClick = { subTabPerf = 1 }) {
-                                    Text("Stopwatch", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                                Tab(selected = subTabPerf == 2, onClick = { subTabPerf = 2 }) {
-                                    Text("Logcat", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                            }
-                        }
-                        2 -> {
-                            SecondaryTabRow(
-                                selectedTabIndex = subTabAutomation,
-                                containerColor = Color(0xFF1E293B),
-                                contentColor = Color(0xFF38BDF8),
-                                modifier = Modifier.height(40.dp)
-                            ) {
-                                Tab(selected = subTabAutomation == 0, onClick = { subTabAutomation = 0 }) {
-                                    Text("UI Inspector", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                                Tab(selected = subTabAutomation == 1, onClick = { subTabAutomation = 1 }) {
-                                    Text("Explorer", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                                Tab(selected = subTabAutomation == 2, onClick = { subTabAutomation = 2 }) {
-                                    Text("BDD Runner", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                            }
-                        }
-                        3 -> {
-                            SecondaryTabRow(
-                                selectedTabIndex = subTabTools,
-                                containerColor = Color(0xFF1E293B),
-                                contentColor = Color(0xFF38BDF8),
-                                modifier = Modifier.height(40.dp)
-                            ) {
-                                Tab(selected = subTabTools == 0, onClick = { subTabTools = 0 }) {
-                                    Text("Apps", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                                Tab(selected = subTabTools == 1, onClick = { subTabTools = 1 }) {
-                                    Text("Shell", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                                Tab(selected = subTabTools == 2, onClick = { subTabTools = 2 }) {
-                                    Text(stringResource(id = R.string.tab_diagnostics), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                            }
-                        }
-                        4 -> {
-                            SecondaryTabRow(
-                                selectedTabIndex = subTabSync,
-                                containerColor = Color(0xFF1E293B),
-                                contentColor = Color(0xFF38BDF8),
-                                modifier = Modifier.height(40.dp)
-                            ) {
-                                Tab(selected = subTabSync == 0, onClick = { subTabSync = 0 }) {
-                                    Text(stringResource(id = R.string.tab_sync_center), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                            }
-                        }
-                    }
-                }
 
                 // Active Sub-Tab View Content
                 Box(
@@ -279,15 +349,15 @@ fun DashboardScreen(
                                 onToggleServer = onToggleServer
                             )
                         }
-                        1 -> when (subTabPerf) {
-                            0 -> PerformanceTabContent()
-                            1 -> StopwatchTabContent()
-                            2 -> LogcatTabContent()
-                        }
-                        2 -> when (subTabAutomation) {
+                        1 -> when (subTabAutomation) {
                             0 -> InspectorTabContent()
                             1 -> ExplorerTabContent()
                             2 -> BddTestRunnerTabContent()
+                        }
+                        2 -> when (subTabPerf) {
+                            0 -> PerformanceTabContent()
+                            1 -> StopwatchTabContent()
+                            2 -> LogcatTabContent()
                         }
                         3 -> when (subTabTools) {
                             0 -> PackageManagerTabContent()
@@ -326,7 +396,7 @@ fun DashboardTabContent(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Row(
                 modifier = Modifier
@@ -345,7 +415,7 @@ fun DashboardTabContent(
                     Text(
                         text = if (telemetry.isServerRunning) "IP: $ipAddress:$port" else stringResource(id = R.string.subtext_tap_start),
                         fontSize = 12.sp,
-                        color = Color(0xFF94A3B8)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -410,20 +480,20 @@ fun DashboardTabContent(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = stringResource(id = R.string.label_accessibility),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "Grants sub-10ms UI tree inspection, click dispatching and autonomous exploration.",
                     fontSize = 12.sp,
-                    color = Color(0xFF94A3B8)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -458,14 +528,14 @@ fun GaugeCard(
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            Text(text = title, fontSize = 11.sp, color = Color(0xFF94A3B8), fontWeight = FontWeight.SemiBold)
+            Text(text = title, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(4.dp))
             Text(text = value, fontSize = 20.sp, color = color, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(2.dp))
-            Text(text = subtitle, fontSize = 10.sp, color = Color(0xFF64748B))
+            Text(text = subtitle, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -480,7 +550,7 @@ fun HardwareSpecsTabContent(detailedSpecs: List<HardwareSpecCategory>) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
@@ -503,13 +573,13 @@ fun HardwareSpecsTabContent(detailedSpecs: List<HardwareSpecCategory>) {
                             ) {
                                 Text(
                                     text = item.label,
-                                    color = Color(0xFF94A3B8),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 12.sp
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = item.value,
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.fillMaxWidth(),
@@ -525,22 +595,23 @@ fun HardwareSpecsTabContent(detailedSpecs: List<HardwareSpecCategory>) {
                             ) {
                                 Text(
                                     text = item.label,
-                                    color = Color(0xFF94A3B8),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 12.sp,
                                     modifier = Modifier.weight(1f, fill = false)
                                 )
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = item.value,
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.SemiBold,
+                                    textAlign = TextAlign.End
                                 )
                             }
                         }
 
                         if (index < category.items.size - 1) {
-                            HorizontalDivider(color = Color(0xFF334155), modifier = Modifier.padding(vertical = 4.dp))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 4.dp))
                         }
                     }
                 }
@@ -569,15 +640,15 @@ fun DiagnosticsTabContent(
         // POS & Hardware Diagnostics Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(stringResource(id = R.string.header_pos_hardware_checklist), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(id = R.string.header_pos_hardware_checklist), color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     "Comprehensive hardware diagnostic checklist for battery, memory, NFC and POS thermal printers.",
-                    color = Color(0xFF94A3B8),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
                 Spacer(modifier = Modifier.height(14.dp))
@@ -617,15 +688,15 @@ fun DiagnosticsTabContent(
         // UI Text Verification & Golden File Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(stringResource(id = R.string.header_ui_text_verification), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(id = R.string.header_ui_text_verification), color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     stringResource(id = R.string.desc_ui_text_verification),
-                    color = Color(0xFF94A3B8),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
                 Spacer(modifier = Modifier.height(14.dp))
@@ -666,13 +737,13 @@ fun DiagnosticsTabContent(
                 uiTextResult?.let { res ->
                     Spacer(modifier = Modifier.height(12.dp))
                     Surface(
-                        color = Color(0xFF0F172A),
+                        color = MaterialTheme.colorScheme.surface,
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(text = "Screen: ${res.screenName}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8))
-                            Text(text = "Match Score: ${res.matchPercentage}% (${res.totalMatched} / ${res.totalExpected})", fontSize = 12.sp, color = Color.White)
+                            Text(text = "Match Score: ${res.matchPercentage}% (${res.totalMatched} / ${res.totalExpected})", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
                             if (res.missingTexts.isNotEmpty()) {
                                 Text(text = "Missing: ${res.missingTexts.take(3).joinToString(", ")}", fontSize = 10.5.sp, color = Color(0xFFEF4444))
                             }
@@ -685,15 +756,15 @@ fun DiagnosticsTabContent(
         // Technical Audit PDF Report Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(stringResource(id = R.string.header_pdf_audit_report), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(id = R.string.header_pdf_audit_report), color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     stringResource(id = R.string.desc_pdf_audit_report),
-                    color = Color(0xFF94A3B8),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
                 Spacer(modifier = Modifier.height(14.dp))
@@ -749,15 +820,15 @@ fun DiagnosticsTabContent(
         // Display Test Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Display & Color Calibration", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text("Display & Color Calibration", color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     "Launch full screen RGB screen test to check for dead pixels and light bleeding.",
-                    color = Color(0xFF94A3B8),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
                 Spacer(modifier = Modifier.height(14.dp))
@@ -770,6 +841,50 @@ fun DiagnosticsTabContent(
                     Text("Launch Full Screen Display Test", fontWeight = FontWeight.SemiBold)
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun PillTabBar(
+    tabs: List<String>,
+    selectedIndex: Int,
+    onTabSelected: (Int) -> Unit
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val primaryColorVal = Color(0xFF10B981) // emerald-500 matching Desktop TabBar
+
+    ScrollableTabRow(
+        selectedTabIndex = selectedIndex,
+        containerColor = colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        contentColor = primaryColorVal,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+            .padding(4.dp),
+        edgePadding = 0.dp,
+        divider = {},
+        indicator = {}
+    ) {
+        tabs.forEachIndexed { index, label ->
+            Tab(
+                selected = selectedIndex == index,
+                onClick = { onTabSelected(index) },
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (selectedIndex == index) primaryColorVal.copy(alpha = 0.15f) else Color.Transparent),
+                text = {
+                    Text(
+                        text = label,
+                        fontSize = 12.sp,
+                        fontWeight = if (selectedIndex == index) FontWeight.Bold else FontWeight.Medium
+                    )
+                },
+                selectedContentColor = primaryColorVal,
+                unselectedContentColor = colorScheme.onSurfaceVariant
+            )
         }
     }
 }

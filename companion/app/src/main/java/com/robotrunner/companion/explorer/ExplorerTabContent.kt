@@ -42,7 +42,7 @@ fun ExplorerTabContent() {
         // Floating HUD Overlay Control Card for Explorer
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Row(
@@ -57,12 +57,12 @@ fun ExplorerTabContent() {
                         text = "🖥️ Explorer Floating HUD Overlay",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = "Control and stop exploration overlay directly on target app",
                         fontSize = 11.sp,
-                        color = Color(0xFF94A3B8)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -105,7 +105,7 @@ fun ExplorerTabContent() {
         // Target App Configuration & Control Header Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -119,12 +119,12 @@ fun ExplorerTabContent() {
                             text = stringResource(id = R.string.header_autonomous_explorer),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = stringResource(id = R.string.desc_autonomous_explorer),
                             fontSize = 11.sp,
-                            color = Color(0xFF94A3B8)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -142,11 +142,11 @@ fun ExplorerTabContent() {
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color(0xFF6366F1),
-                        unfocusedBorderColor = Color(0xFF334155),
-                        focusedContainerColor = Color(0xFF0F172A),
-                        unfocusedContainerColor = Color(0xFF0F172A),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                     ),
                     shape = RoundedCornerShape(10.dp),
                     singleLine = true
@@ -203,7 +203,7 @@ fun ExplorerTabContent() {
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text(text = stringResource(id = R.string.btn_reset_exploration), fontSize = 11.sp, color = Color(0xFF94A3B8))
+                        Text(text = stringResource(id = R.string.btn_reset_exploration), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
 
                     Button(
@@ -254,7 +254,7 @@ fun ExplorerTabContent() {
         // Discovered Screens Graph Table Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -262,7 +262,7 @@ fun ExplorerTabContent() {
                     text = "Discovered Screens Graph (${report.discoveredScreens.size})",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -282,7 +282,7 @@ fun ExplorerTabContent() {
         // Recent Action Stream Ticker
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -290,7 +290,7 @@ fun ExplorerTabContent() {
                     text = "Action Stream Ticker (DFS Clicks & BACK)",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -312,7 +312,7 @@ fun ExplorerTabContent() {
 @Composable
 fun ExplorerStateBadge(state: ExplorerState) {
     val (bgColor, textColor, label) = when (state) {
-        ExplorerState.IDLE -> Triple(Color(0xFF334155), Color(0xFF94A3B8), "IDLE")
+        ExplorerState.IDLE -> Triple(MaterialTheme.colorScheme.outlineVariant, MaterialTheme.colorScheme.onSurfaceVariant, "IDLE")
         ExplorerState.RUNNING -> Triple(Color(0xFF166534), Color(0xFF4ADE80), "RUNNING")
         ExplorerState.PAUSED -> Triple(Color(0xFF854D0E), Color(0xFFFDE047), "PAUSED")
         ExplorerState.EXHAUSTED -> Triple(Color(0xFF1E1B4B), Color(0xFFA78BFA), "EXHAUSTED")
@@ -342,14 +342,14 @@ fun ExplorerGaugeCard(
 ) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(text = title, fontSize = 9.sp, color = Color(0xFF94A3B8), fontWeight = FontWeight.Bold)
+            Text(text = title, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(4.dp))
             Text(text = value, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = color)
         }
@@ -359,7 +359,7 @@ fun ExplorerGaugeCard(
 @Composable
 fun ScreenNodeCard(screenNode: ScreenNode) {
     Surface(
-        color = Color(0xFF0F172A),
+        color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(10.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -375,12 +375,12 @@ fun ScreenNodeCard(screenNode: ScreenNode) {
                 Text(
                     text = "ID: ${screenNode.screenId} | ${screenNode.elements.size} elements",
                     fontSize = 10.sp,
-                    color = Color(0xFF94A3B8),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontFamily = FontFamily.Monospace
                 )
             }
             Surface(
-                color = Color(0xFF1E293B),
+                color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(6.dp)
             ) {
                 Text(
@@ -398,7 +398,7 @@ fun ScreenNodeCard(screenNode: ScreenNode) {
 @Composable
 fun ActionTickerItem(action: ExplorationAction) {
     Surface(
-        color = Color(0xFF0F172A),
+        color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(6.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -420,7 +420,7 @@ fun ActionTickerItem(action: ExplorationAction) {
                 Text(
                     text = action.targetElementName,
                     fontSize = 11.sp,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
             Text(

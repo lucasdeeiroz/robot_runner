@@ -92,7 +92,7 @@ fun StopwatchTabContent() {
         // Overlay HUD Toggle Header Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Row(
@@ -107,12 +107,12 @@ fun StopwatchTabContent() {
                         text = stringResource(id = R.string.header_floating_hud_stopwatch),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = stringResource(id = R.string.desc_floating_hud_stopwatch),
                         fontSize = 11.sp,
-                        color = Color(0xFF94A3B8)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -154,7 +154,7 @@ fun StopwatchTabContent() {
         // Live Meter Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Column(
@@ -167,12 +167,12 @@ fun StopwatchTabContent() {
                     text = stringResource(id = R.string.header_redraw_stopwatch),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = stringResource(id = R.string.desc_redraw_stopwatch),
                     fontSize = 11.sp,
-                    color = Color(0xFF94A3B8)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -194,7 +194,7 @@ fun StopwatchTabContent() {
                         text = deltaStatusText,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
@@ -204,7 +204,7 @@ fun StopwatchTabContent() {
         // Benchmark Session Controls Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -250,7 +250,7 @@ fun StopwatchTabContent() {
                         },
                         enabled = isRecording,
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.outlineVariant),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(text = stringResource(id = R.string.btn_manual_lap), fontSize = 12.sp)
@@ -293,7 +293,7 @@ fun StopwatchTabContent() {
         // Laps Table
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -301,7 +301,7 @@ fun StopwatchTabContent() {
                     text = "Captured Redraw Splits (${laps.size})",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -323,7 +323,7 @@ fun StopwatchTabContent() {
 @Composable
 fun StatCard(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
     Surface(
-        color = Color(0xFF1E293B),
+        color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(10.dp),
         modifier = modifier
     ) {
@@ -331,7 +331,7 @@ fun StatCard(label: String, value: String, color: Color, modifier: Modifier = Mo
             modifier = Modifier.padding(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(text = label, fontSize = 8.sp, color = Color(0xFF94A3B8), fontWeight = FontWeight.Bold)
+            Text(text = label, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(4.dp))
             Text(text = value, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = color, fontFamily = FontFamily.Monospace)
         }
@@ -341,7 +341,7 @@ fun StatCard(label: String, value: String, color: Color, modifier: Modifier = Mo
 @Composable
 fun LapItemRow(lap: RedrawLap) {
     Surface(
-        color = Color(0xFF0F172A),
+        color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(8.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -353,7 +353,7 @@ fun LapItemRow(lap: RedrawLap) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(text = "#${lap.lapNumber}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF6366F1))
                 Spacer(modifier = Modifier.width(10.dp))
-                Text(text = lap.packageName.substringAfterLast('.'), fontSize = 11.sp, color = Color.White)
+                Text(text = lap.packageName.substringAfterLast('.'), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
             }
 
             Text(
