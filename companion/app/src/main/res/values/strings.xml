@@ -143,6 +143,12 @@
     <string name="tab_performance">Performance</string>
     <string name="search_logcat_placeholder">Search logcat tags or text...</string>
     <string name="msg_logcat_exported">Logcat saved to Downloads: %1$s</string>
+    <string name="log_level_all">ALL</string>
+    <string name="log_level_info">INFO</string>
+    <string name="log_level_warn">WARN</string>
+    <string name="log_level_err">ERR</string>
+    <string name="msg_listening_logcat">Listening for Logcat stream...</string>
+    <string name="msg_logcat_stopped">Logcat is stopped. Click Play to start.</string>
     <string name="header_floating_hud">🖥️ Floating Performance HUD Overlay</string>
     <string name="desc_floating_hud">Displays live CPU, RAM, and Battery HUD over active target apps.</string>
     <string name="btn_start_hud">Start Floating HUD</string>

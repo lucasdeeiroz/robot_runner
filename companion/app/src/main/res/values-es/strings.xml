@@ -138,6 +138,12 @@
     <string name="tab_performance">Rendimiento</string>
     <string name="search_logcat_placeholder">Buscar etiquetas o texto de logcat...</string>
     <string name="msg_logcat_exported">Logcat guardado en Descargas: %1$s</string>
+    <string name="log_level_all">TODOS</string>
+    <string name="log_level_info">INFO</string>
+    <string name="log_level_warn">WARN</string>
+    <string name="log_level_err">ERR</string>
+    <string name="msg_listening_logcat">Escuchando el stream de Logcat...</string>
+    <string name="msg_logcat_stopped">Logcat está pausado. Haz clic en Play para iniciar.</string>
     <string name="header_floating_hud">🖥️ Superposición Flotante de Rendimiento (HUD)</string>
     <string name="desc_floating_hud">Muestra HUD con CPU, RAM y Batería sobre aplicaciones en uso.</string>
     <string name="btn_start_hud">Iniciar HUD Flotante</string>

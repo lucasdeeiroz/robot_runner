@@ -43,7 +43,7 @@ import com.lucasdeeiroz.robotrunner.apps.PackageManagerTabContent
 import com.lucasdeeiroz.robotrunner.bdd.BddTestRunnerTabContent
 import com.lucasdeeiroz.robotrunner.explorer.ExplorerTabContent
 import com.lucasdeeiroz.robotrunner.inspector.InspectorTabContent
-import com.lucasdeeiroz.robotrunner.logcat.LogcatTabContent
+import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.LogcatSubTab
 import com.lucasdeeiroz.robotrunner.model.HardwareSpecCategory
 import com.lucasdeeiroz.robotrunner.model.LiveTelemetry
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.home.ConnectSubTab
@@ -390,7 +390,7 @@ fun HomePage(
                             3 -> PlaceholderTabContent(stringResource(id = R.string.tab_scenarios_ai))
                         }
                         2 -> when (subTabToolbox) {
-                            0 -> LogcatTabContent()
+                            0 -> LogcatSubTab()
                             1 -> PerformanceTabContent()
                             2 -> StopwatchTabContent()
                             3 -> ShellConsoleTabContent()
