@@ -24,4 +24,4 @@ val LightSecondary = Color(0xFF0284C7)
 val LightOutline = Color(0xFFCBD5E1)
 
 // Premium UI / Glassmorphism constants
-val GlassmorphismAlpha = 0.6f
+val GlassmorphismAlpha = 0.85f

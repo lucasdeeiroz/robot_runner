@@ -16,20 +16,6 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 2. UI/UX Design & Jetpack Compose Standards
-
-1. **Modern Dark Aesthetics**: Use Material3 with modern dark color palettes, subtle glassmorphism, and responsive layouts that adapt seamlessly across phone screens, tablets, and POS receipt screens (720p / 480p).
-2. **Strict Color Theming (No Hardcoded Colors)**: NEVER use hardcoded Hex colors (e.g., `Color(0xFF10B981)`) for UI elements that must support Dark/Light modes. ALWAYS use `MaterialTheme.colorScheme` (e.g., `primary`, `error`, `surfaceVariant`). Custom semantic colors (like success/warning) must be added as extensions to the theme or derived safely.
-3. **Glassmorphism**: Utilize the custom `glassmorphicBackground` modifier to mimic the Desktop's Tailwind `backdrop-blur-md` aesthetic.
-4. **Animations**: UI state changes should be fluid. Use Compose's `AnimatedVisibility` and `animate*AsState` APIs for transitions.
-5. **Non-Intrusive Floating Inspector**: The on-device UI Inspector floating overlay must be draggable, collapsible, and easily toggled off so it never blocks the user's manual app interaction.
-6. **Visible texts must be internationalized**: All texts visible to the user must be internationalized in `./companion/app/src/main/res/` for `values/`, `values-es/` and `values-pt`.
-7. **Adaptive Icons**: Ensure the app icon uses Android's adaptive icons (separating background and foreground).
-8. **Live Activities & Bubbles**: For long tests, utilize ongoing background notifications. For floating status monitors, use Bubbles.
-9. **Predictive Back**: Migrate navigation to use Jetpack Navigation with Compose or `OnBackPressedDispatcher`, avoiding legacy `onBackPressed()`.
-
----
-
 ## 2. Kotlin Architecture & Performance Standards
 
 1. **Coroutines & Thread Safety**:
@@ -48,7 +34,7 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 4. Hardware Telemetry & Accessibility Detection Rules
+## 3. Hardware Telemetry & Accessibility Detection Rules
 
 1. **Accessibility Service Status Check**:
    - Always check `CompanionAccessibilityService.isRunning` first (checking `instance != null`) before querying system settings.
@@ -63,7 +49,7 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 6. On-Device Package Management & Local Shell Execution Rules
+## 4. On-Device Package Management & Local Shell Execution Rules
 
 1. **Async Package Traversal**:
    - Querying `packageManager.getInstalledPackages()` or requested permissions can inspect hundreds of applications on Android devices. This operation MUST be run asynchronously on `Dispatchers.IO` to prevent blocking the UI frame rendering or triggering ANR (Application Not Responding) dialogs.
@@ -77,7 +63,7 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 7. Wireless ADB & Network Interface Traversal Rules
+## 5. Wireless ADB & Network Interface Traversal Rules
 
 1. **Android 11+ Wireless Debugging Deep-Linking**:
    - Always verify `Build.VERSION.SDK_INT >= Build.VERSION_CODES.R` (API 30) before suggesting Wireless Debugging workflows. Use `Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS` with fallback to `Settings.ACTION_SETTINGS` to safely open system Developer Options.
@@ -87,7 +73,7 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 8. Ring-Buffer Logcat Streaming & Overlay HUD Rules
+## 6. Ring-Buffer Logcat Streaming & Overlay HUD Rules
 
 1. **Memory-Bounded Ring Buffer for Logcat**:
    - Streaming `logcat` on device can generate thousands of lines per minute. Always bound the in-memory log buffer (e.g. max 1,000 items) using thread-safe synchronization (`Collections.synchronizedList` or `ArrayDeque`) to prevent OutOfMemory (OOM) crashes during long QA testing sessions.
@@ -97,7 +83,7 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 9. Accessibility-Driven Redraw Latency & Stopwatch Rules
+## 7. Accessibility-Driven Redraw Latency & Stopwatch Rules
 
 1. **Hardware-Accurate Event Delta Calculation**:
    - Screen redraw deltas are computed inside `CompanionAccessibilityService` by pairing the touch event timestamp (`TYPE_VIEW_CLICKED`, `performTap`) with the subsequent screen content change event timestamp (`TYPE_WINDOW_CONTENT_CHANGED`). Always validate that `now >= lastTouchTimestamp` and cap realistic UI render deltas between 1ms and 10,000ms to eliminate anomalous background redraw noise.
@@ -107,7 +93,7 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 10. Accessibility-Driven BDD Execution & Report Generation Rules
+## 8. Accessibility-Driven BDD Execution & Report Generation Rules
 
 1. **Native UI Tree Matching & Gesture Dispatching**:
    - Native BDD test step execution relies on `CompanionAccessibilityService.performNodeActionByMatch` to locate interactive views by `textMatch`, `contentDescMatch`, or `resourceId`. Always fallback to parent containers if `isClickable` is false on child text views.
@@ -117,7 +103,7 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 11. On-Device DFS Graph Autonomous Exploration Rules
+## 9. On-Device DFS Graph Autonomous Exploration Rules
 
 1. **Native DFS State Machine Isolation**:
    - On-device autonomous exploration runs on `Dispatchers.IO` using Kotlin Coroutines inside `AutonomousExplorerEngine`. Always emit graph state changes (`UNEXPLORED`, `EXPLORING`, `EXHAUSTED`) through thread-safe `StateFlow` streams.
@@ -127,7 +113,7 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 12. Offline Hardware Diagnostics, UI Text Verification & PDF Audit Rules
+## 10. Offline Hardware Diagnostics, UI Text Verification & PDF Audit Rules
 
 1. **Golden File Schema Compatibility**:
    - Golden Files generated on device (`golden_*.json`) must conform strictly to `version 2.0` schema, exporting clean `id`, `text`, and `description` properties compatible with Desktop assertions.
@@ -137,22 +123,19 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
-## 13. Bi-Directional Synchronization & Fleet P2P Subnet Discovery Rules
+## 11. Bi-Directional Synchronization & Fleet P2P Subnet Discovery Rules
 
 1. **Artifact Vault Indexing & Scoped File Sharing**:
    - `SyncManager` indexes local artifacts (`map_*.json`, `golden_*.json`, `suite_*.json`, `report_*.html`, `audit_report_*.pdf`) directly from `Environment.DIRECTORY_DOWNLOADS`. Sharing files to external apps or Desktop must always go through `FileProvider.getUriForFile()` with `FLAG_GRANT_READ_URI_PERMISSION`.
 
-2. **Subnet P2P Discovery Rate & Timeout Isolation**:
-   - Subnet scanning in `FleetP2pBridge` queries up to 254 IP addresses on `Dispatchers.IO` using bounded Coroutine jobs (`async`). Enforce strict connection and read timeouts (e.g. 400ms) on each HTTP socket check to prevent ANR UI thread lockup.
-
 ---
 
-## 16. Continuous Learning & Rule Maintenance Instruction
+## 12. Continuous Learning & Rule Maintenance Instruction
 
 > **IMPORTANT**: As new features, optimizations, or Android SDK workarounds are implemented in `companion/`, the **Android Companion Engineer** profile MUST update and append new rules directly to this document.
 ---
 
-## 17. UI Folder Structure & Code Organization
+## 13. UI Folder Structure & Code Organization
 
 1. **Desktop Parity**: The Android Companion app MUST mirror the React Desktop structure for its UI components to maintain consistency across the workspace.
    - **Pages**: Root-level screens should reside in ui/pages (e.g., HomePage.kt).
@@ -160,6 +143,8 @@ This document outlines mandatory architectural guidelines, performance standards
    - Never place UI tab components loosely in root packages or unorganized folders (like 
 et/ or sync/ if they are UI representations). Keep business logic in their respective modules, but UI components must follow the ui/ hierarchy.
 
-## 18. Internationalization & Strings
+## 14. Internationalization & Strings
 
 1. **No Hardcoded UI Strings**: Ensure that any string exposed to the UI (titles, descriptions, placeholders) uses stringResource(id = R.string.key). Avoid hardcoded English or Portuguese text in Compose files.
+2. **Resource Duplication Prevention**: Always check for existing keys before adding new strings to `strings.xml` in multiple languages (`values`, `values-pt`, `values-es`) to avoid Gradle build failures from resource merging.
+3. **Strings outside Composable Context**: For strings that need to be accessed outside of the Compose hierarchy (e.g., inside `onClick` lambdas for `Toast.makeText` or `Intent.createChooser`), do NOT use `@Composable` `stringResource`. Retrieve the `Context` beforehand (e.g. `val context = LocalContext.current`) and use `context.getString(R.string.key)`.

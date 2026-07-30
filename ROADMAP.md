@@ -42,58 +42,143 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
 ---
 
 ## Fase: Revisão da Aba Dashboard (Home)
+  - [x] Internacionalizar todos os textos.
+  - [x] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [x] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [x] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
 - [/] Revisar, otimizar e garantir a paridade da UI/UX da aba Dashboard do Companion com o Desktop.
   - [ ] Popular seção 'Atividade' com os dados fornecidos pelo Robot Runner Desktop.
   - [x] Restante da UI
 
 ## Fase: Revisão da Aba Sync Center (Home)
-- [ ] Revisar fluxos de conexão e emparelhamento.
+  - [x] Internacionalizar todos os textos.
+  - [x] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [x] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [x] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
+- [x] Revisar fluxos de conexão e emparelhamento.
 
 ## Fase: Revisão da Aba Network (Home)
-- [ ] Otimizar os componentes de leitura de tráfego de rede e consumo.
+  - [x] Internacionalizar todos os textos.
+  - [x] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [x] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [x] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
+- [x] Otimizar os componentes de leitura de tráfego de rede e consumo.
 
 ## Fase: Revisão da Aba BDD Runner (Run)
+  - [ ] Internacionalizar todos os textos.
+  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
 - [ ] Otimizar a execução de suítes de automação e validação de relatórios exportados.
 
 ## Fase: Revisão da Aba UI Inspector (Run)
+  - [ ] Internacionalizar todos os textos.
+  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
 - [ ] Assegurar sub-10ms na leitura de árvore hierárquica e envio do payload para o Desktop.
 
 ## Fase: Revisão da Aba Explorer (Run)
+  - [ ] Internacionalizar todos os textos.
+  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
 - [ ] Revisar a lógica de busca heurística e exploração (DFS Grafo) do aplicativo.
 
 ## Fase: Revisão da Aba Logcat (Toolbox)
+  - [ ] Internacionalizar todos os textos.
+  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
 - [ ] Garantir o limite em memória circular e evitar memory leaks no streaming local de logcat.
 
 ## Fase: Revisão da Aba Performance (Toolbox)
+  - [ ] Internacionalizar todos os textos.
+  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
 - [ ] Otimizar gráficos e captura multi-tier de CPU/RAM em tempo real.
 
 ## Fase: Revisão da Aba Stopwatch (Toolbox)
+  - [ ] Internacionalizar todos os textos.
+  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
 - [ ] Revisar a engine de Redraw para cálculos precisos (deltas de renderização) entre comandos de clique e redraw de UI.
 
 ## Fase: Revisão da Aba Shell Console (Toolbox)
+  - [ ] Internacionalizar todos os textos.
+  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
 - [ ] Otimizar isolamento de streams Stdout/Stderr e timeouts seguros via Coroutines.
 
 ## Fase: Revisão da Aba Apps (Toolbox)
+  - [ ] Internacionalizar todos os textos.
+  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
 - [ ] Revisar a renderização da lista de apps via PackageManager no Companion App.
 
 ## Fase: Revisão da Aba Hardware Specs (Toolbox)
+  - [ ] Internacionalizar todos os textos.
+  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
 - [ ] Conferir validações SELinux em dispositivos POS Android para recuperar status de rede/memória.
 
 ## Fase: Revisão da Aba Diagnostics (Toolbox)
+  - [ ] Internacionalizar todos os textos.
+  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
 - [ ] Validar extração do JSON Golden File e geração offline do Relatório de Auditoria PDF.
 
 ---
 
 ## Fase: Implementação da Aba Scenarios (Run)
+  - [ ] Internacionalizar todos os textos.
+  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
 - [ ] Criar interface (atualmente placeholder) e integração AI no Companion App, substituindo o placeholder pela tela interativa.
 
 ## Fase: Implementação da Aba Run Console (Toolbox)
+  - [ ] Internacionalizar todos os textos.
+  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
 - [ ] Espelhar a aba Console de Execução (log bruto em tempo real) para testes BDD em interface mobile.
 
 ## Fase: Implementação da Aba Webview (Toolbox)
+  - [ ] Internacionalizar todos os textos.
+  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
 - [ ] Adicionar suporte a inspeção webview híbrida via Companion App.
 
 ## Fase: Implementação da Aba History (Toolbox)
+  - [ ] Internacionalizar todos os textos.
+  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
 - [ ] Construir layout para listagem de todos os relatórios `.json` e `.pdf` já gerados no aparelho local.
 
 ---

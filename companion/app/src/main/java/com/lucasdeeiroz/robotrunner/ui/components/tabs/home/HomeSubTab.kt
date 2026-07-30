@@ -49,7 +49,7 @@ fun HomeSubTab(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(bottom = 24.dp)
+            .padding(bottom = 100.dp)
     ) {
         // Server Hub (Quick Server Actions Bar equivalent)
         Card(

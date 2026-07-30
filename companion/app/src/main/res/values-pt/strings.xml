@@ -274,4 +274,23 @@
     <string name="header_display_calibration">Calibração de Tela e Cor</string>
     <string name="desc_display_calibration">Inicie o teste de tela RGB para verificar pixels mortos e vazamento de luz.</string>
 
+    <string name="label_ipv6_format">IPv6: %1$s</string>
+    <string name="label_ipv4_format">IPv4: %1$s</string>
+    <string name="label_na">N/A</string>
+    <string name="label_adb_pair_command">Comando de Pareamento ADB</string>
+    <string name="msg_scanning_subnet">Escaneando Sub-rede Wi-Fi...</string>
+    <string name="msg_desktop_sync_active">Servidor de Sync Desktop Ativo em http://%1$s:9876/sync/artifacts</string>
+    <string name="format_kb_date">%1$s KB • %2$s</string>
+    <string name="format_device_name">%1$s %2$s</string>
+    <string name="format_fileprovider">%1$s.fileprovider</string>
+    <string name="btn_share_artifact">Compartilhar Artefato</string>
+    <string name="format_ip_port">IP: %1$s:%2$d</string>
+    <string name="msg_artifacts_stored">%1$d artefatos armazenados em Downloads</string>
+    <string name="label_port_active_uppercase">PORTA 9876 ATIVA</string>
+    <string name="label_online">ONLINE</string>
+    <string name="msg_error_sharing_artifact">Erro ao compartilhar artefato: %1$s</string>
+    <string name="msg_no_artifacts_generated">Nenhum artefato gerado ainda. Rode o Inspetor, Testes BDD ou Checkups para gerar arquivos.</string>
+    <string name="msg_artifact_deleted">Artefato deletado</string>
+    <string name="tab_connect">Conectar</string>
+
 </resources>

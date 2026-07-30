@@ -273,4 +273,23 @@
     <string name="label_guest">Invitado</string>
     <string name="label_no_hosts">Sin hosts</string>
     <string name="label_no_activity">Sin actividad</string>
+    <string name="label_ipv6_format">IPv6: %1$s</string>
+    <string name="label_ipv4_format">IPv4: %1$s</string>
+    <string name="label_na">N/A</string>
+    <string name="label_adb_pair_command">Comando de Emparejamiento ADB</string>
+    <string name="msg_scanning_subnet">Escaneando Subred Wi-Fi...</string>
+    <string name="msg_desktop_sync_active">Servidor de Sync Desktop Activo en http://%1$s:9876/sync/artifacts</string>
+    <string name="format_kb_date">%1$s KB • %2$s</string>
+    <string name="format_device_name">%1$s %2$s</string>
+    <string name="format_fileprovider">%1$s.fileprovider</string>
+    <string name="btn_share_artifact">Compartir Artefacto</string>
+    <string name="format_ip_port">IP: %1$s:%2$d</string>
+    <string name="msg_artifacts_stored">%1$d artefactos almacenados en Descargas</string>
+    <string name="label_port_active_uppercase">PUERTO 9876 ACTIVO</string>
+    <string name="label_online">EN LÍNEA</string>
+    <string name="msg_error_sharing_artifact">Error al compartir artefacto: %1$s</string>
+    <string name="msg_no_artifacts_generated">Aún no hay artefactos generados. Ejecute el Inspector, Pruebas BDD o Checkups para generar archivos.</string>
+    <string name="msg_artifact_deleted">Artefacto eliminado</string>
+    <string name="tab_connect">Conectar</string>
+
 </resources>

@@ -69,6 +69,7 @@ dependencies {
     
     // Material Icons
     implementation("androidx.compose.material:material-icons-core")
+    implementation("androidx.compose.material:material-icons-extended")
     
     // Material 3 (Essencial para as cores dinâmicas e UI Moderna do Android 16)
     implementation("androidx.compose.material3:material3")

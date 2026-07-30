@@ -10,6 +10,11 @@ import android.content.Intent
 import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.List
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.horizontalScroll
@@ -24,7 +29,6 @@ import androidx.compose.material3.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.*
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.home.HomeSubTab
-import com.lucasdeeiroz.robotrunner.ui.components.tabs.home.SyncCenterSubTab
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.home.ConnectSubTab
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,17 +50,15 @@ import com.lucasdeeiroz.robotrunner.ui.components.tabs.home.ConnectSubTab
 import com.lucasdeeiroz.robotrunner.performance.PerformanceTabContent
 import com.lucasdeeiroz.robotrunner.shell.ShellConsoleTabContent
 import com.lucasdeeiroz.robotrunner.stopwatch.StopwatchTabContent
-import com.lucasdeeiroz.robotrunner.ui.components.tabs.home.SyncCenterSubTab
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.List
+
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Build
@@ -142,7 +144,6 @@ fun HomePage(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(colorScheme.surface)
                         .padding(horizontal = 20.dp, vertical = 8.dp)
                         .windowInsetsPadding(WindowInsets.navigationBars),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -151,9 +152,8 @@ fun HomePage(
                         0 -> {
                             PillTabBar(
                                 tabs = listOf(
-                                    stringResource(id = R.string.tab_dashboard),
-                                    stringResource(id = R.string.tab_sync_center),
-                                    stringResource(id = R.string.tab_network)
+                                    PillTabItem(stringResource(id = R.string.tab_dashboard), Icons.Rounded.Dashboard),
+                                    PillTabItem(stringResource(id = R.string.tab_connect), Icons.Rounded.Wifi)
                                 ),
                                 selectedIndex = subTabHome,
                                 onTabSelected = { subTabHome = it }
@@ -161,7 +161,12 @@ fun HomePage(
                         }
                         1 -> {
                             PillTabBar(
-                                tabs = listOf(stringResource(id = R.string.tab_bdd_runner), stringResource(id = R.string.tab_ui_inspector), stringResource(id = R.string.tab_explorer), stringResource(id = R.string.tab_scenarios)),
+                                tabs = listOf(
+                                    PillTabItem(stringResource(id = R.string.tab_bdd_runner), Icons.Rounded.PlayArrow),
+                                    PillTabItem(stringResource(id = R.string.tab_ui_inspector), Icons.Rounded.Search),
+                                    PillTabItem(stringResource(id = R.string.tab_explorer), Icons.Rounded.Explore),
+                                    // PillTabItem(stringResource(id = R.string.tab_scenarios), Icons.AutoMirrored.Rounded.List)
+                                ),
                                 selectedIndex = subTabRun,
                                 onTabSelected = { subTabRun = it }
                             )
@@ -169,10 +174,16 @@ fun HomePage(
                         2 -> {
                             PillTabBar(
                                 tabs = listOf(
-                                    stringResource(id = R.string.tab_logcat), stringResource(id = R.string.tab_performance), stringResource(id = R.string.tab_stopwatch), stringResource(id = R.string.tab_shell),
-                                    stringResource(id = R.string.tab_apps), stringResource(id = R.string.tab_hardware_specs), 
-                                    stringResource(id = R.string.tab_diagnostics), 
-                                    stringResource(id = R.string.tab_run_console), stringResource(id = R.string.tab_webview), stringResource(id = R.string.tab_history)
+                                    PillTabItem(stringResource(id = R.string.tab_logcat), Icons.Rounded.FormatAlignLeft),
+                                    PillTabItem(stringResource(id = R.string.tab_performance), Icons.Rounded.Speed),
+                                    PillTabItem(stringResource(id = R.string.tab_stopwatch), Icons.Rounded.Timer),
+                                    PillTabItem(stringResource(id = R.string.tab_shell), Icons.Rounded.Terminal),
+                                    PillTabItem(stringResource(id = R.string.tab_apps), Icons.Rounded.Apps),
+                                    PillTabItem(stringResource(id = R.string.tab_hardware_specs), Icons.Rounded.Memory),
+                                    PillTabItem(stringResource(id = R.string.tab_diagnostics), Icons.Rounded.Build),
+                                    // PillTabItem(stringResource(id = R.string.tab_webview), Icons.Rounded.Language),
+                                    PillTabItem(stringResource(id = R.string.tab_run_console), Icons.Rounded.Code),
+                                    PillTabItem(stringResource(id = R.string.tab_history), Icons.Rounded.History)
                                 ),
                                 selectedIndex = subTabToolbox,
                                 onTabSelected = { subTabToolbox = it }
@@ -307,7 +318,7 @@ fun HomePage(
                         val tabs = listOf(
                             stringResource(id = R.string.tab_main_home) to Icons.Default.Home,
                             stringResource(id = R.string.tab_main_run) to Icons.Default.PlayArrow,
-                            stringResource(id = R.string.tab_main_tests) to Icons.Default.List
+                            stringResource(id = R.string.tab_main_tests) to Icons.AutoMirrored.Rounded.List
                         )
                         tabs.forEachIndexed { index, (label, icon) ->
                             Tab(
@@ -339,7 +350,10 @@ fun HomePage(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
+                    .padding(
+                        top = paddingValues.calculateTopPadding(),
+                        bottom = 0.dp
+                    )
                     .background(MaterialTheme.colorScheme.surface)
             ) {
 
@@ -360,8 +374,8 @@ fun HomePage(
                                 onToggleServer = onToggleServer,
                                 context = context
                             )
-                            1 -> SyncCenterSubTab()
-                            2 -> ConnectSubTab(
+                            
+                            1 -> ConnectSubTab(
                                 ipAddress = ipAddress,
                                 port = port,
                                 isServerRunning = telemetry.isServerRunning,
@@ -725,9 +739,11 @@ fun DiagnosticsTabContent(
     }
 }
 
+data class PillTabItem(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+
 @Composable
 fun PillTabBar(
-    tabs: List<String>,
+    tabs: List<PillTabItem>,
     selectedIndex: Int,
     onTabSelected: (Int) -> Unit
 ) {
@@ -736,8 +752,7 @@ fun PillTabBar(
 
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .background(colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+            .glassmorphicBackground(colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
             .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp))
             .padding(4.dp)
@@ -745,7 +760,7 @@ fun PillTabBar(
         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        tabs.forEachIndexed { index, label ->
+        tabs.forEachIndexed { index, tabItem ->
             Tab(
                 selected = selectedIndex == index,
                 onClick = { onTabSelected(index) },
@@ -754,11 +769,21 @@ fun PillTabBar(
                     .clip(RoundedCornerShape(12.dp))
                     .background(if (selectedIndex == index) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent),
                 text = {
-                    Text(
-                        text = label,
-                        fontSize = 12.sp,
-                        fontWeight = if (selectedIndex == index) FontWeight.Bold else FontWeight.Medium
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = tabItem.icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = tabItem.label,
+                            fontSize = 12.sp,
+                            fontWeight = if (selectedIndex == index) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
                 },
                 selectedContentColor = MaterialTheme.colorScheme.primary,
                 unselectedContentColor = colorScheme.onSurfaceVariant

@@ -129,6 +129,7 @@ fun PackageManagerTabContent() {
             }
         } else {
             LazyColumn(
+        contentPadding = PaddingValues(bottom = 100.dp),
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
