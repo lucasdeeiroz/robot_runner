@@ -1,4 +1,4 @@
-package com.lucasdeeiroz.robotrunner.sync
+package com.lucasdeeiroz.robotrunner.ui.components.tabs.home
 
 import android.content.Intent
 import android.widget.Toast
@@ -21,13 +21,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.lucasdeeiroz.robotrunner.R
+
+import com.lucasdeeiroz.robotrunner.sync.FleetP2pBridge
+import com.lucasdeeiroz.robotrunner.sync.FleetPeerDevice
+import com.lucasdeeiroz.robotrunner.sync.SyncManager
+import com.lucasdeeiroz.robotrunner.sync.ArtifactItem
+import com.lucasdeeiroz.robotrunner.sync.ArtifactCategory
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
-fun SyncCenterTabContent() {
+fun SyncCenterSubTab() {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val syncManager = remember { SyncManager(context) }

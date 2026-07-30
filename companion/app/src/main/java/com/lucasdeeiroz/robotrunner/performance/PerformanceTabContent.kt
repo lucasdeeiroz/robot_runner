@@ -1,5 +1,7 @@
 package com.lucasdeeiroz.robotrunner.performance
 
+import com.lucasdeeiroz.robotrunner.ui.pages.GaugeCard
+
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -49,6 +51,27 @@ fun PerformanceTabContent() {
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Live Telemetry Gauges Grid
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            GaugeCard(
+                title = stringResource(id = R.string.gauge_cpu_title),
+                value = "${latestSample?.cpuUsagePercent?.toInt() ?: 0}%",
+                subtitle = stringResource(id = R.string.gauge_cpu_sub),
+                color = Color(0xFF38BDF8),
+                modifier = Modifier.weight(1f)
+            )
+            GaugeCard(
+                title = stringResource(id = R.string.gauge_ram_title),
+                value = "${((latestSample?.ramUsedMb?.toFloat() ?: 0f) / (latestSample?.ramTotalMb?.toFloat()?.takeIf { it > 0f } ?: 1f) * 100).toInt()}%",
+                subtitle = "${latestSample?.ramUsedMb ?: 0}/${latestSample?.ramTotalMb ?: 0} MB",
+                color = Color(0xFF10B981),
+                modifier = Modifier.weight(1f)
+            )
+        }
+
         // Overlay HUD Toggle Header Card
         Card(
             modifier = Modifier.fillMaxWidth(),

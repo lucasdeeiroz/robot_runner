@@ -467,6 +467,68 @@ class CompanionHttpServer(
                 }
             }
 
+            "/sync/host" -> {
+                try {
+                    val map = HashMap<String, String>()
+                    session.parseBody(map)
+                    val postData = map["postData"]
+                    val json = gson.fromJson(postData, JsonObject::class.java)
+                    
+                    val hostname = json?.get("hostname")?.asString ?: "Unknown Host"
+                    val osName = json?.get("os_name")?.asString ?: "Unknown OS"
+                    val osVersion = json?.get("os_version")?.asString ?: ""
+                    val userName = json?.get("user_name")?.asString
+
+                    com.lucasdeeiroz.robotrunner.sync.DesktopSyncManager.updateHost(
+                        hostname = hostname,
+                        osName = osName,
+                        osVersion = osVersion,
+                        userName = userName
+                    )
+                    
+                    JsonObject().apply {
+                        addProperty("status", "ok")
+                        addProperty("message", "Host metadata synced successfully")
+                    }
+                } catch (e: Exception) {
+                    JsonObject().apply {
+                        addProperty("status", "error")
+                        addProperty("message", e.message ?: "Failed to parse host sync body")
+                    }
+                }
+            }
+
+            "/sync/activity" -> {
+                try {
+                    val map = HashMap<String, String>()
+                    session.parseBody(map)
+                    val postData = map["postData"]
+                    val json = gson.fromJson(postData, JsonObject::class.java)
+                    
+                    val type = json?.get("type")?.asString ?: "unknown"
+                    val status = json?.get("status")?.asString ?: "info"
+                    val message = json?.get("message")?.asString ?: ""
+                    val timestamp = json?.get("timestamp")?.asLong ?: System.currentTimeMillis()
+
+                    com.lucasdeeiroz.robotrunner.sync.DesktopSyncManager.pushActivity(
+                        type = type,
+                        status = status,
+                        message = message,
+                        timestamp = timestamp
+                    )
+                    
+                    JsonObject().apply {
+                        addProperty("status", "ok")
+                        addProperty("message", "Activity event synced successfully")
+                    }
+                } catch (e: Exception) {
+                    JsonObject().apply {
+                        addProperty("status", "error")
+                        addProperty("message", e.message ?: "Failed to parse activity sync body")
+                    }
+                }
+            }
+
             "/printer/test-print" -> {
                 val printed = printerHelper.printTestReceipt()
                 JsonObject().apply {

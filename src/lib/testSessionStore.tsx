@@ -454,8 +454,19 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
             session.aiPrompt,
             sessionProfileName
         );
-
         try {
+            // Notificar Android Companion sobre o início da atividade de teste
+            invoke('trigger_companion_action', {
+                port: 9876,
+                endpoint: '/sync/activity',
+                payload: JSON.stringify({
+                    type: "bdd_test",
+                    status: "running",
+                    message: session.testPath || "Test Execution",
+                    timestamp: Date.now()
+                })
+            }).catch(e => console.warn("Failed to notify companion:", e));
+
             // Check Appium (Skip for Maestro, Cypress, Selenium, or if Robot is selected and noAppiumForRobot is enabled)
             const fw = session.framework;
             const skipAppium = fw === 'maestro' || fw === 'cypress' || fw === 'selenium' || (fw === 'robot' && settings.noAppiumForRobot);

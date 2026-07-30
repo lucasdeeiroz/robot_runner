@@ -227,4 +227,17 @@
     <string name="nav_automation">Automação</string>
     <string name="nav_tools">Ferramentas</string>
     <string name="nav_sync">Sync &amp; Frota</string>
+
+    <!-- Dashboard Sync Strings PT-BR -->
+    <string name="header_connected_hosts">Hosts Conectados</string>
+    <string name="desc_connected_hosts">Robot Runner Desktops gerenciando este dispositivo</string>
+    <string name="header_activity">Atividade</string>
+    <string name="desc_activity">Execuções de testes e interações recentes</string>
+    <string name="no_hosts_connected">Nenhum host conectado</string>
+    <string name="no_recent_activity">Nenhuma atividade recente</string>
+    <string name="header_local_device_status">Status Local do Dispositivo</string>
+    <string name="desc_local_device_status">Visão geral da saúde deste dispositivo</string>
+    <string name="status_charging">Carregando</string>
+    <string name="status_discharging">Descarregando</string>
+    <string name="desc_accessibility_grants">Permite inspeção da árvore de UI abaixo de 10ms, envio de cliques e exploração autônoma.</string>
 </resources>

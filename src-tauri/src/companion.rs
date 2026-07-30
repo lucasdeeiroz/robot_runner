@@ -473,3 +473,23 @@ pub async fn push_companion_payload(port: Option<u16>, payload: String) -> AppRe
 
     Ok(text)
 }
+
+#[derive(serde::Serialize)]
+pub struct HostMetadata {
+    pub hostname: String,
+    pub os_name: String,
+}
+
+#[command]
+pub async fn get_host_metadata() -> AppResult<HostMetadata> {
+    let hostname = std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .unwrap_or_else(|_| "Unknown Host".to_string());
+        
+    let os_name = std::env::consts::OS.to_string();
+
+    Ok(HostMetadata {
+        hostname,
+        os_name,
+    })
+}

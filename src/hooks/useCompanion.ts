@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { version } from '@tauri-apps/plugin-os';
 import { readFile } from '@tauri-apps/plugin-fs';
 import packageJson from '../../package.json';
 import { useSettings } from '../lib/settings';
@@ -12,6 +13,11 @@ export interface CompanionEventItem {
     packageName: string;
     message: string;
     timestamp: number;
+}
+
+export interface HostMetadata {
+    hostname: string;
+    os_name: string;
 }
 
 export interface CompanionDeviceInfo {
@@ -294,6 +300,7 @@ export function useCompanion(selectedDevice: string | null) {
                     logoBase64, 
                     port
                 );
+                syncHostInfo(port);
                 if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                 pollIntervalRef.current = setInterval(() => {
                     fetchDeviceStats(port);
@@ -316,6 +323,7 @@ export function useCompanion(selectedDevice: string | null) {
                                 logoBase64,
                                 port
                             );
+                            syncHostInfo(port);
                             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                             pollIntervalRef.current = setInterval(() => {
                                 fetchDeviceStats(port);
@@ -466,6 +474,48 @@ export function useCompanion(selectedDevice: string | null) {
         }
     }, []);
 
+    const syncHostInfo = useCallback(async (port = 9876) => {
+        try {
+            const hostData = await invoke<HostMetadata>('get_host_metadata');
+            const payload = {
+                hostname: hostData.hostname,
+                os_name: hostData.os_name,
+                os_version: version(),
+                appVersion: packageJson.version,
+                user_name: user?.displayName || user?.email || 'Unknown User'
+            };
+            const result = await invoke<string>('trigger_companion_action', {
+                port,
+                endpoint: '/sync/host',
+                payload: JSON.stringify(payload)
+            });
+            return JSON.parse(result);
+        } catch (e) {
+            console.warn("[useCompanion] Failed to sync host info:", e);
+            return null;
+        }
+    }, [user]);
+
+    const pushActivityEvent = useCallback(async (status: string, testName: string, port = 9876) => {
+        try {
+            const payload = {
+                type: "bdd_test",
+                status,
+                message: testName,
+                timestamp: Date.now()
+            };
+            const result = await invoke<string>('trigger_companion_action', {
+                port,
+                endpoint: '/sync/activity',
+                payload: JSON.stringify(payload)
+            });
+            return JSON.parse(result);
+        } catch (e) {
+            console.warn("[useCompanion] Failed to push activity event:", e);
+            return null;
+        }
+    }, []);
+
     return {
         status,
         isInstalled,
@@ -485,6 +535,8 @@ export function useCompanion(selectedDevice: string | null) {
         fetchArtifacts,
         fetchFleetPeers,
         pushPayload,
-        syncTheme
+        syncTheme,
+        syncHostInfo,
+        pushActivityEvent
     };
 }

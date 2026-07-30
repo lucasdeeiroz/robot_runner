@@ -19,11 +19,14 @@ This document outlines mandatory architectural guidelines, performance standards
 ## 2. UI/UX Design & Jetpack Compose Standards
 
 1. **Modern Dark Aesthetics**: Use Material3 with modern dark color palettes, subtle glassmorphism, and responsive layouts that adapt seamlessly across phone screens, tablets, and POS receipt screens (720p / 480p).
-2. **Non-Intrusive Floating Inspector**: The on-device UI Inspector floating overlay must be draggable, collapsible, and easily toggled off so it never blocks the user's manual app interaction.
-3. **Visible texts must be internationalized**: All texts visible to the user must be internationalized in `./companion/app/src/main/res/` for `values/`, `values-es/` and `values-pt`.
-4. **Adaptive Icons**: Ensure the app icon uses Android's adaptive icons (separating background and foreground).
-5. **Live Activities & Bubbles**: For long tests, utilize ongoing background notifications. For floating status monitors, use Bubbles.
-6. **Predictive Back**: Migrate navigation to use Jetpack Navigation with Compose or `OnBackPressedDispatcher`, avoiding legacy `onBackPressed()`.
+2. **Strict Color Theming (No Hardcoded Colors)**: NEVER use hardcoded Hex colors (e.g., `Color(0xFF10B981)`) for UI elements that must support Dark/Light modes. ALWAYS use `MaterialTheme.colorScheme` (e.g., `primary`, `error`, `surfaceVariant`). Custom semantic colors (like success/warning) must be added as extensions to the theme or derived safely.
+3. **Glassmorphism**: Utilize the custom `glassmorphicBackground` modifier to mimic the Desktop's Tailwind `backdrop-blur-md` aesthetic.
+4. **Animations**: UI state changes should be fluid. Use Compose's `AnimatedVisibility` and `animate*AsState` APIs for transitions.
+5. **Non-Intrusive Floating Inspector**: The on-device UI Inspector floating overlay must be draggable, collapsible, and easily toggled off so it never blocks the user's manual app interaction.
+6. **Visible texts must be internationalized**: All texts visible to the user must be internationalized in `./companion/app/src/main/res/` for `values/`, `values-es/` and `values-pt`.
+7. **Adaptive Icons**: Ensure the app icon uses Android's adaptive icons (separating background and foreground).
+8. **Live Activities & Bubbles**: For long tests, utilize ongoing background notifications. For floating status monitors, use Bubbles.
+9. **Predictive Back**: Migrate navigation to use Jetpack Navigation with Compose or `OnBackPressedDispatcher`, avoiding legacy `onBackPressed()`.
 
 ---
 
@@ -147,3 +150,16 @@ This document outlines mandatory architectural guidelines, performance standards
 ## 16. Continuous Learning & Rule Maintenance Instruction
 
 > **IMPORTANT**: As new features, optimizations, or Android SDK workarounds are implemented in `companion/`, the **Android Companion Engineer** profile MUST update and append new rules directly to this document.
+---
+
+## 17. UI Folder Structure & Code Organization
+
+1. **Desktop Parity**: The Android Companion app MUST mirror the React Desktop structure for its UI components to maintain consistency across the workspace.
+   - **Pages**: Root-level screens should reside in ui/pages (e.g., HomePage.kt).
+   - **Tabs**: Tab contents and sub-sections should be organized in ui/components/tabs/<feature_name> (e.g., ui/components/tabs/home/HomeSubTab.kt, ConnectSubTab.kt).
+   - Never place UI tab components loosely in root packages or unorganized folders (like 
+et/ or sync/ if they are UI representations). Keep business logic in their respective modules, but UI components must follow the ui/ hierarchy.
+
+## 18. Internationalization & Strings
+
+1. **No Hardcoded UI Strings**: Ensure that any string exposed to the UI (titles, descriptions, placeholders) uses stringResource(id = R.string.key). Avoid hardcoded English or Portuguese text in Compose files.

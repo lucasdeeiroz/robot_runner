@@ -1,5 +1,7 @@
 package com.lucasdeeiroz.robotrunner
 
+import com.lucasdeeiroz.robotrunner.ui.pages.HomePage
+
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -117,7 +119,8 @@ class MainActivity : ComponentActivity() {
 
             val detailedSpecs = remember { HardwareSpecsProvider.getDetailedSpecs(this@MainActivity) }
 
-            com.lucasdeeiroz.robotrunner.ui.DashboardScreen(
+            HomePage(
+                isServerRunning = isServerRunning,
                 telemetry = telemetry,
                 detailedSpecs = detailedSpecs,
                 ipAddress = getLocalIpAddress(),

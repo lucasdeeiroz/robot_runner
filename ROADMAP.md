@@ -42,7 +42,9 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
 ---
 
 ## Fase: Revisão da Aba Dashboard (Home)
-- [ ] Revisar, otimizar e garantir a paridade da UI/UX da aba Dashboard do Companion com o Desktop.
+- [/] Revisar, otimizar e garantir a paridade da UI/UX da aba Dashboard do Companion com o Desktop.
+  - [ ] Popular seção 'Atividade' com os dados fornecidos pelo Robot Runner Desktop.
+  - [x] Restante da UI
 
 ## Fase: Revisão da Aba Sync Center (Home)
 - [ ] Revisar fluxos de conexão e emparelhamento.

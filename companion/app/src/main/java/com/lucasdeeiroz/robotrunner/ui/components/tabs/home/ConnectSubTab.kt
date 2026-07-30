@@ -1,4 +1,8 @@
-package com.lucasdeeiroz.robotrunner.net
+package com.lucasdeeiroz.robotrunner.ui.components.tabs.home
+
+import com.lucasdeeiroz.robotrunner.net.*
+
+import com.lucasdeeiroz.robotrunner.net.NetworkInterfaceType
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -25,7 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.lucasdeeiroz.robotrunner.R
 
 @Composable
-fun NetworkTabContent(
+fun ConnectSubTab(
     ipAddress: String,
     port: Int,
     isServerRunning: Boolean,

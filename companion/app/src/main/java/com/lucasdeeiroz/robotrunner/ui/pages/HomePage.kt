@@ -1,4 +1,4 @@
-package com.lucasdeeiroz.robotrunner.ui
+package com.lucasdeeiroz.robotrunner.ui.pages
 
 import coil.compose.AsyncImage
 import coil.ImageLoader
@@ -22,6 +22,9 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.*
+import com.lucasdeeiroz.robotrunner.ui.components.tabs.home.HomeSubTab
+import com.lucasdeeiroz.robotrunner.ui.components.tabs.home.SyncCenterSubTab
+import com.lucasdeeiroz.robotrunner.ui.components.tabs.home.ConnectSubTab
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,11 +41,11 @@ import com.lucasdeeiroz.robotrunner.inspector.InspectorTabContent
 import com.lucasdeeiroz.robotrunner.logcat.LogcatTabContent
 import com.lucasdeeiroz.robotrunner.model.HardwareSpecCategory
 import com.lucasdeeiroz.robotrunner.model.LiveTelemetry
-import com.lucasdeeiroz.robotrunner.net.NetworkTabContent
+import com.lucasdeeiroz.robotrunner.ui.components.tabs.home.ConnectSubTab
 import com.lucasdeeiroz.robotrunner.performance.PerformanceTabContent
 import com.lucasdeeiroz.robotrunner.shell.ShellConsoleTabContent
 import com.lucasdeeiroz.robotrunner.stopwatch.StopwatchTabContent
-import com.lucasdeeiroz.robotrunner.sync.SyncCenterTabContent
+import com.lucasdeeiroz.robotrunner.ui.components.tabs.home.SyncCenterSubTab
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.draw.clip
@@ -92,7 +95,8 @@ fun PlaceholderTabContent(title: String) {
 
 
 @Composable
-fun DashboardScreen(
+fun HomePage(
+    isServerRunning: Boolean,
     telemetry: LiveTelemetry,
     detailedSpecs: List<HardwareSpecCategory>,
     ipAddress: String,
@@ -336,15 +340,16 @@ fun DashboardScreen(
                 ) {
                     when (currentSection) {
                         0 -> when (subTabHome) {
-                            0 -> DashboardTabContent(
+                            0 -> HomeSubTab(
+                                isServerRunning = isServerRunning,
                                 telemetry = telemetry,
                                 ipAddress = ipAddress,
                                 port = port,
                                 onToggleServer = onToggleServer,
                                 context = context
                             )
-                            1 -> SyncCenterTabContent()
-                            2 -> NetworkTabContent(
+                            1 -> SyncCenterSubTab()
+                            2 -> ConnectSubTab(
                                 ipAddress = ipAddress,
                                 port = port,
                                 isServerRunning = telemetry.isServerRunning,
@@ -374,146 +379,6 @@ fun DashboardScreen(
                             9 -> PlaceholderTabContent("History")
                         }
                     }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun DashboardTabContent(
-    telemetry: LiveTelemetry,
-    ipAddress: String,
-    port: Int,
-    onToggleServer: () -> Unit,
-    context: Context
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = 24.dp)
-    ) {
-        // Status Bar Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = if (telemetry.isServerRunning) stringResource(id = R.string.status_port_active, port) else stringResource(id = R.string.status_server_offline),
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (telemetry.isServerRunning) Color(0xFF10B981) else Color(0xFFEF4444)
-                    )
-                    Text(
-                        text = if (telemetry.isServerRunning) "IP: $ipAddress:$port" else stringResource(id = R.string.subtext_tap_start),
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Button(
-                    onClick = onToggleServer,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (telemetry.isServerRunning) Color(0xFFEF4444) else Color(0xFF6366F1)
-                    )
-                ) {
-                    Text(
-                        text = if (telemetry.isServerRunning) stringResource(id = R.string.btn_stop_rest_server) else stringResource(id = R.string.btn_start_rest_server),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp
-                    )
-                }
-            }
-        }
-
-        // Live Telemetry Gauges Grid
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            GaugeCard(
-                title = stringResource(id = R.string.gauge_cpu_title),
-                value = "${telemetry.cpuUsagePercent}%",
-                subtitle = stringResource(id = R.string.gauge_cpu_sub),
-                color = Color(0xFF38BDF8),
-                modifier = Modifier.weight(1f)
-            )
-            GaugeCard(
-                title = stringResource(id = R.string.gauge_ram_title),
-                value = "${telemetry.ramPercent}%",
-                subtitle = "${telemetry.ramUsedMb}/${telemetry.ramTotalMb} MB",
-                color = Color(0xFF10B981),
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            GaugeCard(
-                title = stringResource(id = R.string.gauge_battery_title),
-                value = "${telemetry.batteryTempC}°C",
-                subtitle = "${telemetry.batteryPercent}% • ${if (telemetry.isCharging) "Charging" else "Discharging"}",
-                color = Color(0xFFF59E0B),
-                modifier = Modifier.weight(1f)
-            )
-            GaugeCard(
-                title = stringResource(id = R.string.gauge_storage_title),
-                value = "${telemetry.storagePercent}%",
-                subtitle = "${telemetry.storageUsedGb}/${telemetry.storageTotalGb} GB",
-                color = Color(0xFFA855F7),
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        // Accessibility Service Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = stringResource(id = R.string.label_accessibility),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Grants sub-10ms UI tree inspection, click dispatching and autonomous exploration.",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-
-                OutlinedButton(
-                    onClick = {
-                        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                        context.startActivity(intent)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8))
-                ) {
-                    Text(
-                        text = stringResource(id = R.string.btn_open_accessibility_settings),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 12.sp
-                    )
                 }
             }
         }
