@@ -111,7 +111,7 @@ fun SyncCenterSubTab() {
                         onClick = { loadArtifacts() },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
                         Text(text = stringResource(id = R.string.btn_refresh_vault), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }

@@ -208,7 +208,7 @@ fun HomeSubTab(
                         ) {
                             androidx.compose.material3.Icon(
                                 imageVector = androidx.compose.material.icons.Icons.Default.Build, // Computer icon fallback
-                                contentDescription = "Host",
+                                contentDescription = stringResource(id = R.string.label_host),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -222,7 +222,7 @@ fun HomeSubTab(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "${hostState!!.osName.capitalize()} ${hostState!!.osVersion} • ${hostState!!.userName ?: "Guest"}",
+                                text = "${hostState!!.osName.capitalize()} ${hostState!!.osVersion} • ${hostState!!.userName ?: stringResource(id = R.string.label_guest)}",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -245,7 +245,7 @@ fun HomeSubTab(
                     ) {
                         androidx.compose.material3.Icon(
                             imageVector = androidx.compose.material.icons.Icons.Default.Info,
-                            contentDescription = "No hosts",
+                            contentDescription = stringResource(id = R.string.label_no_hosts),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                             modifier = Modifier.size(32.dp)
                         )
@@ -358,7 +358,7 @@ fun HomeSubTab(
                     ) {
                         androidx.compose.material3.Icon(
                             imageVector = androidx.compose.material.icons.Icons.Default.PlayArrow,
-                            contentDescription = "No activity",
+                            contentDescription = stringResource(id = R.string.label_no_activity),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                             modifier = Modifier.size(32.dp)
                         )

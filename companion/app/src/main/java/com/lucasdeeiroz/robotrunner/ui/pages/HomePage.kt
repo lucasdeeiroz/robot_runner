@@ -12,6 +12,7 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -77,14 +78,14 @@ fun PlaceholderTabContent(title: String) {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "$title em breve",
+            text = stringResource(id = R.string.msg_coming_soon, title),
             fontSize = 18.sp,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Esta funcionalidade ainda não está disponível no Companion.",
+            text = stringResource(id = R.string.msg_feature_unavailable),
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             textAlign = TextAlign.Center,
@@ -117,7 +118,18 @@ fun HomePage(
     val themeState by com.lucasdeeiroz.robotrunner.sync.ThemeSyncManager.themeState.collectAsState()
     
     val primaryColorVal = try {
-        themeState.primaryColor?.let { Color(android.graphics.Color.parseColor(it)) } ?: Color(0xFF6366F1)
+        themeState.primaryColor?.let { colorStr ->
+            when (colorStr.lowercase()) {
+                "blue" -> Color(0xFF4338CA)
+                "red" -> Color(0xFFE11D48)
+                "green" -> Color(0xFF059669)
+                "purple" -> Color(0xFF7C3AED)
+                "orange" -> Color(0xFFD97706)
+                "cyan" -> Color(0xFF0D9488)
+                "pink" -> Color(0xFFBE123C)
+                else -> Color(android.graphics.Color.parseColor(colorStr))
+            }
+        } ?: Color(0xFF6366F1)
     } catch (e: Exception) { Color(0xFF6366F1) }
 
     RobotRunnerTheme(
@@ -130,7 +142,7 @@ fun HomePage(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .glassmorphicBackground(colorScheme.surface)
+                        .background(colorScheme.surface)
                         .padding(horizontal = 20.dp, vertical = 8.dp)
                         .windowInsetsPadding(WindowInsets.navigationBars),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -141,7 +153,7 @@ fun HomePage(
                                 tabs = listOf(
                                     stringResource(id = R.string.tab_dashboard),
                                     stringResource(id = R.string.tab_sync_center),
-                                    "Network"
+                                    stringResource(id = R.string.tab_network)
                                 ),
                                 selectedIndex = subTabHome,
                                 onTabSelected = { subTabHome = it }
@@ -149,7 +161,7 @@ fun HomePage(
                         }
                         1 -> {
                             PillTabBar(
-                                tabs = listOf("BDD Runner", "UI Inspector", "Explorer", "Scenarios"),
+                                tabs = listOf(stringResource(id = R.string.tab_bdd_runner), stringResource(id = R.string.tab_ui_inspector), stringResource(id = R.string.tab_explorer), stringResource(id = R.string.tab_scenarios)),
                                 selectedIndex = subTabRun,
                                 onTabSelected = { subTabRun = it }
                             )
@@ -157,10 +169,10 @@ fun HomePage(
                         2 -> {
                             PillTabBar(
                                 tabs = listOf(
-                                    "Logcat", "Performance", "Stopwatch", "Shell", 
-                                    "Apps", stringResource(id = R.string.tab_hardware_specs), 
+                                    stringResource(id = R.string.tab_logcat), stringResource(id = R.string.tab_performance), stringResource(id = R.string.tab_stopwatch), stringResource(id = R.string.tab_shell),
+                                    stringResource(id = R.string.tab_apps), stringResource(id = R.string.tab_hardware_specs), 
                                     stringResource(id = R.string.tab_diagnostics), 
-                                    "Run Console", "Webview", "History"
+                                    stringResource(id = R.string.tab_run_console), stringResource(id = R.string.tab_webview), stringResource(id = R.string.tab_history)
                                 ),
                                 selectedIndex = subTabToolbox,
                                 onTabSelected = { subTabToolbox = it }
@@ -173,7 +185,7 @@ fun HomePage(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .glassmorphicBackground(colorScheme.surface)
+                        .background(colorScheme.surface)
                         .windowInsetsPadding(WindowInsets.statusBars)
                 ) {
                     Row(
@@ -198,7 +210,7 @@ fun HomePage(
                                 if (logoBytes != null) {
                                     AsyncImage(
                                         model = logoBytes,
-                                        contentDescription = "Logo",
+                                        contentDescription = stringResource(id = R.string.desc_logo),
                                         imageLoader = imageLoader,
                                         modifier = Modifier.height(28.dp)
                                     )
@@ -225,7 +237,7 @@ fun HomePage(
                                 if (!themeState.userPhotoBase64.isNullOrEmpty()) {
                                     AsyncImage(
                                         model = themeState.userPhotoBase64,
-                                        contentDescription = "User",
+                                        contentDescription = stringResource(id = R.string.desc_user_avatar),
                                         modifier = Modifier
                                             .size(24.dp)
                                             .clip(CircleShape)
@@ -233,7 +245,7 @@ fun HomePage(
                                 } else {
                                     androidx.compose.material3.Icon(
                                         imageVector = Icons.Default.AccountCircle,
-                                        contentDescription = "User",
+                                        contentDescription = stringResource(id = R.string.desc_user_avatar),
                                         modifier = Modifier.size(24.dp),
                                         tint = colorScheme.onSurfaceVariant
                                     )
@@ -249,7 +261,7 @@ fun HomePage(
                                     modifier = Modifier.background(colorScheme.surface)
                                 ) {
                                     DropdownMenuItem(
-                                    text = { Text("Configurações", color = colorScheme.onSurface) },
+                                    text = { Text(stringResource(id = R.string.menu_settings), color = colorScheme.onSurface) },
                                     leadingIcon = { 
                                         androidx.compose.material3.Icon(
                                             imageVector = Icons.Default.Settings,
@@ -258,12 +270,12 @@ fun HomePage(
                                         )
                                     },
                                     onClick = {
-                                        Toast.makeText(context, "Configurações em breve", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.msg_settings_soon), Toast.LENGTH_SHORT).show()
                                         profileMenuExpanded = false
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Sobre", color = colorScheme.onSurface) },
+                                    text = { Text(stringResource(id = R.string.menu_about), color = colorScheme.onSurface) },
                                     leadingIcon = { 
                                         androidx.compose.material3.Icon(
                                             imageVector = Icons.Default.Info,
@@ -272,7 +284,7 @@ fun HomePage(
                                         )
                                     },
                                     onClick = {
-                                        Toast.makeText(context, "Sobre em breve", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.msg_about_soon), Toast.LENGTH_SHORT).show()
                                         profileMenuExpanded = false
                                     }
                                 )
@@ -284,7 +296,7 @@ fun HomePage(
                     TabRow(
                         selectedTabIndex = if (currentSection > 2) -1 else currentSection,
                         containerColor = colorScheme.surface,
-                        contentColor = primaryColorVal,
+                        contentColor = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp, horizontal = 16.dp)
@@ -293,9 +305,9 @@ fun HomePage(
                         indicator = {}
                     ) {
                         val tabs = listOf(
-                            "Início" to Icons.Default.Home,
-                            "Executar" to Icons.Default.PlayArrow,
-                            "Ferramentas" to Icons.Default.Build
+                            stringResource(id = R.string.tab_main_home) to Icons.Default.Home,
+                            stringResource(id = R.string.tab_main_run) to Icons.Default.PlayArrow,
+                            stringResource(id = R.string.tab_main_tests) to Icons.Default.List
                         )
                         tabs.forEachIndexed { index, (label, icon) ->
                             Tab(
@@ -304,7 +316,7 @@ fun HomePage(
                                 modifier = Modifier
                                     .padding(horizontal = 4.dp)
                                     .clip(RoundedCornerShape(16.dp))
-                                    .background(if (currentSection == index) primaryColorVal.copy(alpha = 0.15f) else Color.Transparent),
+                                    .background(if (currentSection == index) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent),
                                 text = { 
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         androidx.compose.material3.Icon(
@@ -316,19 +328,19 @@ fun HomePage(
                                         Text(label, fontSize = 13.sp, fontWeight = if (currentSection == index) FontWeight.Bold else FontWeight.Medium)
                                     }
                                 },
-                                selectedContentColor = primaryColorVal,
+                                selectedContentColor = MaterialTheme.colorScheme.primary,
                                 unselectedContentColor = colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 }
             }
-        ) { innerPadding ->
-            Column(
+        ) { paddingValues ->
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
-                    .background(colorScheme.background)
+                    .padding(paddingValues)
+                    .background(MaterialTheme.colorScheme.surface)
             ) {
 
 
@@ -361,7 +373,7 @@ fun HomePage(
                             0 -> BddTestRunnerTabContent()
                             1 -> InspectorTabContent()
                             2 -> ExplorerTabContent()
-                            3 -> PlaceholderTabContent("Scenarios (AI)")
+                            3 -> PlaceholderTabContent(stringResource(id = R.string.tab_scenarios_ai))
                         }
                         2 -> when (subTabToolbox) {
                             0 -> LogcatTabContent()
@@ -374,9 +386,9 @@ fun HomePage(
                                 onRunOfflineCheckup = onRunOfflineCheckup,
                                 onLaunchDisplayTest = onLaunchDisplayTest
                             )
-                            7 -> PlaceholderTabContent("Run Console")
-                            8 -> PlaceholderTabContent("Webview")
-                            9 -> PlaceholderTabContent("History")
+                            7 -> PlaceholderTabContent(stringResource(id = R.string.tab_run_console))
+                            8 -> PlaceholderTabContent(stringResource(id = R.string.tab_webview))
+                            9 -> PlaceholderTabContent(stringResource(id = R.string.tab_history))
                         }
                     }
                 }
@@ -515,7 +527,7 @@ fun DiagnosticsTabContent(
                 Text(stringResource(id = R.string.header_pos_hardware_checklist), color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    "Comprehensive hardware diagnostic checklist for battery, memory, NFC and POS thermal printers.",
+                    stringResource(id = R.string.desc_hardware_diagnostic),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
@@ -540,7 +552,7 @@ fun DiagnosticsTabContent(
                             if (printed) {
                                 Toast.makeText(context, context.getString(R.string.msg_receipt_printed), Toast.LENGTH_SHORT).show()
                             } else {
-                                Toast.makeText(context, "POS Thermal printer unavailable or out of paper", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.msg_pos_printer_unavailable), Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -576,7 +588,7 @@ fun DiagnosticsTabContent(
                     Button(
                         onClick = {
                             uiTextResult = com.lucasdeeiroz.robotrunner.checkup.UiTextVerifier.verifyActiveScreenText()
-                            Toast.makeText(context, "Text Audit: ${uiTextResult?.matchPercentage}% match", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.text_audit_match, uiTextResult?.matchPercentage ?: 0), Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22C55E)),
@@ -610,10 +622,10 @@ fun DiagnosticsTabContent(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text(text = "Screen: ${res.screenName}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8))
-                            Text(text = "Match Score: ${res.matchPercentage}% (${res.totalMatched} / ${res.totalExpected})", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
+                            Text(text = stringResource(id = R.string.label_screen_name, res.screenName), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8))
+                            Text(text = stringResource(id = R.string.label_match_score, res.matchPercentage, res.totalMatched, res.totalExpected), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
                             if (res.missingTexts.isNotEmpty()) {
-                                Text(text = "Missing: ${res.missingTexts.take(3).joinToString(", ")}", fontSize = 10.5.sp, color = Color(0xFFEF4444))
+                                Text(text = stringResource(id = R.string.label_missing_texts, res.missingTexts.take(3).joinToString(", ")), fontSize = 10.5.sp, color = Color(0xFFEF4444))
                             }
                         }
                     }
@@ -670,9 +682,9 @@ fun DiagnosticsTabContent(
                                     putExtra(Intent.EXTRA_STREAM, uri)
                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
-                                context.startActivity(Intent.createChooser(shareIntent, "Share Technical Audit PDF Report"))
+                                context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.btn_share_audit_pdf)))
                             } catch (e: Exception) {
-                                Toast.makeText(context, "Error opening PDF file: ${e.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.msg_error_opening_pdf, e.message ?: ""), Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -692,10 +704,10 @@ fun DiagnosticsTabContent(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Display & Color Calibration", color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(id = R.string.header_display_calibration), color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    "Launch full screen RGB screen test to check for dead pixels and light bleeding.",
+                    stringResource(id = R.string.desc_display_calibration),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
@@ -706,7 +718,7 @@ fun DiagnosticsTabContent(
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8))
                 ) {
-                    Text("Launch Full Screen Display Test", fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(id = R.string.btn_launch_display_test), fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -720,20 +732,18 @@ fun PillTabBar(
     onTabSelected: (Int) -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val primaryColorVal = Color(0xFF10B981) // emerald-500 matching Desktop TabBar
+    val primaryColorVal = MaterialTheme.colorScheme.primary // match active theme primary color
 
-    ScrollableTabRow(
-        selectedTabIndex = selectedIndex,
-        containerColor = colorScheme.surfaceVariant.copy(alpha = 0.3f),
-        contentColor = primaryColorVal,
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .background(colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
             .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-            .padding(4.dp),
-        edgePadding = 0.dp,
-        divider = {},
-        indicator = {}
+            .clip(RoundedCornerShape(16.dp))
+            .padding(4.dp)
+            .horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         tabs.forEachIndexed { index, label ->
             Tab(
@@ -742,7 +752,7 @@ fun PillTabBar(
                 modifier = Modifier
                     .padding(horizontal = 4.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (selectedIndex == index) primaryColorVal.copy(alpha = 0.15f) else Color.Transparent),
+                    .background(if (selectedIndex == index) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent),
                 text = {
                     Text(
                         text = label,
@@ -750,7 +760,7 @@ fun PillTabBar(
                         fontWeight = if (selectedIndex == index) FontWeight.Bold else FontWeight.Medium
                     )
                 },
-                selectedContentColor = primaryColorVal,
+                selectedContentColor = MaterialTheme.colorScheme.primary,
                 unselectedContentColor = colorScheme.onSurfaceVariant
             )
         }

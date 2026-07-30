@@ -32,7 +32,7 @@
     <string name="tab_dashboard">Dashboard</string>
     <string name="tab_hardware_specs">Hardware Specs</string>
     <string name="tab_diagnostics">Diagnostics</string>
-    <string name="label_rest_server">REST Server</string>
+    <string name="label_rest_server">RR Server</string>
     <string name="status_port_active">Port %1$d Active</string>
     <string name="status_server_offline">Server Offline</string>
     <string name="subtext_server_ip">IP: %1$s</string>
@@ -49,8 +49,8 @@
     <string name="gauge_battery_title">Battery</string>
     <string name="gauge_storage_title">Internal Storage</string>
     <string name="header_quick_actions">⚡ Quick Actions &amp; Control</string>
-    <string name="btn_stop_rest_server">Stop REST Server Engine</string>
-    <string name="btn_start_rest_server">Start REST Server Engine</string>
+    <string name="btn_stop_rest_server">Stop Server</string>
+    <string name="btn_start_rest_server">Start Server</string>
     <string name="btn_open_accessibility_settings">Open Android Accessibility Settings</string>
 
     <!-- Specs Categories & Items -->
@@ -87,6 +87,11 @@
     <string name="title_display_test">🖥️ Screen Pixel &amp; Color Calibration Test</string>
     <string name="desc_display_test">Launch full-screen pixel color cycling test to detect dead pixels or screen burn-in.</string>
     <string name="btn_launch_display_test">Launch Fullscreen Display Test</string>
+    <string name="label_host">Host</string>
+    <string name="label_guest">Guest</string>
+    <string name="label_no_hosts">No hosts</string>
+    <string name="label_no_activity">No activity</string>
+
     <!-- Phase 2 Strings -->
     <string name="tab_apps">Apps</string>
     <string name="tab_shell">Shell</string>
@@ -129,7 +134,7 @@
     <string name="label_ipv4">IPv4</string>
     <string name="label_ipv6">IPv6</string>
     <string name="label_mac">MAC</string>
-    <string name="header_rest_control">🔒 REST Server Engine &amp; Security</string>
+    <string name="header_rest_control">🔒 Server &amp; Security</string>
     <string name="label_server_port">Server Port (Default 9876)</string>
     <string name="label_active_clients">Active Connected Clients: %1$d</string>
     <string name="label_total_requests">Total Requests Processed: %1$d</string>
@@ -240,4 +245,34 @@
     <string name="status_charging">Charging</string>
     <string name="status_discharging">Discharging</string>
     <string name="desc_accessibility_grants">Grants sub-10ms UI tree inspection, click dispatching and autonomous exploration.</string>
+    <string name="tab_ui_inspector">UI Inspector</string>
+    <string name="tab_scenarios">Scenarios</string>
+    <string name="tab_run_console">Run Console</string>
+    <string name="tab_webview">Webview</string>
+    <string name="tab_history">History</string>
+    <string name="tab_main_home">Home</string>
+    <string name="tab_main_run">Run</string>
+    <string name="tab_main_tests">Tests</string>
+    <string name="menu_settings">Settings</string>
+    <string name="menu_about">About</string>
+
+    <string name="msg_coming_soon">%1$s coming soon</string>
+    <string name="msg_feature_unavailable">This feature is not yet available in the Companion.</string>
+    <string name="desc_logo">Logo</string>
+    <string name="desc_user_avatar">User</string>
+    <string name="msg_settings_soon">Settings coming soon</string>
+    <string name="msg_about_soon">About coming soon</string>
+    <string name="tab_scenarios_ai">Scenarios (AI)</string>
+    <string name="desc_hardware_diagnostic">Comprehensive hardware diagnostic checklist for battery, memory, NFC and POS thermal printers.</string>
+    <string name="msg_pos_printer_unavailable">POS Thermal printer unavailable or out of paper</string>
+    <string name="text_audit_match">Text Audit: %1$s%% match</string>
+    <string name="label_active_screen">Active Screen</string>
+    <string name="label_screen_name">Screen: %1$s</string>
+    <string name="label_match_score">Match Score: %1$s%% (%2$s / %3$s)</string>
+    <string name="label_missing_texts">Missing: %1$s</string>
+    <string name="btn_share_audit_pdf">Share Technical Audit PDF Report</string>
+    <string name="msg_error_opening_pdf">Error opening PDF file: %1$s</string>
+    <string name="header_display_calibration">Display &amp; Color Calibration</string>
+    <string name="desc_display_calibration">Launch full screen RGB screen test to check for dead pixels and light bleeding.</string>
+
 </resources>

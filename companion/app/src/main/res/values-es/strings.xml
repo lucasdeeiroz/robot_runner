@@ -32,7 +32,7 @@
     <string name="tab_dashboard">Panel</string>
     <string name="tab_hardware_specs">Especificaciones</string>
     <string name="tab_diagnostics">Diagnósticos</string>
-    <string name="label_rest_server">Servidor REST</string>
+    <string name="label_rest_server">Servidor RR</string>
     <string name="status_port_active">Puerto %1$d Activo</string>
     <string name="status_server_offline">Servidor Desconectado</string>
     <string name="subtext_server_ip">IP: %1$s</string>
@@ -49,8 +49,8 @@
     <string name="gauge_battery_title">Batería</string>
     <string name="gauge_storage_title">Almacenamiento Interno</string>
     <string name="header_quick_actions">⚡ Acciones Rápidas y Control</string>
-    <string name="btn_stop_rest_server">Detener Servidor REST</string>
-    <string name="btn_start_rest_server">Iniciar Servidor REST</string>
+    <string name="btn_stop_rest_server">Detener Servidor</string>
+    <string name="btn_start_rest_server">Iniciar Servidor</string>
     <string name="btn_open_accessibility_settings">Abrir Configuración de Accesibilidad</string>
 
     <!-- Specs Categories & Items (ES) -->
@@ -129,7 +129,7 @@
     <string name="label_ipv4">IPv4</string>
     <string name="label_ipv6">IPv6</string>
     <string name="label_mac">MAC</string>
-    <string name="header_rest_control">🔒 Servidor REST y Seguridad</string>
+    <string name="header_rest_control">🔒 Servidor y Seguridad</string>
     <string name="label_server_port">Puerto del Servidor (Predeterminado 9876)</string>
     <string name="label_active_clients">Clientes Conectados Activos: %1$d</string>
     <string name="label_total_requests">Total de Solicitudes Procesadas: %1$d</string>
@@ -240,4 +240,37 @@
     <string name="status_charging">Cargando</string>
     <string name="status_discharging">Descargando</string>
     <string name="desc_accessibility_grants">Permite la inspección del árbol de UI en menos de 10 ms, envío de clics y exploración autónoma.</string>
+    <string name="tab_ui_inspector">Inspector de UI</string>
+    <string name="tab_scenarios">Escenarios</string>
+    <string name="tab_run_console">Consola</string>
+    <string name="tab_webview">Webview</string>
+    <string name="tab_history">Historial</string>
+    <string name="tab_main_home">Inicio</string>
+    <string name="tab_main_run">Ejecutar</string>
+    <string name="tab_main_tests">Pruebas</string>
+    <string name="menu_settings">Ajustes</string>
+    <string name="menu_about">Acerca de</string>
+
+    <string name="msg_coming_soon">%1$s próximamente</string>
+    <string name="msg_feature_unavailable">Esta función aún no está disponible en el Companion.</string>
+    <string name="desc_logo">Logotipo</string>
+    <string name="desc_user_avatar">Usuario</string>
+    <string name="msg_settings_soon">Ajustes próximamente</string>
+    <string name="msg_about_soon">Acerca de próximamente</string>
+    <string name="tab_scenarios_ai">Escenarios (IA)</string>
+    <string name="desc_hardware_diagnostic">Lista de diagnóstico completo de hardware para batería, memoria, NFC e impresoras térmicas POS.</string>
+    <string name="msg_pos_printer_unavailable">Impresora térmica POS no disponible o sin papel</string>
+    <string name="text_audit_match">Auditoría de Texto: %1$s%% coincidencia</string>
+    <string name="label_active_screen">Pantalla Activa</string>
+    <string name="label_screen_name">Pantalla: %1$s</string>
+    <string name="label_match_score">Puntuación: %1$s%% (%2$s / %3$s)</string>
+    <string name="label_missing_texts">Faltan: %1$s</string>
+    <string name="btn_share_audit_pdf">Compartir Informe PDF de la Auditoría</string>
+    <string name="msg_error_opening_pdf">Error al abrir PDF: %1$s</string>
+    <string name="header_display_calibration">Calibración de Pantalla y Color</string>
+    <string name="desc_display_calibration">Inicie la prueba de pantalla RGB para comprobar píxeles muertos y fugas de luz.</string>
+    <string name="label_host">Host</string>
+    <string name="label_guest">Invitado</string>
+    <string name="label_no_hosts">Sin hosts</string>
+    <string name="label_no_activity">Sin actividad</string>
 </resources>

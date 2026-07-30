@@ -32,7 +32,7 @@
     <string name="tab_dashboard">Painel</string>
     <string name="tab_hardware_specs">Especificações</string>
     <string name="tab_diagnostics">Diagnósticos</string>
-    <string name="label_rest_server">Servidor REST</string>
+    <string name="label_rest_server">Servidor RR</string>
     <string name="status_port_active">Porta %1$d Ativa</string>
     <string name="status_server_offline">Servidor Offline</string>
     <string name="subtext_server_ip">IP: %1$s</string>
@@ -49,8 +49,8 @@
     <string name="gauge_battery_title">Bateria</string>
     <string name="gauge_storage_title">Armazenamento Interno</string>
     <string name="header_quick_actions">⚡ Ações Rápidas e Controle</string>
-    <string name="btn_stop_rest_server">Parar Servidor REST</string>
-    <string name="btn_start_rest_server">Iniciar Servidor REST</string>
+    <string name="btn_stop_rest_server">Parar Servidor</string>
+    <string name="btn_start_rest_server">Iniciar Servidor</string>
     <string name="btn_open_accessibility_settings">Abrir Configurações de Acessibilidade</string>
 
     <!-- Specs Categories & Items (PT-BR) -->
@@ -87,6 +87,10 @@
     <string name="title_display_test">🖥️ Teste de Calibração de Tela e Pixels</string>
     <string name="desc_display_test">Inicia o teste de cores em tela cheia para detectar pixels mortos ou retenção de imagem (burn-in).</string>
     <string name="btn_launch_display_test">Iniciar Teste de Tela Cheia</string>
+    <string name="label_host">Host</string>
+    <string name="label_guest">Convidado</string>
+    <string name="label_no_hosts">Sem hosts</string>
+    <string name="label_no_activity">Sem atividade</string>
     <!-- Phase 2 Strings (PT-BR) -->
     <string name="tab_apps">Apps</string>
     <string name="tab_shell">Shell</string>
@@ -129,7 +133,7 @@
     <string name="label_ipv4">IPv4</string>
     <string name="label_ipv6">IPv6</string>
     <string name="label_mac">MAC</string>
-    <string name="header_rest_control">🔒 Servidor REST e Segurança</string>
+    <string name="header_rest_control">🔒 Servidor e Segurança</string>
     <string name="label_server_port">Porta do Servidor (Padrão 9876)</string>
     <string name="label_active_clients">Clientes Conectados Ativos: %1$d</string>
     <string name="label_total_requests">Total de Requisições Processadas: %1$d</string>
@@ -240,4 +244,34 @@
     <string name="status_charging">Carregando</string>
     <string name="status_discharging">Descarregando</string>
     <string name="desc_accessibility_grants">Permite inspeção da árvore de UI abaixo de 10ms, envio de cliques e exploração autônoma.</string>
+    <string name="tab_ui_inspector">Inspetor de UI</string>
+    <string name="tab_scenarios">Cenários</string>
+    <string name="tab_run_console">Console</string>
+    <string name="tab_webview">Webview</string>
+    <string name="tab_history">Histórico</string>
+    <string name="tab_main_home">Início</string>
+    <string name="tab_main_run">Executar</string>
+    <string name="tab_main_tests">Testes</string>
+    <string name="menu_settings">Configurações</string>
+    <string name="menu_about">Sobre</string>
+
+    <string name="msg_coming_soon">%1$s em breve</string>
+    <string name="msg_feature_unavailable">Esta funcionalidade ainda não está disponível no Companion.</string>
+    <string name="desc_logo">Logo</string>
+    <string name="desc_user_avatar">Usuário</string>
+    <string name="msg_settings_soon">Configurações em breve</string>
+    <string name="msg_about_soon">Sobre em breve</string>
+    <string name="tab_scenarios_ai">Cenários (IA)</string>
+    <string name="desc_hardware_diagnostic">Checklist de diagnóstico abrangente para bateria, memória, NFC e impressoras térmicas POS.</string>
+    <string name="msg_pos_printer_unavailable">Impressora térmica POS indisponível ou sem papel</string>
+    <string name="text_audit_match">Auditoria de Texto: %1$s%% de correspondência</string>
+    <string name="label_active_screen">Tela Ativa</string>
+    <string name="label_screen_name">Tela: %1$s</string>
+    <string name="label_match_score">Pontuação: %1$s%% (%2$s / %3$s)</string>
+    <string name="label_missing_texts">Faltando: %1$s</string>
+    <string name="btn_share_audit_pdf">Compartilhar Relatório PDF da Auditoria</string>
+    <string name="msg_error_opening_pdf">Erro ao abrir PDF: %1$s</string>
+    <string name="header_display_calibration">Calibração de Tela e Cor</string>
+    <string name="desc_display_calibration">Inicie o teste de tela RGB para verificar pixels mortos e vazamento de luz.</string>
+
 </resources>

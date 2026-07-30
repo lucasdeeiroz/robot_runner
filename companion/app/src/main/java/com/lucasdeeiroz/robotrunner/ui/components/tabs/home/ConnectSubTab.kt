@@ -116,7 +116,7 @@ fun ConnectSubTab(
                                     Text(
                                         text = stringResource(id = R.string.btn_gen_pin),
                                         fontSize = 11.sp,
-                                        color = Color(0xFF6366F1)
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                 }
                             }
@@ -135,7 +135,7 @@ fun ConnectSubTab(
                             value = pairingPortInput,
                             onValueChange = { pairingPortInput = it },
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color(0xFF6366F1),
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
                                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                                 focusedContainerColor = MaterialTheme.colorScheme.surface,
                                 unfocusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -192,7 +192,7 @@ fun ConnectSubTab(
                 Button(
                     onClick = { WirelessAdbHelper.openDeveloperOptions(context) },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text(text = stringResource(id = R.string.btn_open_dev_options), fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -217,7 +217,7 @@ fun ConnectSubTab(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 if (isLoadingInterfaces) {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally), color = Color(0xFF6366F1))
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally), color = MaterialTheme.colorScheme.primary)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         interfacesList.forEach { iface ->
