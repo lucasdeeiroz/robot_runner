@@ -13,8 +13,20 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.os.Build
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.RenderEffect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import com.lucasdeeiroz.robotrunner.ui.theme.GlassmorphismAlpha
 
-@Composable
+fun Modifier.glassmorphicBackground(color: Color): Modifier {
+    // In Jetpack Compose, native backdrop-filter (blurring content behind) 
+    // requires complex workarounds (like Chris Banes' Haze library). 
+    // Applying a RenderEffect directly to the modifier blurs the children as well.
+    // Therefore, we fall back to a clean translucent background for the Glassmorphism effect.
+    return this.background(color.copy(alpha = GlassmorphismAlpha))
+}@Composable
 fun CompanionCard(
     modifier: Modifier = Modifier,
     backgroundColor: Color = MaterialTheme.colorScheme.surfaceVariant,

@@ -13,11 +13,86 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
 - [ ] **Criação do protocolo de testes RRT (testes de UI in-device)**
   - *Objetivo:* Desenvolver o "Robot Runner Test" (RRT) protocol. Estabelecer o padrão de execução de testes de interface diretamente no dispositivo (via Companion App), sem dependência excessiva do host.
 
-- [ ] **Alinhamento de funcionalidades, telas e layouts entre Desktop e Mobile**
-  - *Objetivo:* Garantir consistência de UI/UX (Glassmorphism, Dark Mode, etc.) e simetria de funcionalidades entre o Robot Runner Desktop (Tauri/React) e o Companion App (Android/Compose).
+- [x] **Alinhamento Estrutural e de Funcionalidades (Desktop vs Companion)**
+  - *Objetivo:* Reestruturar a navegação e as abas do Companion App para que reflitam a exata organização do Robot Runner Desktop, além de implementar as funcionalidades ausentes.
+  - *Mapeamento de Abas Desktop -> Companion:*
+    - **Home (Página Inicial):**
+      - Desktop: Home, Connect
+      - Companion (Atual): N/A (Dashboard atual mistura itens)
+      - *Ação:* Criar seção `Home` no Companion contendo visão geral e conexão (Sync Center).
+    - **Run (Execução):**
+      - Desktop: Launcher (Tests), Inspector, Mapper, Scenarios (AI)
+      - Companion (Atual): BDD Runner (Launcher), UI Inspector, Explorer (Mapper). Falta Scenarios (AI).
+      - *Ação:* Criar seção `Run` no Companion com estas abas. Implementar placeholder para AI Scenarios.
+    - **Tests/Devices (Toolbox/Ferramentas):**
+      - Desktop: Logcat, Performance, Stopwatch, Commands, Apps, Hardware, Checkup, Console, Webview, History
+      - Companion (Atual): Logcat, Performance, Stopwatch, Shell (Commands), Apps, Hardware Specs, Diagnostics (Checkup). Faltam Console, Webview, History.
+      - *Ação:* Criar seção `Toolbox` no Companion. Implementar Run Console, Webview (placeholder), e histórico de execuções.
+  - *Ações Necessárias (ROADMAP):*
+    - [x] Refatorar `DashboardScreen.kt` para usar a nova estrutura de navegação principal (Home, Run, Toolbox, Settings).
+    - [x] Mover as views existentes (UI Inspector, BDD Runner, etc.) para as novas sessões estruturais.
+    - [x] Criar abas em branco/placeholder para funcionalidades do Desktop ausentes no mobile (Scenarios, Console, Webview, History).
+
+- [ ] **Paridade Completa: Console de Execução (Run Console)**
+  - *Objetivo:* Implementar interface dedicada no Mobile (Android) para o "Run Console", espelhando a funcionalidade do Desktop. Deve prover monitoramento de saída bruta interativo com scroll virtualizado da execução dos testes localmente.
 
 - [x] **Alterar pacote do app mobile**
   - *Objetivo:* Alterar o nome do pacote (Application ID/Package Name) do Companion App Android para `com.lucasdeeiroz.robotrunner`, alinhando-o com o identificador Winget do Robot Runner Desktop.
+
+---
+
+## Fase: Revisão da Aba Dashboard (Home)
+- [ ] Revisar, otimizar e garantir a paridade da UI/UX da aba Dashboard do Companion com o Desktop.
+
+## Fase: Revisão da Aba Sync Center (Home)
+- [ ] Revisar fluxos de conexão e emparelhamento.
+
+## Fase: Revisão da Aba Network (Home)
+- [ ] Otimizar os componentes de leitura de tráfego de rede e consumo.
+
+## Fase: Revisão da Aba BDD Runner (Run)
+- [ ] Otimizar a execução de suítes de automação e validação de relatórios exportados.
+
+## Fase: Revisão da Aba UI Inspector (Run)
+- [ ] Assegurar sub-10ms na leitura de árvore hierárquica e envio do payload para o Desktop.
+
+## Fase: Revisão da Aba Explorer (Run)
+- [ ] Revisar a lógica de busca heurística e exploração (DFS Grafo) do aplicativo.
+
+## Fase: Revisão da Aba Logcat (Toolbox)
+- [ ] Garantir o limite em memória circular e evitar memory leaks no streaming local de logcat.
+
+## Fase: Revisão da Aba Performance (Toolbox)
+- [ ] Otimizar gráficos e captura multi-tier de CPU/RAM em tempo real.
+
+## Fase: Revisão da Aba Stopwatch (Toolbox)
+- [ ] Revisar a engine de Redraw para cálculos precisos (deltas de renderização) entre comandos de clique e redraw de UI.
+
+## Fase: Revisão da Aba Shell Console (Toolbox)
+- [ ] Otimizar isolamento de streams Stdout/Stderr e timeouts seguros via Coroutines.
+
+## Fase: Revisão da Aba Apps (Toolbox)
+- [ ] Revisar a renderização da lista de apps via PackageManager no Companion App.
+
+## Fase: Revisão da Aba Hardware Specs (Toolbox)
+- [ ] Conferir validações SELinux em dispositivos POS Android para recuperar status de rede/memória.
+
+## Fase: Revisão da Aba Diagnostics (Toolbox)
+- [ ] Validar extração do JSON Golden File e geração offline do Relatório de Auditoria PDF.
+
+---
+
+## Fase: Implementação da Aba Scenarios (Run)
+- [ ] Criar interface (atualmente placeholder) e integração AI no Companion App, substituindo o placeholder pela tela interativa.
+
+## Fase: Implementação da Aba Run Console (Toolbox)
+- [ ] Espelhar a aba Console de Execução (log bruto em tempo real) para testes BDD em interface mobile.
+
+## Fase: Implementação da Aba Webview (Toolbox)
+- [ ] Adicionar suporte a inspeção webview híbrida via Companion App.
+
+## Fase: Implementação da Aba History (Toolbox)
+- [ ] Construir layout para listagem de todos os relatórios `.json` e `.pdf` já gerados no aparelho local.
 
 ---
 *Nota: Atualize o status (`[x]`, `[/]`, `[ ]`) deste documento conforme as tarefas avancem, servindo de base contínua de consulta para o projeto.*

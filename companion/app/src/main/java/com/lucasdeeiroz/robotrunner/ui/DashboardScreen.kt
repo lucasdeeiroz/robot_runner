@@ -55,6 +55,41 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Build
+import com.lucasdeeiroz.robotrunner.ui.theme.RobotRunnerTheme
+import com.lucasdeeiroz.robotrunner.ui.components.glassmorphicBackground
+
+@Composable
+fun PlaceholderTabContent(title: String) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        androidx.compose.material3.Icon(
+            imageVector = Icons.Default.Info,
+            contentDescription = null,
+            modifier = Modifier.size(48.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "$title em breve",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Esta funcionalidade ainda não está disponível no Companion.",
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 32.dp)
+        )
+    }
+}
+
 
 @Composable
 fun DashboardScreen(
@@ -66,12 +101,10 @@ fun DashboardScreen(
     onRunOfflineCheckup: () -> Unit,
     onLaunchDisplayTest: () -> Unit
 ) {
-    var currentSection by remember { mutableIntStateOf(0) } // 0: Dashboard, 1: Perf, 2: Automation, 3: Tools, 4: Sync
-    var subTabDashboard by remember { mutableIntStateOf(0) }
-    var subTabPerf by remember { mutableIntStateOf(0) }
-    var subTabAutomation by remember { mutableIntStateOf(0) }
-    var subTabTools by remember { mutableIntStateOf(0) }
-    var subTabSync by remember { mutableIntStateOf(0) }
+    var currentSection by remember { mutableIntStateOf(0) } // 0: Home, 1: Run, 2: Toolbox
+    var subTabHome by remember { mutableIntStateOf(0) } // 0: Dashboard, 1: Connect, 2: Network
+    var subTabRun by remember { mutableIntStateOf(0) } // 0: Launcher, 1: Inspector, 2: Mapper, 3: Scenarios
+    var subTabToolbox by remember { mutableIntStateOf(0) } // 0: Logcat, 1: Perf, 2: Stopwatch, 3: Shell, 4: Apps, 5: Hardware, 6: Checkup, 7: Console, 8: Webview, 9: History
     
     var profileMenuExpanded by remember { mutableStateOf(false) }
 
@@ -83,38 +116,17 @@ fun DashboardScreen(
         themeState.primaryColor?.let { Color(android.graphics.Color.parseColor(it)) } ?: Color(0xFF6366F1)
     } catch (e: Exception) { Color(0xFF6366F1) }
 
-    val isDark = themeState.theme == "dark"
-    val colorScheme = if (isDark) {
-        darkColorScheme(
-            primary = primaryColorVal,
-            secondary = Color(0xFF38BDF8),
-            surface = Color(0xFF0F172A),
-            background = Color(0xFF090D16),
-            surfaceVariant = Color(0xFF1E293B),
-            onSurface = Color.White,
-            onSurfaceVariant = Color(0xFF94A3B8)
-        )
-    } else {
-        lightColorScheme(
-            primary = primaryColorVal,
-            secondary = Color(0xFF0284C7),
-            surface = Color(0xFFF8FAFC),
-            background = Color(0xFFF1F5F9),
-            surfaceVariant = Color(0xFFE2E8F0),
-            onSurface = Color(0xFF0F172A),
-            onSurfaceVariant = Color(0xFF475569)
-        )
-    }
-
-    MaterialTheme(
-        colorScheme = colorScheme
+    RobotRunnerTheme(
+        darkTheme = themeState.theme == "dark",
+        dynamicPrimaryColor = primaryColorVal
     ) {
+        val colorScheme = MaterialTheme.colorScheme
         Scaffold(
             bottomBar = {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(colorScheme.surface)
+                        .glassmorphicBackground(colorScheme.surface)
                         .padding(horizontal = 20.dp, vertical = 8.dp)
                         .windowInsetsPadding(WindowInsets.navigationBars),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -124,39 +136,30 @@ fun DashboardScreen(
                             PillTabBar(
                                 tabs = listOf(
                                     stringResource(id = R.string.tab_dashboard),
-                                    stringResource(id = R.string.tab_hardware_specs),
+                                    stringResource(id = R.string.tab_sync_center),
                                     "Network"
                                 ),
-                                selectedIndex = subTabDashboard,
-                                onTabSelected = { subTabDashboard = it }
+                                selectedIndex = subTabHome,
+                                onTabSelected = { subTabHome = it }
                             )
                         }
                         1 -> {
                             PillTabBar(
-                                tabs = listOf("UI Inspector", "Explorer", "BDD Runner"),
-                                selectedIndex = subTabAutomation,
-                                onTabSelected = { subTabAutomation = it }
+                                tabs = listOf("BDD Runner", "UI Inspector", "Explorer", "Scenarios"),
+                                selectedIndex = subTabRun,
+                                onTabSelected = { subTabRun = it }
                             )
                         }
                         2 -> {
                             PillTabBar(
-                                tabs = listOf("Performance", "Stopwatch", "Logcat"),
-                                selectedIndex = subTabPerf,
-                                onTabSelected = { subTabPerf = it }
-                            )
-                        }
-                        3 -> {
-                            PillTabBar(
-                                tabs = listOf("Apps", "Shell", stringResource(id = R.string.tab_diagnostics)),
-                                selectedIndex = subTabTools,
-                                onTabSelected = { subTabTools = it }
-                            )
-                        }
-                        4 -> {
-                            PillTabBar(
-                                tabs = listOf(stringResource(id = R.string.tab_sync_center)),
-                                selectedIndex = subTabSync,
-                                onTabSelected = { subTabSync = it }
+                                tabs = listOf(
+                                    "Logcat", "Performance", "Stopwatch", "Shell", 
+                                    "Apps", stringResource(id = R.string.tab_hardware_specs), 
+                                    stringResource(id = R.string.tab_diagnostics), 
+                                    "Run Console", "Webview", "History"
+                                ),
+                                selectedIndex = subTabToolbox,
+                                onTabSelected = { subTabToolbox = it }
                             )
                         }
                     }
@@ -166,7 +169,7 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(colorScheme.surface)
+                        .glassmorphicBackground(colorScheme.surface)
                         .windowInsetsPadding(WindowInsets.statusBars)
                 ) {
                     Row(
@@ -251,7 +254,7 @@ fun DashboardScreen(
                                         )
                                     },
                                     onClick = {
-                                        currentSection = 3
+                                        Toast.makeText(context, "Configurações em breve", Toast.LENGTH_SHORT).show()
                                         profileMenuExpanded = false
                                     }
                                 )
@@ -265,7 +268,7 @@ fun DashboardScreen(
                                         )
                                     },
                                     onClick = {
-                                        currentSection = 4
+                                        Toast.makeText(context, "Sobre em breve", Toast.LENGTH_SHORT).show()
                                         profileMenuExpanded = false
                                     }
                                 )
@@ -288,7 +291,7 @@ fun DashboardScreen(
                         val tabs = listOf(
                             "Início" to Icons.Default.Home,
                             "Executar" to Icons.Default.PlayArrow,
-                            "Testes" to Icons.Default.List
+                            "Ferramentas" to Icons.Default.Build
                         )
                         tabs.forEachIndexed { index, (label, icon) ->
                             Tab(
@@ -332,7 +335,7 @@ fun DashboardScreen(
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     when (currentSection) {
-                        0 -> when (subTabDashboard) {
+                        0 -> when (subTabHome) {
                             0 -> DashboardTabContent(
                                 telemetry = telemetry,
                                 ipAddress = ipAddress,
@@ -340,7 +343,7 @@ fun DashboardScreen(
                                 onToggleServer = onToggleServer,
                                 context = context
                             )
-                            1 -> HardwareSpecsTabContent(detailedSpecs = detailedSpecs)
+                            1 -> SyncCenterTabContent()
                             2 -> NetworkTabContent(
                                 ipAddress = ipAddress,
                                 port = port,
@@ -349,26 +352,26 @@ fun DashboardScreen(
                                 onToggleServer = onToggleServer
                             )
                         }
-                        1 -> when (subTabAutomation) {
-                            0 -> InspectorTabContent()
-                            1 -> ExplorerTabContent()
-                            2 -> BddTestRunnerTabContent()
+                        1 -> when (subTabRun) {
+                            0 -> BddTestRunnerTabContent()
+                            1 -> InspectorTabContent()
+                            2 -> ExplorerTabContent()
+                            3 -> PlaceholderTabContent("Scenarios (AI)")
                         }
-                        2 -> when (subTabPerf) {
-                            0 -> PerformanceTabContent()
-                            1 -> StopwatchTabContent()
-                            2 -> LogcatTabContent()
-                        }
-                        3 -> when (subTabTools) {
-                            0 -> PackageManagerTabContent()
-                            1 -> ShellConsoleTabContent()
-                            2 -> DiagnosticsTabContent(
+                        2 -> when (subTabToolbox) {
+                            0 -> LogcatTabContent()
+                            1 -> PerformanceTabContent()
+                            2 -> StopwatchTabContent()
+                            3 -> ShellConsoleTabContent()
+                            4 -> PackageManagerTabContent()
+                            5 -> HardwareSpecsTabContent(detailedSpecs = detailedSpecs)
+                            6 -> DiagnosticsTabContent(
                                 onRunOfflineCheckup = onRunOfflineCheckup,
                                 onLaunchDisplayTest = onLaunchDisplayTest
                             )
-                        }
-                        4 -> when (subTabSync) {
-                            0 -> SyncCenterTabContent()
+                            7 -> PlaceholderTabContent("Run Console")
+                            8 -> PlaceholderTabContent("Webview")
+                            9 -> PlaceholderTabContent("History")
                         }
                     }
                 }
