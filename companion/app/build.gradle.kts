@@ -5,12 +5,12 @@ plugins {
 }
 
 android {
-    namespace = "com.robotrunner.companion"
+    namespace = "com.lucasdeeiroz.robotrunner"
     compileSdk = 37
     buildToolsVersion = "37.0.0"
 
     defaultConfig {
-        applicationId = "com.robotrunner.companion"
+        applicationId = "com.lucasdeeiroz.robotrunner"
         minSdk = 24
         targetSdk = 37
         versionCode = 300

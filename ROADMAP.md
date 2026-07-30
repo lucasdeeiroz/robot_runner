@@ -16,7 +16,7 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
 - [ ] **Alinhamento de funcionalidades, telas e layouts entre Desktop e Mobile**
   - *Objetivo:* Garantir consistência de UI/UX (Glassmorphism, Dark Mode, etc.) e simetria de funcionalidades entre o Robot Runner Desktop (Tauri/React) e o Companion App (Android/Compose).
 
-- [ ] **Alterar pacote do app mobile**
+- [x] **Alterar pacote do app mobile**
   - *Objetivo:* Alterar o nome do pacote (Application ID/Package Name) do Companion App Android para `com.lucasdeeiroz.robotrunner`, alinhando-o com o identificador Winget do Robot Runner Desktop.
 
 ---

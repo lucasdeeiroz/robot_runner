@@ -74,7 +74,7 @@ pub async fn get_connected_devices(app: AppHandle) -> Result<Vec<Device>, String
             device_tasks.push(tokio::spawn(async move {
                 let program = get_adb_program(&app_clone);
                 let mut cmd = new_tokio_command(&program);
-                let script = "getprop ro.product.model; echo '---SEP---'; getprop ro.build.version.release; echo '---SEP---'; dumpsys battery; echo '---SEP---'; cat /proc/meminfo || dumpsys meminfo; echo '---SEP---'; df -k /data; echo '---SEP---'; pm list packages com.robotrunner.companion";
+                let script = "getprop ro.product.model; echo '---SEP---'; getprop ro.build.version.release; echo '---SEP---'; dumpsys battery; echo '---SEP---'; cat /proc/meminfo || dumpsys meminfo; echo '---SEP---'; df -k /data; echo '---SEP---'; pm list packages com.lucasdeeiroz.robotrunner";
                 cmd.args(&["-s", &udid, "shell", script]);
                 
                 let output = cmd.output().await;
@@ -116,7 +116,7 @@ pub async fn get_connected_devices(app: AppHandle) -> Result<Vec<Device>, String
                     })
                     .unwrap_or((0, 0));
 
-                let is_companion_installed = parts.get(5).map(|s| s.contains("com.robotrunner.companion"));
+                let is_companion_installed = parts.get(5).map(|s| s.contains("com.lucasdeeiroz.robotrunner"));
                 let companion_port = if is_companion_installed == Some(true) { Some(9876) } else { None };
 
                 let mut is_companion_active = None;

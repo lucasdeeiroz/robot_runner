@@ -22,11 +22,11 @@ pub async fn check_companion_installed(app: AppHandle, device: String) -> AppRes
         "pm".to_string(),
         "list".to_string(),
         "packages".to_string(),
-        "com.robotrunner.companion".to_string(),
+        "com.lucasdeeiroz.robotrunner".to_string(),
     ];
     let output = execute_adb_with_recovery(&app, Some(&device), args).await?;
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let installed = stdout.contains("com.robotrunner.companion");
+    let installed = stdout.contains("com.lucasdeeiroz.robotrunner");
     eprintln!("[Companion Rust] check_companion_installed for {}: {}", device, installed);
     Ok(installed)
 }
@@ -99,7 +99,7 @@ pub async fn launch_companion_app(app: AppHandle, device: String) -> AppResult<(
         "am".to_string(),
         "start".to_string(),
         "-n".to_string(),
-        "com.robotrunner.companion/.MainActivity".to_string(),
+        "com.lucasdeeiroz.robotrunner/.MainActivity".to_string(),
     ];
     eprintln!("[Companion Rust] Launching intent: adb -s {} am start...", device);
     let output = execute_adb_with_recovery(&app, Some(&device), args).await?;
@@ -121,7 +121,7 @@ pub async fn enable_companion_accessibility(app: AppHandle, device: String) -> A
         "put".to_string(),
         "secure".to_string(),
         "enabled_accessibility_services".to_string(),
-        "com.robotrunner.companion/.service.CompanionAccessibilityService".to_string(),
+        "com.lucasdeeiroz.robotrunner/.service.CompanionAccessibilityService".to_string(),
     ];
     let args2 = vec![
         "shell".to_string(),

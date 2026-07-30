@@ -90,7 +90,7 @@ export function useCompanion(selectedDevice: string | null) {
         try {
             const version = await invoke<string>('get_app_version', {
                 device: selectedDevice,
-                package: 'com.robotrunner.companion'
+                package: 'com.lucasdeeiroz.robotrunner'
             });
             // console.log("Versão do app:", version);
             return version;
