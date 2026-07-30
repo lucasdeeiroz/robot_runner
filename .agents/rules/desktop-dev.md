@@ -16,6 +16,10 @@ Performance: Dado o recurso de Screen Mirroring e Live Logs, minimize o overhead
 
 Ciclo de Vida do ADB: Garanta que os comandos enviados via Rust tratem desconexões abruptas de dispositivos. Ao executar chamadas periódicas via `adb shell` para monitorar o dispositivo (ex: `top`, `dumpsys`), evite flags que forcem amostragens repetidas com delays no lado do dispositivo (ex: use `top -b -n 1` em vez de `top -b -n 2 -d 0.5`). Mantenha intervalos de polling conservadores (>= 3000ms) para minimizar a criação de processos `adb.exe` e overhead no SO host (Windows).
 
+**Agrupamento de Comandos ADB**: Ao necessitar rodar múltiplos comandos ADB na mesma execução (ex: resgatar vários stats como meminfo, dumpsys, top), **SEMPRE** concatene os comandos no lado do Rust em um único payload enviado ao device (ex: `adb shell "cmd1 && cmd2"` ou `adb shell "cmd1 ; cmd2"`). Evite invocar o processo local do `adb.exe` dezenas de vezes seguidas para comandos triviais; isso acumula delay absurdo (IPC + USB latency) e destrói a performance do backend.
+
+**Parsing de Output do ADB**: Ao interpretar retornos de comandos em lote do ADB no terminal, **SEMPRE** utilize condicionais para descartar lixo gerado pelo ciclo de vida do daemon do ADB. Linhas que contenham `* daemon not running`, `* daemon started successfully` ou `adb server` frequentemente poluem o stdout e causam falhas graves. Utilize algo como `if line.starts_with('*') || line.starts_with("adb server") { continue; }`.
+
 Test Runner: Ao lidar com o modo de arquivo/pasta e arquivos .args, assegure-se de que os caminhos (paths) sejam tratados de forma agnóstica ao SO (Windows/Linux/macOS).
 
 Logs em Tempo Real: Implemente streams eficientes entre o processo do Appium/Robot e a UI do React para evitar vazamento de memória.
@@ -24,7 +28,8 @@ Gerenciamento de Processos em Sub-abas Voláteis: NUNCA encerre processos em seg
 
 3. UX para QA:
 
-Internacionalização (i18n): Todo novo elemento de UI deve suportar as chaves de tradução (EN, PT-BR, ES).
+27: 
+
 
 Diagnóstico: Sugira sempre mecanismos de feedback visual para o usuário quando um comando de backend falhar (ex: Toast notifications ou logs de erro detalhados).
 
@@ -40,4 +45,4 @@ Modularidade: Sugira a criação de hooks customizados no React ou modules espec
 
 Comentários: Utilize comentários no código apenas para explicar o bloco ou linha de código. Nunca utilize os comentários para expor suas dúvidas e indecisões ou o que lhe foi solicitado.
 
-Idioma: Escreva códigos e comentários apenas em Inglês (US), mesmo que a solicitação seja feita em outro idioma, como o Português (BR), a menos que lhe seja solicitado explicitamente.
+43: 

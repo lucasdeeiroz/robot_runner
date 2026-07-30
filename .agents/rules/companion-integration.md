@@ -6,6 +6,35 @@ As seguintes diretrizes arquiteturais e técnicas são estritamente obrigatória
 
 ---
 
+## Arquitetura da Ponte TCP
+
+O Companion funciona como um servidor REST embarcado via TCP porta 9876.
+
+```
++-------------------------------------------------------------+
+|                    Robot Runner Desktop                     |
+|  [ React Frontend ] <--- IPC ---> [ Tauri Rust Backend ]    |
++----------------------------------------+--------------------+
+                                         |
+                            ADB Forward  | Localhost TCP Port 9876
+                            (tcp:9876)   v
++-------------------------------------------------------------+
+|               Android Device (Companion App)                |
+|  [ NanoHTTPD REST ] <---> [ CompanionAccessibilityService ] |
+|  [ 720p Frame Engine ] <---> [ Native Hardware Sensors ]    |
++-------------------------------------------------------------+
+```
+
+### Endpoints Principais (`http://127.0.0.1:9876`)
+- `GET /ping`: Health check (`{"status": "ok", "type": "pong"}`).
+- `GET /info` ou `GET /device-info`: Telemetria em tempo real (`battery`, `storage`, `nfc`, `printer`).
+- `GET /ui-tree`: Retorna a árvore JSON da tela ativa em **~8ms**.
+- `GET /screenshot/fast`: Retorna um frame JPEG de 720p (~30KB) em **~25ms**.
+- `POST /action/tap`: Recebe `{"x": 500, "y": 1200}` e dispara toque instantâneo nativo.
+- `GET /checkup/run`: Executa as 8 etapas de diagnóstico de hardware e permissões.
+
+---
+
 ## 1. Arquitetura de Ponte e Fallback Silencioso (Dual-Bridge)
 - **Companion como Primário**: A comunicação via Companion (porta HTTP local `9876` encaminhada via ADB forward `tcp:9876 tcp:9876`) deve SEMPRE ser a primeira tentativa para busca de árvore de UI e estatísticas.
 - **ADB como Fallback Silencioso**: Se o Companion estiver ausente, desativado ou falhar em responder, o sistema DEVE alternar silenciosamente e sem travamentos para os comandos legados do ADB (`uiautomator dump`, `screencap`).

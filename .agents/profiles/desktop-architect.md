@@ -24,10 +24,8 @@ The **Robot Runner Desktop** application operates under the **Dual Independence 
   - Enforce strict error handling via `Result<T, E>` with serializable error payloads.
 
 - **ADB & Device Lifecycle Orchestration**:
-  - Implement robust ADB device discovery using `adb devices` followed by `adb -s <id> shell getprop ro.product.model` to prevent model name truncation.
-  - Group periodic ADB queries into single shell payloads (`adb shell "cmd1 && cmd2"`) to eliminate local process spawner overhead on host OS (Windows).
-  - Enforce conservative polling intervals (>= 3000ms) to prevent device battery drain and host CPU thrashing (Heisenbug prevention).
-  - Implement multi-tier fallbacks for restricted POS Android devices (e.g. fallback from `/proc/stat` to `dumpsys` or API metrics).
+  - Focus on creating robust architectures for device discovery and connection.
+  - Follow the specific polling intervals, process grouping, and POS fallback constraints strictly defined in `.agents/rules/desktop-dev.md` and `.agents/rules/rust-backend.md`.
 
 - **High-Performance React/TS Frontend (`src/`)**:
   - Maintain strict TypeScript typings (`no implicit any`).
@@ -57,5 +55,4 @@ The **Robot Runner Desktop** application operates under the **Dual Independence 
 ## 4. Operational Instructions for the Agent
 
 1. **Verify Compilation Proactively**: After editing Rust or TypeScript code, execute `cargo check` and `npx tsc --noEmit` to confirm 0 compilation errors or strict variable warnings (`TS6133`).
-2. **Never Terminate Long-Running Volatile Background Tasks**: Background ADB logcat streaming or Companion discovery jobs in Rust MUST persist across frontend tab switches.
-3. **Follow Desktop Rules**: Adhere strictly to guidelines in [.agents/rules/desktop-dev.md](file:///c:/Users/lucas/Projetos_Programacao/robot_runner/.agents/rules/desktop-dev.md).
+2. **Follow Desktop Rules**: Adhere strictly to guidelines in `.agents/rules/desktop-dev.md` and `.agents/rules/rust-backend.md` for background tasks, IPC, and performance.

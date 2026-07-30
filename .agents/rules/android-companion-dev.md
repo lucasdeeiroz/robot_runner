@@ -16,6 +16,17 @@ This document outlines mandatory architectural guidelines, performance standards
 
 ---
 
+## 2. UI/UX Design & Jetpack Compose Standards
+
+1. **Modern Dark Aesthetics**: Use Material3 with modern dark color palettes, subtle glassmorphism, and responsive layouts that adapt seamlessly across phone screens, tablets, and POS receipt screens (720p / 480p).
+2. **Non-Intrusive Floating Inspector**: The on-device UI Inspector floating overlay must be draggable, collapsible, and easily toggled off so it never blocks the user's manual app interaction.
+3. **Visible texts must be internationalized**: All texts visible to the user must be internationalized in `./companion/app/src/main/res/` for `values/`, `values-es/` and `values-pt`.
+4. **Adaptive Icons**: Ensure the app icon uses Android's adaptive icons (separating background and foreground).
+5. **Live Activities & Bubbles**: For long tests, utilize ongoing background notifications. For floating status monitors, use Bubbles.
+6. **Predictive Back**: Migrate navigation to use Jetpack Navigation with Compose or `OnBackPressedDispatcher`, avoiding legacy `onBackPressed()`.
+
+---
+
 ## 2. Kotlin Architecture & Performance Standards
 
 1. **Coroutines & Thread Safety**:
