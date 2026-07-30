@@ -86,7 +86,8 @@ fun HomeSubTab(
                     onClick = onToggleServer,
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (telemetry.isServerRunning) MaterialTheme.colorScheme.error.copy(alpha = 0.8f) else MaterialTheme.colorScheme.primary
+                        containerColor = if (telemetry.isServerRunning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        contentColor = if (telemetry.isServerRunning) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onPrimary
                     ),
                     modifier = Modifier.height(36.dp)
                 ) {

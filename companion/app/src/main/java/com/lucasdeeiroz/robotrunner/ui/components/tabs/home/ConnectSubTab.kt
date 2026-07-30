@@ -137,7 +137,8 @@ val coroutineScope = rememberCoroutineScope()
                         Button(
                             onClick = onToggleServer,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isServerRunning) Color(0xFFEF4444) else Color(0xFF22C55E)
+                                containerColor = if (isServerRunning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                contentColor = if (isServerRunning) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onPrimary
                             ),
                             shape = RoundedCornerShape(8.dp)
                         ) {
