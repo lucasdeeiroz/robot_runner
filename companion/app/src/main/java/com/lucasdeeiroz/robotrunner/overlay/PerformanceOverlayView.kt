@@ -45,7 +45,7 @@ fun PerformanceOverlayView(
             delay(1000)
         }
     }
-    
+
     var isActive by remember { mutableStateOf(true) }
 
     LaunchedEffect(lastInteractionTime) {
@@ -96,8 +96,8 @@ fun PerformanceOverlayView(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     IconButton(
-                        onClick = { 
-                            isExpanded = !isExpanded 
+                        onClick = {
+                            isExpanded = !isExpanded
                             lastInteractionTime = System.currentTimeMillis()
                         },
                         modifier = Modifier.size(28.dp)
@@ -109,30 +109,22 @@ fun PerformanceOverlayView(
                             modifier = Modifier.size(16.dp)
                         )
                     }
-                    Text(
-                        text = "RR Performance",
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(start = 2.dp)
-                    )
+                    TextButton(
+                        onClick = {
+                            lastInteractionTime = System.currentTimeMillis()
+                            onOpenApp()
+                        },
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            text = "RR Performance",
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
 
                     Row {
-
-                        IconButton(
-                            onClick = {
-                                lastInteractionTime = System.currentTimeMillis()
-                                onOpenApp()
-                            },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
-                                contentDescription = "Open App",
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
 
                         IconButton(
                             onClick = {
@@ -155,7 +147,7 @@ fun PerformanceOverlayView(
                     // Expanded Content (Charts)
                     if (isExpanded) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -181,7 +173,7 @@ fun PerformanceOverlayView(
                         )
 
                         Spacer(modifier = Modifier.height(4.dp))
-                        
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -205,9 +197,9 @@ fun PerformanceOverlayView(
                             dataPoints = historySamples.map { it.ramUsedMb.toFloat() },
                             maxY = maxRam,
                             lineColor = MaterialTheme.colorScheme.tertiary
-                            )
+                        )
                         Spacer(modifier = Modifier.height(4.dp))
-                        
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -223,79 +215,77 @@ fun PerformanceOverlayView(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.secondary
-                                )
-                            }
+                            )
+                        }
                         Spacer(modifier = Modifier.height(2.dp))
                         val maxMa = 3000f
                         PerformanceLineChart(
                             dataPoints = historySamples.map { Math.abs(it.batteryCurrentMa).toFloat() },
                             maxY = maxMa,
                             lineColor = MaterialTheme.colorScheme.secondary
+                        )
+                    } else {
+                        // Compact Content
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "CPU:",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${latestSample?.cpuUsagePercent?.toInt() ?: 0}%",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
-                        else
-                        {
-                            // Compact Content
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "CPU:",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "${latestSample?.cpuUsagePercent?.toInt() ?: 0}%",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
 
-                            Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "RAM:",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = formatRam(latestSample?.ramUsedMb ?: 0),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.tertiary
-                                )
-                            }
-                            
-                            Spacer(modifier = Modifier.height(2.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "RAM:",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = formatRam(latestSample?.ramUsedMb ?: 0),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.tertiary
+                            )
+                        }
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "Power:",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = formatPower(latestSample?.batteryCurrentMa ?: 0),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                            }
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Power:",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = formatPower(latestSample?.batteryCurrentMa ?: 0),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
                         }
                     }
                 }
             }
         }
     }
+}
