@@ -72,7 +72,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     
     // Material 3 (Essencial para as cores dinâmicas e UI Moderna do Android 16)
-    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material3:material3:1.4.0")
     implementation("com.google.android.material:material:1.14.0")
     
     // Jetpack Navigation com Compose (Necessário para a Navegação Preditiva / Predictive Back)
@@ -81,4 +81,14 @@ dependencies {
     // NanoHTTPd (Core Maven Central)
     implementation("org.nanohttpd:nanohttpd:2.3.1")
     implementation("com.google.code.gson:gson:2.14.0")
+    
+    // CameraX for Scanner Mode
+    val camerax_version = "1.6.1"
+    implementation("androidx.camera:camera-core:$camerax_version")
+    implementation("androidx.camera:camera-camera2:$camerax_version")
+    implementation("androidx.camera:camera-lifecycle:$camerax_version")
+    implementation("androidx.camera:camera-view:$camerax_version")
+
+    // ML Kit Barcode Scanning
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
 }

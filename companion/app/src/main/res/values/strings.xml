@@ -317,4 +317,20 @@
     <string name="msg_artifact_deleted">Artifact deleted</string>
     <string name="tab_connect">Connect</string>
 
+    <!-- Stopwatch New Modes -->
+    <string name="mode_redraw">Redraw (TTI)</string>
+    <string name="mode_logcat">Logcat</string>
+    <string name="mode_scanner">Scanner</string>
+    <string name="header_logcat_stopwatch">Logcat Keyword Stopwatch</string>
+    <string name="desc_logcat_stopwatch">Measures time delta between session start and logcat keyword detection.</string>
+    <string name="header_scanner_stopwatch">Barcode Scanner Stopwatch</string>
+    <string name="desc_scanner_stopwatch">Measures barcode recognition time and decoding latency using CameraX and ML Kit.</string>
+    <string name="btn_start_logcat_session">Start Logcat Session</string>
+    <string name="btn_start_scanner_session">Start Camera Scanner</string>
+    <string name="label_keywords">Keywords (comma separated)</string>
+    <string name="msg_camera_permission">Camera permission required for Scanner Mode.</string>
+    <string name="label_format">Format: %1$d</string>
+    <string name="btn_save_round">Save Round</string>
+    <string name="btn_discard">Discard</string>
+    <string name="msg_use_hud_for_redraw">Tip: Use the Floating HUD (Above) and open another app to test redraws. Tapping this screen will only measure this app (usually 16ms).</string>
 </resources>

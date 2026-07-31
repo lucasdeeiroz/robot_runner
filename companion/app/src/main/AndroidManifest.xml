@@ -105,6 +105,13 @@
             android:enabled="true"
             android:exported="false" />
 
+        <!-- Stopwatch Overlay Service -->
+        <service
+            android:name=".overlay.StopwatchOverlayService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
+
     </application>
 
 </manifest>

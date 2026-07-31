@@ -316,4 +316,20 @@
     <string name="msg_artifact_deleted">Artefacto eliminado</string>
     <string name="tab_connect">Conectar</string>
 
+    <!-- Stopwatch New Modes -->
+    <string name="mode_redraw">Redraw (TTI)</string>
+    <string name="mode_logcat">Logcat</string>
+    <string name="mode_scanner">Escáner</string>
+    <string name="header_logcat_stopwatch">Cronómetro de Logcat</string>
+    <string name="desc_logcat_stopwatch">Mide el delta de tiempo entre el inicio de la sesión y la detección de palabras clave en el logcat.</string>
+    <string name="header_scanner_stopwatch">Cronómetro Lector de Códigos</string>
+    <string name="desc_scanner_stopwatch">Mide el tiempo de reconocimiento y la latencia de decodificación de códigos de barras (CameraX + ML Kit).</string>
+    <string name="btn_start_logcat_session">Iniciar Sesión Logcat</string>
+    <string name="btn_start_scanner_session">Iniciar Lector de Cámara</string>
+    <string name="label_keywords">Palabras clave (separadas por comas)</string>
+    <string name="msg_camera_permission">Se requiere permiso de cámara para el Escáner.</string>
+    <string name="label_format">Formato: %1$d</string>
+    <string name="btn_save_round">Guardar Round</string>
+    <string name="btn_discard">Descartar</string>
+    <string name="msg_use_hud_for_redraw">Consejo: Usa el Floating HUD (Arriba) y abre otra app para probar el redraw. Tocar esta pantalla solo medirá esta app (generalmente 16ms).</string>
 </resources>
