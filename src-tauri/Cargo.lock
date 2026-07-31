@@ -4032,7 +4032,7 @@ dependencies = [
 
 [[package]]
 name = "robot_runner"
-version = "3.0.0-alpha2"
+version = "3.0.0-alpha3"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
