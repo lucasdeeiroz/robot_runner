@@ -42,7 +42,7 @@
     <string name="status_bridge_off">Ponte Desligada</string>
     <string name="subtext_ready_dump">Pronto para extração de UI</string>
     <string name="subtext_grant_adb">Toque para conceder via ADB</string>
-    <string name="header_live_metrics">⚡ Métricas de Recursos em Tempo Real</string>
+    <string name="header_live_metrics">Métricas de Recursos em Tempo Real</string>
     <string name="gauge_cpu_title">Uso de CPU</string>
     <string name="gauge_cpu_sub">Sistema</string>
     <string name="gauge_ram_title">Memória RAM</string>
@@ -81,10 +81,10 @@
     <string name="sensors_registered_format">%1$d sensores registrados</string>
 
     <!-- Diagnostics Tab (PT-BR) -->
-    <string name="title_pos_checklist">📋 Checkup e Diagnóstico de Hardware e POS</string>
+    <string name="title_pos_checklist">Checkup e Diagnóstico de Hardware e POS</string>
     <string name="desc_pos_checklist">Executa auditoria local de hardware (Bateria mA, Térmico, NFC, Armazenamento) e gera relatório PDF offline no dispositivo.</string>
     <string name="btn_run_offline_pdf">Executar Checkup Offline e Exportar PDF</string>
-    <string name="title_display_test">🖥️ Teste de Calibração de Tela e Pixels</string>
+    <string name="title_display_test">Teste de Calibração de Tela e Pixels</string>
     <string name="desc_display_test">Inicia o teste de cores em tela cheia para detectar pixels mortos ou retenção de imagem (burn-in).</string>
     <string name="btn_launch_display_test">Iniciar Teste de Tela Cheia</string>
     <string name="label_host">Host</string>
@@ -111,7 +111,7 @@
     <string name="header_permissions">Inspetor de Permissões Solicitadas</string>
     <string name="perm_granted">CONCEDIDA</string>
     <string name="perm_denied">NEGADA</string>
-    <string name="shell_header_templates">⚡ Modelos de Comandos</string>
+    <string name="shell_header_templates">Modelos de Comandos</string>
     <string name="shell_input_placeholder">Digite o comando (ex: dumpsys battery)...</string>
     <string name="btn_run_shell">Executar</string>
     <string name="btn_clear_console">Limpar</string>
@@ -120,7 +120,7 @@
     <string name="shell_status_format">Exit Code: %1$d | Tempo de Execução: %2$dms</string>
     <!-- Phase 3 Strings (PT-BR) -->
     <string name="tab_network">Rede</string>
-    <string name="header_wireless_adb">📶 Depuração Sem Fio e Pareamento ADB</string>
+    <string name="header_wireless_adb">Depuração Sem Fio e Pareamento ADB</string>
     <string name="desc_wireless_adb">Conecte o Robot Runner Desktop sem fios via Wi-Fi (Android 11+).</string>
     <string name="label_pairing_pin">Código PIN de Pareamento</string>
     <string name="btn_gen_pin">Gerar PIN</string>
@@ -128,12 +128,12 @@
     <string name="label_pairing_cmd">Comando de Pareamento no Terminal</string>
     <string name="btn_copy_cmd">Copiar Comando</string>
     <string name="btn_open_dev_options">Abrir Opções do Desenvolvedor</string>
-    <string name="header_net_interfaces">🌐 Interfaces de Rede Ativas</string>
+    <string name="header_net_interfaces">Interfaces de Rede Ativas</string>
     <string name="label_interface_type">Tipo</string>
     <string name="label_ipv4">IPv4</string>
     <string name="label_ipv6">IPv6</string>
     <string name="label_mac">MAC</string>
-    <string name="header_rest_control">🔒 Servidor e Segurança</string>
+    <string name="header_rest_control">Servidor e Segurança</string>
     <string name="label_server_port">Porta do Servidor (Padrão 9876)</string>
     <string name="label_active_clients">Clientes Conectados Ativos: %1$d</string>
     <string name="label_total_requests">Total de Requisições Processadas: %1$d</string>
@@ -174,11 +174,11 @@
     <string name="label_cpu_mem">CPU/MEM</string>
     <!-- Phase 5 Strings (PT-BR) -->
     <string name="tab_stopwatch">Cronômetro</string>
-    <string name="header_redraw_stopwatch">⏱️ Cronômetro e Benchmark de Redesenho de Tela (ms)</string>
+    <string name="header_redraw_stopwatch">Cronômetro e Benchmark de Redesenho de Tela (ms)</string>
     <string name="desc_redraw_stopwatch">Mede a latência exata do gesto até o redesenho visual em milissegundos via Acessibilidade.</string>
-    <string name="header_floating_hud_stopwatch">🖥️ Overlay Flutuante do Cronômetro (HUD)</string>
+    <string name="header_floating_hud_stopwatch">Overlay Flutuante do Cronômetro (HUD)</string>
     <string name="desc_floating_hud_stopwatch">Exibe latência de redesenho sobre aplicativos em uso.</string>
-    <string name="header_floating_hud_logcat">🖥️ Overlay Flutuante do Logcat (HUD)</string>
+    <string name="header_floating_hud_logcat">Overlay Flutuante do Logcat (HUD)</string>
     <string name="desc_floating_hud_logcat">Transmite logs do logcat sobre aplicativos em uso.</string>
     <string name="label_last_delta">Última Latência de Redesenho</string>
     <string name="status_fast_ui">RÁPIDO (&lt;50ms)</string>
@@ -195,7 +195,7 @@
     <string name="msg_benchmark_exported">Relatório de benchmark salvo em Downloads: %1$s</string>
     <!-- Phase 6 Strings (PT-BR) -->
     <string name="tab_bdd_runner">Testes BDD</string>
-    <string name="header_bdd_runner">🤖 Motor de Execução de Testes BDD no Dispositivo</string>
+    <string name="header_bdd_runner">Motor de Execução de Testes BDD no Dispositivo</string>
     <string name="desc_bdd_runner">Executa cenários Gherkin nativamente no dispositivo sem necessidade de PC ou servidor Appium.</string>
     <string name="btn_run_suite">Executar Suíte de Testes</string>
     <string name="btn_stop_suite">Parar Execução</string>
@@ -204,16 +204,16 @@
     <string name="msg_report_exported">Relatório de auditoria salvo em Downloads: %1$s</string>
     <!-- Phase 7 Strings (PT-BR) -->
     <string name="tab_inspector">Inspetor</string>
-    <string name="header_floating_hud_inspector">🖥️ Overlay Flutuante do Inspetor de UI (HUD)</string>
+    <string name="header_floating_hud_inspector">Overlay Flutuante do Inspetor de UI (HUD)</string>
     <string name="desc_floating_hud_inspector">Inspecione elementos de UI e localizadores sobre aplicativos em uso.</string>
-    <string name="header_ui_inspector">🔍 Inspetor de UI Flutuante no Dispositivo</string>
+    <string name="header_ui_inspector">Inspetor de UI Flutuante no Dispositivo</string>
     <string name="desc_ui_inspector">Capture árvores de UI em sub-10ms, gere seletores múltiplos e exporte mapas de elementos.</string>
     <string name="btn_capture_ui">Capturar UI da Tela</string>
     <string name="btn_export_ui_map">Exportar Mapa de UI JSON</string>
     <string name="msg_ui_map_exported">Mapa de elementos salvo em Downloads: %1$s</string>
     <!-- Phase 7 Strings (Autonomous Explorer PT-BR) -->
     <string name="tab_explorer">Explorador</string>
-    <string name="header_autonomous_explorer">🕸️ Explorador Autônomo Nativo Kotlin DFS</string>
+    <string name="header_autonomous_explorer">Explorador Autônomo Nativo Kotlin DFS</string>
     <string name="desc_autonomous_explorer">Explore aplicativos autônomamente usando máquina de estados DFS sem necessidade de PC conectado.</string>
     <string name="btn_start_exploration">Iniciar Exploração</string>
     <string name="btn_pause_exploration">Pausar Exploração</string>
@@ -225,13 +225,13 @@
     <string name="label_dead_ends">BECOS SEM SAÍDA</string>
     <string name="msg_dfs_map_exported">Mapa DFS de UI salvo em Downloads: %1$s</string>
     <!-- Phase 9 Strings (Diagnostics & PDF Audit PT-BR) -->
-    <string name="header_pos_hardware_checklist">🖨️ Checklist de Diagnósticos POS &amp; Hardware</string>
-    <string name="header_ui_text_verification">🔤 Verificação de Texto de UI &amp; Arquivos Golden</string>
+    <string name="header_pos_hardware_checklist">Checklist de Diagnósticos POS &amp; Hardware</string>
+    <string name="header_ui_text_verification">Verificação de Texto de UI &amp; Arquivos Golden</string>
     <string name="desc_ui_text_verification">Verifique os textos visíveis na tela contra arquivos Golden (golden_*.json) para detectar divergências.</string>
     <string name="btn_print_test_receipt">Imprimir Comprovante Teste</string>
     <string name="btn_verify_ui_text">Verificar Texto da Tela vs Golden</string>
     <string name="btn_export_golden_json">Exportar Arquivo Golden JSON</string>
-    <string name="header_pdf_audit_report">📄 Relatório de Auditoria Técnica PDF</string>
+    <string name="header_pdf_audit_report">Relatório de Auditoria Técnica PDF</string>
     <string name="desc_pdf_audit_report">Gere relatório técnico certificado em PDF com especificações de hardware, status POS e auditoria de texto.</string>
     <string name="btn_generate_pdf_audit">Gerar Relatório PDF de Auditoria</string>
     <string name="btn_share_pdf_report">Compartilhar Relatório PDF</string>
@@ -239,14 +239,14 @@
     <string name="msg_pdf_report_generated">Relatório de Auditoria PDF gerado: %1$s</string>
     <string name="msg_receipt_printed">Comprovante térmico impresso com sucesso!</string>
     <!-- Phase 10 Strings (Sync & Fleet P2P PT-BR) -->
-    <string name="header_sync_center">🔄 Sincronização Bidirecional &amp; Ponte Desktop</string>
+    <string name="header_sync_center">Sincronização Bidirecional &amp; Ponte Desktop</string>
     <string name="desc_sync_center">Sincronize artefatos de teste, Arquivos Golden e configurações de projetos com o Robot Runner Desktop via REST / Wi-Fi.</string>
     <string name="btn_refresh_vault">Atualizar Índice do Cofre</string>
     <string name="btn_export_all_desktop">Exportar Tudo para o Desktop</string>
-    <string name="header_fleet_radar">🛰️ Radar P2P da Frota de Dispositivos</string>
+    <string name="header_fleet_radar">Radar P2P da Frota de Dispositivos</string>
     <string name="desc_fleet_radar">Descubra dispositivos Robot Runner Companion e servidores Desktop ativos na sub-rede Wi-Fi local.</string>
     <string name="btn_scan_fleet">Escanear Sub-rede da Frota</string>
-    <string name="header_artifact_vault">📦 Cofre Local de Artefatos</string>
+    <string name="header_artifact_vault">Cofre Local de Artefatos</string>
     <string name="tab_sync_center">Central Sync</string>
     <!-- Play Store Style Bottom Navigation Strings PT-BR -->
     <string name="nav_dashboard">Dashboard</string>

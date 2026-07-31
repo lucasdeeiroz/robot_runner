@@ -42,7 +42,7 @@
     <string name="status_bridge_off">Bridge Off</string>
     <string name="subtext_ready_dump">Ready for UI dump</string>
     <string name="subtext_grant_adb">Tap to grant via ADB</string>
-    <string name="header_live_metrics">⚡ Live Resource Metrics</string>
+    <string name="header_live_metrics">Live Resource Metrics</string>
     <string name="gauge_cpu_title">CPU Usage</string>
     <string name="gauge_cpu_sub">System</string>
     <string name="gauge_ram_title">RAM Memory</string>
@@ -81,10 +81,10 @@
     <string name="sensors_registered_format">%1$d sensors registered</string>
 
     <!-- Diagnostics Tab -->
-    <string name="title_pos_checklist">📋 Standalone POS &amp; Hardware Diagnostic Checklist</string>
+    <string name="title_pos_checklist">Standalone POS &amp; Hardware Diagnostic Checklist</string>
     <string name="desc_pos_checklist">Executes local hardware audit (Battery mA, Thermal, NFC, Storage) and generates an offline PDF report directly on the device.</string>
     <string name="btn_run_offline_pdf">Run Offline Checkup &amp; Export PDF</string>
-    <string name="title_display_test">🖥️ Screen Pixel &amp; Color Calibration Test</string>
+    <string name="title_display_test">Screen Pixel &amp; Color Calibration Test</string>
     <string name="desc_display_test">Launch full-screen pixel color cycling test to detect dead pixels or screen burn-in.</string>
     <string name="btn_launch_display_test">Launch Fullscreen Display Test</string>
     <string name="label_host">Host</string>
@@ -112,7 +112,7 @@
     <string name="header_permissions">Requested Permissions Inspector</string>
     <string name="perm_granted">GRANTED</string>
     <string name="perm_denied">DENIED</string>
-    <string name="shell_header_templates">⚡ Command Templates</string>
+    <string name="shell_header_templates">Command Templates</string>
     <string name="shell_input_placeholder">Enter command (e.g. dumpsys battery)...</string>
     <string name="btn_run_shell">Run</string>
     <string name="btn_clear_console">Clear</string>
@@ -121,7 +121,7 @@
     <string name="shell_status_format">Exit Code: %1$d | Execution Time: %2$dms</string>
     <!-- Phase 3 Strings -->
     <string name="tab_network">Network</string>
-    <string name="header_wireless_adb">📶 Wireless Debugging &amp; ADB Pairing</string>
+    <string name="header_wireless_adb">Wireless Debugging &amp; ADB Pairing</string>
     <string name="desc_wireless_adb">Connect Robot Runner Desktop cable-free via Wi-Fi (Android 11+).</string>
     <string name="label_pairing_pin">Pairing PIN Code</string>
     <string name="btn_gen_pin">Generate PIN</string>
@@ -129,12 +129,12 @@
     <string name="label_pairing_cmd">Pairing Terminal Command</string>
     <string name="btn_copy_cmd">Copy Command</string>
     <string name="btn_open_dev_options">Open Developer Options</string>
-    <string name="header_net_interfaces">🌐 Active Network Interfaces</string>
+    <string name="header_net_interfaces">Active Network Interfaces</string>
     <string name="label_interface_type">Type</string>
     <string name="label_ipv4">IPv4</string>
     <string name="label_ipv6">IPv6</string>
     <string name="label_mac">MAC</string>
-    <string name="header_rest_control">🔒 Server &amp; Security</string>
+    <string name="header_rest_control">Server &amp; Security</string>
     <string name="label_server_port">Server Port (Default 9876)</string>
     <string name="label_active_clients">Active Connected Clients: %1$d</string>
     <string name="label_total_requests">Total Requests Processed: %1$d</string>
@@ -175,11 +175,11 @@
     <string name="label_cpu_mem">CPU/MEM</string>
     <!-- Phase 5 Strings -->
     <string name="tab_stopwatch">Stopwatch</string>
-    <string name="header_redraw_stopwatch">⏱️ Millisecond UI Redraw &amp; Latency Benchmark</string>
+    <string name="header_redraw_stopwatch">Millisecond UI Redraw &amp; Latency Benchmark</string>
     <string name="desc_redraw_stopwatch">Measures exact gesture-to-frame rendering latency in milliseconds using Accessibility events.</string>
-    <string name="header_floating_hud_stopwatch">🖥️ Floating Stopwatch HUD Overlay</string>
+    <string name="header_floating_hud_stopwatch"> Floating Stopwatch HUD Overlay</string>
     <string name="desc_floating_hud_stopwatch">Measures live redraw latency over active target apps.</string>
-    <string name="header_floating_hud_logcat">🖥️ Floating Logcat HUD Overlay</string>
+    <string name="header_floating_hud_logcat">Floating Logcat HUD Overlay</string>
     <string name="desc_floating_hud_logcat">Streams live logcat entries over active target apps.</string>
     <string name="label_last_delta">Last Screen Redraw Delta</string>
     <string name="status_fast_ui">FAST (&lt;50ms)</string>
@@ -196,7 +196,7 @@
     <string name="msg_benchmark_exported">Benchmark report saved to Downloads: %1$s</string>
     <!-- Phase 6 Strings -->
     <string name="tab_bdd_runner">BDD Runner</string>
-    <string name="header_bdd_runner">🤖 On-Device BDD Test Execution Engine</string>
+    <string name="header_bdd_runner">On-Device BDD Test Execution Engine</string>
     <string name="desc_bdd_runner">Execute Gherkin scenarios natively on device without requiring a PC or Appium server.</string>
     <string name="btn_run_suite">Run Test Suite</string>
     <string name="btn_stop_suite">Stop Execution</string>
@@ -205,16 +205,16 @@
     <string name="msg_report_exported">Audit report saved to Downloads: %1$s</string>
     <!-- Phase 7 Strings -->
     <string name="tab_inspector">Inspector</string>
-    <string name="header_floating_hud_inspector">🖥️ Floating UI Inspector HUD Overlay</string>
+    <string name="header_floating_hud_inspector">Floating UI Inspector HUD Overlay</string>
     <string name="desc_floating_hud_inspector">Inspect target app UI elements and multi-locators over active windows.</string>
-    <string name="header_ui_inspector">🔍 On-Device Floating UI Inspector &amp; Element Mapper</string>
+    <string name="header_ui_inspector">On-Device Floating UI Inspector &amp; Element Mapper</string>
     <string name="desc_ui_inspector">Capture sub-10ms UI trees, generate multi-selectors, and export local UI element maps.</string>
     <string name="btn_capture_ui">Capture Screen UI</string>
     <string name="btn_export_ui_map">Export UI Map JSON</string>
     <string name="msg_ui_map_exported">UI Element Map saved to Downloads: %1$s</string>
     <!-- Phase 7 Strings (Autonomous Explorer) -->
     <string name="tab_explorer">Explorer</string>
-    <string name="header_autonomous_explorer">🕸️ Native Kotlin DFS Autonomous Explorer</string>
+    <string name="header_autonomous_explorer">Native Kotlin DFS Autonomous Explorer</string>
     <string name="desc_autonomous_explorer">Explore target apps autonomously using DFS graph state machine without connected PC.</string>
     <string name="btn_start_exploration">Start Exploration</string>
     <string name="btn_pause_exploration">Pause Exploration</string>
@@ -226,13 +226,13 @@
     <string name="label_dead_ends">DEAD ENDS</string>
     <string name="msg_dfs_map_exported">DFS UI Element Map saved to Downloads: %1$s</string>
     <!-- Phase 9 Strings (Diagnostics & PDF Audit) -->
-    <string name="header_pos_hardware_checklist">🖨️ POS &amp; Hardware Diagnostics Checklist</string>
-    <string name="header_ui_text_verification">🔤 UI Text Verification &amp; Golden File Check</string>
+    <string name="header_pos_hardware_checklist">POS &amp; Hardware Diagnostics Checklist</string>
+    <string name="header_ui_text_verification">UI Text Verification &amp; Golden File Check</string>
     <string name="desc_ui_text_verification">Verify visible UI texts against Golden Files (golden_*.json) to detect text drift.</string>
     <string name="btn_print_test_receipt">Print Test Receipt</string>
     <string name="btn_verify_ui_text">Verify Screen Text vs Golden</string>
     <string name="btn_export_golden_json">Export Golden File JSON</string>
-    <string name="header_pdf_audit_report">📄 Technical Audit PDF Report</string>
+    <string name="header_pdf_audit_report">Technical Audit PDF Report</string>
     <string name="desc_pdf_audit_report">Generate certified PDF technical report for hardware specs, POS status, and UI text audit.</string>
     <string name="btn_generate_pdf_audit">Generate PDF Audit Report</string>
     <string name="btn_share_pdf_report">Share PDF Report</string>
@@ -240,14 +240,14 @@
     <string name="msg_pdf_report_generated">PDF Technical Audit Report generated: %1$s</string>
     <string name="msg_receipt_printed">POS Thermal receipt printed successfully!</string>
     <!-- Phase 10 Strings (Sync & Fleet P2P) -->
-    <string name="header_sync_center">🔄 Bi-Directional Sync &amp; Desktop Bridge</string>
+    <string name="header_sync_center">Bi-Directional Sync &amp; Desktop Bridge</string>
     <string name="desc_sync_center">Synchronize test artifacts, Golden Files, and project configs with Robot Runner Desktop over REST / Wi-Fi.</string>
     <string name="btn_refresh_vault">Refresh Vault Index</string>
     <string name="btn_export_all_desktop">Export All to Desktop</string>
-    <string name="header_fleet_radar">🛰️ Fleet P2P Network Radar</string>
+    <string name="header_fleet_radar">Fleet P2P Network Radar</string>
     <string name="desc_fleet_radar">Discover active Robot Runner Companion devices and Desktop servers on local Wi-Fi subnet.</string>
     <string name="btn_scan_fleet">Scan Fleet Subnet</string>
-    <string name="header_artifact_vault">📦 Local Artifact Vault</string>
+    <string name="header_artifact_vault">Local Artifact Vault</string>
     <string name="tab_sync_center">Sync Center</string>
     <!-- Play Store Style Bottom Navigation Strings -->
     <string name="nav_dashboard">Dashboard</string>
