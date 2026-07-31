@@ -302,6 +302,37 @@ class CompanionHttpServer(
                 }
             }
 
+            "/performance/battery-audit" -> {
+                if (session.method == Method.POST) {
+                    kotlinx.coroutines.runBlocking {
+                        com.lucasdeeiroz.robotrunner.performance.BatteryAuditEngine.resetBatteryStats()
+                    }
+                    JsonObject().apply {
+                        addProperty("status", "ok")
+                        addProperty("message", "Battery stats reset successfully")
+                    }
+                } else {
+                    val array = JsonArray()
+                    val results = kotlinx.coroutines.runBlocking {
+                        com.lucasdeeiroz.robotrunner.performance.BatteryAuditEngine.runAudit(context)
+                    }
+                    results.forEach { item ->
+                        val obj = JsonObject().apply {
+                            addProperty("uid", item.uid)
+                            addProperty("packageName", item.packageName)
+                            addProperty("consumptionMah", item.consumptionMah)
+                        }
+                        array.add(obj)
+                    }
+                    JsonObject().apply {
+                        addProperty("status", "ok")
+                        add("audit", array)
+                    }
+                }
+            }
+
+
+
             "/stopwatch/start" -> {
                 com.lucasdeeiroz.robotrunner.stopwatch.RedrawStopwatchEngine.startSession()
                 JsonObject().apply {

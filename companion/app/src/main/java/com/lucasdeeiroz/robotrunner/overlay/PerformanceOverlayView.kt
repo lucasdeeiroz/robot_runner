@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lucasdeeiroz.robotrunner.performance.PerformanceCollector
 import com.lucasdeeiroz.robotrunner.performance.PerformanceSample
+import com.lucasdeeiroz.robotrunner.performance.formatPower
+import com.lucasdeeiroz.robotrunner.performance.formatRam
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.PerformanceLineChart
 import com.lucasdeeiroz.robotrunner.ui.theme.RobotRunnerTheme
 import kotlinx.coroutines.delay
@@ -191,18 +193,44 @@ fun PerformanceOverlayView(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "${latestSample?.ramUsedMb ?: 0} MB",
+                                text = formatRam(latestSample?.ramUsedMb ?: 0),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.tertiary
-                                )
-                            }
+                            )
+                        }
                         Spacer(modifier = Modifier.height(2.dp))
                         val maxRam = (latestSample?.ramTotalMb?.toFloat() ?: 4096f)
                         PerformanceLineChart(
                             dataPoints = historySamples.map { it.ramUsedMb.toFloat() },
                             maxY = maxRam,
                             lineColor = MaterialTheme.colorScheme.tertiary
+                            )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Power:",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = formatPower(latestSample?.batteryCurrentMa ?: 0),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        val maxMa = 3000f
+                        PerformanceLineChart(
+                            dataPoints = historySamples.map { Math.abs(it.batteryCurrentMa).toFloat() },
+                            maxY = maxMa,
+                            lineColor = MaterialTheme.colorScheme.secondary
                             )
                         }
                         else
@@ -239,10 +267,30 @@ fun PerformanceOverlayView(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "${latestSample?.ramUsedMb ?: 0} MB",
+                                    text = formatRam(latestSample?.ramUsedMb ?: 0),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.tertiary
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(2.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Power:",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = formatPower(latestSample?.batteryCurrentMa ?: 0),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.secondary
                                 )
                             }
                         }

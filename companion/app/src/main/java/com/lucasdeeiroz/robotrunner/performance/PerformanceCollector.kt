@@ -25,11 +25,13 @@ object PerformanceCollector {
     var isCollecting = false
         private set
 
-    fun startCollecting(context: Context, scope: CoroutineScope) {
+    private val collectorScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    fun startCollecting(context: Context) {
         if (isCollecting) return
         isCollecting = true
 
-        job = scope.launch(Dispatchers.IO) {
+        job = collectorScope.launch {
             while (isActive && isCollecting) {
                 try {
                     val telemetry = HardwareSpecsProvider.getLiveTelemetry(
@@ -59,6 +61,8 @@ object PerformanceCollector {
                 delay(1000)
             }
         }
+
+
     }
 
     fun stopCollecting() {
