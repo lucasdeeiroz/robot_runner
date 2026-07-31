@@ -13,6 +13,7 @@ import { FileSavedFeedback } from "@/components/molecules/FileSavedFeedback";
 import { Section } from "@/components/organisms/Section";
 import { DeviceStats } from "@/hooks/usePerformanceRecorder";
 import { useProcessMonitor } from "@/hooks/useProcessMonitor";
+import { useCompanion } from "@/hooks/useCompanion";
 import { Virtuoso } from "react-virtuoso";
 import { Button } from "@/components/atoms/Button";
 import { Select } from "@/components/atoms/Select";
@@ -70,6 +71,7 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
     const { t } = useTranslation();
     const { settings, updateSetting } = useSettings();
     const [showHighImpactWarning, setShowHighImpactWarning] = useState(false);
+    const { status: companionStatus } = useCompanion(selectedDevice);
 
     // Process Monitor State
     const [showProcessMonitor, setShowProcessMonitor] = useState(true);
@@ -171,7 +173,34 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
     const fetchBatteryAudit = async () => {
         setIsBatteryAuditLoading(true);
         try {
-            const data: BatteryAuditData = await invoke("get_battery_audit", { device: selectedDevice });
+            let data: BatteryAuditData;
+            if (companionStatus === 'connected') {
+                const rawJson = await invoke<string>('trigger_companion_action', {
+                    port: 9876,
+                    endpoint: '/performance/battery-audit',
+                    method: 'GET'
+                });
+                console.log("[BatteryAudit] rawJson:", rawJson);
+                const parsed = JSON.parse(rawJson);
+                if (parsed.status === 'ok' && parsed.audit) {
+                    data = {
+                        capacity: 0,
+                        computed_drain: 0,
+                        actual_drain: 0,
+                        apps: parsed.audit.map((a: any) => ({
+                            uid: a.uid,
+                            name: a.packageName,
+                            usage: a.consumptionMah,
+                            details: ''
+                        }))
+                    };
+                } else {
+                    console.error("[BatteryAudit] Invalid payload:", parsed);
+                    throw new Error("Invalid payload from companion: " + JSON.stringify(parsed));
+                }
+            } else {
+                data = await invoke("get_battery_audit", { device: selectedDevice });
+            }
             setBatteryAuditData(data);
             setBatteryAuditLastUpdate(Date.now());
         } catch (e) {
@@ -184,7 +213,15 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
     const resetBatteryAudit = async () => {
         setIsBatteryAuditLoading(true);
         try {
-            await invoke("reset_battery_stats", { device: selectedDevice });
+            if (companionStatus === 'connected') {
+                await invoke('trigger_companion_action', {
+                    port: 9876,
+                    endpoint: '/performance/battery-audit',
+                    method: 'POST'
+                });
+            } else {
+                await invoke("reset_battery_stats", { device: selectedDevice });
+            }
             feedback.toast.success(t('performance.battery_reset_success', 'Battery stats reset successfully'));
             await fetchBatteryAudit();
         } catch (e) {

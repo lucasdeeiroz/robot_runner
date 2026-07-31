@@ -2,18 +2,7 @@ use crate::adb::shell::execute_adb_with_recovery;
 use crate::errors::{AppError, AppResult};
 use std::time::Duration;
 use tauri::{command, AppHandle};
-use std::sync::Mutex;
-use std::collections::HashSet;
-use std::sync::LazyLock;
 
-static ACTIVE_FORWARDS: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
-
-pub fn invalidate_forward(device: &str, port: u16) {
-    let key = format!("{}:{}", device, port);
-    if let Ok(mut set) = ACTIVE_FORWARDS.lock() {
-        set.remove(&key);
-    }
-}
 
 #[command]
 pub async fn check_companion_installed(app: AppHandle, device: String) -> AppResult<bool> {
@@ -40,15 +29,6 @@ pub async fn start_companion_forward(
 ) -> AppResult<u16> {
     let l_port = local_port.unwrap_or(9876);
     let r_port = remote_port.unwrap_or(9876);
-    let key = format!("{}:{}", device, l_port);
-
-    {
-        if let Ok(set) = ACTIVE_FORWARDS.lock() {
-            if set.contains(&key) {
-                return Ok(l_port);
-            }
-        }
-    }
 
     let args = vec![
         "forward".to_string(),
@@ -63,9 +43,6 @@ pub async fn start_companion_forward(
     eprintln!("[Companion Rust] ADB forward result: stdout='{}', stderr='{}', status={}", stdout.trim(), stderr.trim(), output.status);
 
     if output.status.success() {
-        if let Ok(mut set) = ACTIVE_FORWARDS.lock() {
-            set.insert(key);
-        }
         Ok(l_port)
     } else {
         Err(AppError::AdbError(format!(
@@ -82,7 +59,6 @@ pub async fn stop_companion_forward(
     local_port: Option<u16>,
 ) -> AppResult<()> {
     let l_port = local_port.unwrap_or(9876);
-    invalidate_forward(&device, l_port);
     let args = vec![
         "forward".to_string(),
         "--remove".to_string(),
@@ -269,21 +245,24 @@ pub async fn trigger_companion_action(
     port: Option<u16>,
     endpoint: String,
     payload: Option<String>,
+    method: Option<String>,
 ) -> AppResult<String> {
     let p = port.unwrap_or(9876);
     let clean_endpoint = if endpoint.starts_with('/') { endpoint } else { format!("/{}", endpoint) };
     let url = format!("http://127.0.0.1:{}{}", p, clean_endpoint);
-    eprintln!("[Companion Rust] Triggering action at {}", url);
+    let m = method.unwrap_or_else(|| "POST".to_string()).to_uppercase();
+    eprintln!("[Companion Rust] Triggering action at {} with method {}", url, m);
 
     let client = reqwest::Client::builder()
         .timeout(Duration::from_millis(4000))
         .build()
         .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
 
-    let req_builder = if let Some(body) = payload {
-        client.post(&url).header("Content-Type", "application/json").body(body)
-    } else {
-        client.post(&url)
+    let req_builder = match m.as_str() {
+        "GET" => client.get(&url),
+        "PUT" => if let Some(body) = payload { client.put(&url).header("Content-Type", "application/json").body(body) } else { client.put(&url) },
+        "DELETE" => client.delete(&url),
+        _ => if let Some(body) = payload { client.post(&url).header("Content-Type", "application/json").body(body) } else { client.post(&url) }
     };
 
     let resp = req_builder
