@@ -13,6 +13,7 @@ val DarkOnSurface = Color.White
 val DarkOnSurfaceVariant = Color(0xFF94A3B8)
 val DarkSecondary = Color(0xFF38BDF8)
 val DarkOutline = Color(0xFF334155)
+val DarkTertiary = Color(0xFF10B981)
 
 // Light Theme Colors
 val LightSurface = Color(0xFFFBFDFA)
@@ -22,6 +23,7 @@ val LightOnSurface = Color(0xFF0F172A)
 val LightOnSurfaceVariant = Color(0xFF475569)
 val LightSecondary = Color(0xFF0284C7)
 val LightOutline = Color(0xFFCBD5E1)
+val LightTertiary = Color(0xFF059669)
 
 // Premium UI / Glassmorphism constants
 val GlassmorphismAlpha = 0.85f

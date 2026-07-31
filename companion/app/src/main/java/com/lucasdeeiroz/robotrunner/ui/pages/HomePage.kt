@@ -391,18 +391,18 @@ fun HomePage(
                         }
                         2 -> when (subTabToolbox) {
                             // 0 -> LogcatSubTab()
-                            1 -> PerformanceSubTab()
-                            2 -> StopwatchTabContent()
-                            3 -> ShellConsoleTabContent()
-                            4 -> PackageManagerTabContent()
-                            5 -> HardwareSpecsTabContent(detailedSpecs = detailedSpecs)
-                            6 -> DiagnosticsTabContent(
+                            0 -> PerformanceSubTab()
+                            1 -> StopwatchTabContent()
+                            2 -> ShellConsoleTabContent()
+                            3 -> PackageManagerTabContent()
+                            4 -> HardwareSpecsTabContent(detailedSpecs = detailedSpecs)
+                            5 -> DiagnosticsTabContent(
                                 onRunOfflineCheckup = onRunOfflineCheckup,
                                 onLaunchDisplayTest = onLaunchDisplayTest
                             )
-                            7 -> PlaceholderTabContent(stringResource(id = R.string.tab_run_console))
-                            8 -> PlaceholderTabContent(stringResource(id = R.string.tab_webview))
-                            9 -> PlaceholderTabContent(stringResource(id = R.string.tab_history))
+                            6 -> PlaceholderTabContent(stringResource(id = R.string.tab_run_console))
+                            7 -> PlaceholderTabContent(stringResource(id = R.string.tab_history))
+                            // 9 -> PlaceholderTabContent(stringResource(id = R.string.tab_webview))
                         }
                     }
                 }

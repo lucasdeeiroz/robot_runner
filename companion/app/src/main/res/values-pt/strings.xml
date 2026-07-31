@@ -150,8 +150,8 @@
     <string name="msg_logcat_stopped">Logcat está pausado. Clique em Play para iniciar.</string>
     <string name="header_floating_hud">🖥️ Overlay Flutuante de Performance (HUD)</string>
     <string name="desc_floating_hud">Exibe HUD com CPU, RAM e Bateria sobre aplicativos em uso.</string>
-    <string name="btn_start_hud">Iniciar HUD Flutuante</string>
-    <string name="btn_stop_hud">Parar HUD Flutuante</string>
+    <string name="btn_start_hud">Iniciar HUD</string>
+    <string name="btn_stop_hud">Parar HUD</string>
     <string name="msg_grant_overlay_permission">Conceda permissão de Exibição sobre outros apps</string>
     <string name="chart_cpu_title">⚡ Histórico de Uso de CPU (%)</string>
     <string name="chart_ram_title">⚡ Memória RAM do App (MB)</string>

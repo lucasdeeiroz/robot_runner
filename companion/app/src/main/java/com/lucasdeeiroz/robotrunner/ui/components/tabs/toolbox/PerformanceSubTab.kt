@@ -2,7 +2,8 @@ package com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox
 
 import com.lucasdeeiroz.robotrunner.performance.PerformanceSample
 import com.lucasdeeiroz.robotrunner.performance.PerformanceCollector
-import com.lucasdeeiroz.robotrunner.performance.FloatingHudServiceimport com.lucasdeeiroz.robotrunner.ui.pages.GaugeCard
+import com.lucasdeeiroz.robotrunner.performance.FloatingHudService
+import com.lucasdeeiroz.robotrunner.ui.pages.GaugeCard
 
 import android.content.Intent
 import android.net.Uri
@@ -35,12 +36,13 @@ fun PerformanceSubTab() {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var historySamples by remember { mutableStateOf<List<PerformanceSample>>(emptyList()) }
-    var isHudRunning by remember { mutableStateOf(false) }
+    var isHudRunning by remember { mutableStateOf(com.lucasdeeiroz.robotrunner.overlay.PerformanceOverlayService.isRunning) }
 
     LaunchedEffect(Unit) {
         PerformanceCollector.startCollecting(context, coroutineScope)
         while (true) {
             historySamples = PerformanceCollector.getHistorySnapshot()
+            isHudRunning = com.lucasdeeiroz.robotrunner.overlay.PerformanceOverlayService.isRunning
             delay(1000)
         }
     }
@@ -73,67 +75,6 @@ fun PerformanceSubTab() {
                 color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.weight(1f)
             )
-        }
-
-        // Overlay HUD Toggle Header Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(14.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(id = R.string.header_floating_hud),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(id = R.string.desc_floating_hud),
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Button(
-                    onClick = {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
-                            val intent = Intent(
-                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                Uri.parse("package:${context.packageName}")
-                            ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
-                            context.startActivity(intent)
-                            Toast.makeText(context, context.getString(R.string.msg_grant_overlay_permission), Toast.LENGTH_LONG).show()
-                        } else {
-                            val serviceIntent = Intent(context, FloatingHudService::class.java)
-                            if (isHudRunning) {
-                                context.stopService(serviceIntent)
-                                isHudRunning = false
-                            } else {
-                                context.startService(serviceIntent)
-                                isHudRunning = true
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isHudRunning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = if (isHudRunning) stringResource(id = R.string.btn_stop_hud) else stringResource(id = R.string.btn_start_hud),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
         }
 
         // Real-Time CPU Trend Chart Card
@@ -204,6 +145,67 @@ fun PerformanceSubTab() {
                     maxY = maxRam,
                     lineColor = MaterialTheme.colorScheme.tertiary
                 )
+            }
+        }
+
+        // Overlay HUD Toggle Header Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(id = R.string.header_floating_hud),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(id = R.string.desc_floating_hud),
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
+                            val intent = Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:${context.packageName}")
+                            ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                            context.startActivity(intent)
+                            Toast.makeText(context, context.getString(R.string.msg_grant_overlay_permission), Toast.LENGTH_LONG).show()
+                        } else {
+                            val serviceIntent = Intent(context, com.lucasdeeiroz.robotrunner.overlay.PerformanceOverlayService::class.java)
+                            if (isHudRunning) {
+                                context.stopService(serviceIntent)
+                                isHudRunning = false
+                            } else {
+                                context.startService(serviceIntent)
+                                isHudRunning = true
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isHudRunning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = if (isHudRunning) stringResource(id = R.string.btn_stop_hud) else stringResource(id = R.string.btn_start_hud),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }

@@ -97,6 +97,11 @@
             android:enabled="true"
             android:exported="false" />
 
+        <service
+            android:name=".overlay.PerformanceOverlayService"
+            android:enabled="true"
+            android:exported="false" />
+
     </application>
 
 </manifest>

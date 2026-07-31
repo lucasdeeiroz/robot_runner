@@ -22,7 +22,8 @@ private val DarkColorScheme = darkColorScheme(
     surfaceVariant = DarkSurfaceVariant,
     onSurface = DarkOnSurface,
     onSurfaceVariant = DarkOnSurfaceVariant,
-    outline = DarkOutline
+    outline = DarkOutline,
+    tertiary = DarkTertiary
 )
 
 
@@ -52,7 +53,8 @@ private val LightColorScheme = lightColorScheme(
     surfaceVariant = LightSurfaceVariant,
     onSurface = LightOnSurface,
     onSurfaceVariant = LightOnSurfaceVariant,
-    outline = LightOutline
+    outline = LightOutline,
+    tertiary = LightTertiary
 )
 
 @Composable

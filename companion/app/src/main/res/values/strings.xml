@@ -151,8 +151,8 @@
     <string name="msg_logcat_stopped">Logcat is stopped. Click Play to start.</string>
     <string name="header_floating_hud">🖥️ Floating Performance HUD Overlay</string>
     <string name="desc_floating_hud">Displays live CPU, RAM, and Battery HUD over active target apps.</string>
-    <string name="btn_start_hud">Start Floating HUD</string>
-    <string name="btn_stop_hud">Stop Floating HUD</string>
+    <string name="btn_start_hud">Start HUD</string>
+    <string name="btn_stop_hud">Stop HUD</string>
     <string name="msg_grant_overlay_permission">Please grant Overlay Display permission</string>
     <string name="chart_cpu_title">⚡ CPU Usage History (%)</string>
     <string name="chart_ram_title">⚡ RAM Memory Heap (MB)</string>
