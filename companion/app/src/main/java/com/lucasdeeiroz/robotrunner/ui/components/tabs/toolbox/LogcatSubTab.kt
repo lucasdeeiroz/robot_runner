@@ -9,6 +9,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
@@ -16,6 +18,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -170,7 +173,10 @@ fun LogcatSubTab() {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 FilterChip(
                     selected = selectedLevel == LogLevel.VERBOSE,
                     onClick = { selectedLevel = LogLevel.VERBOSE },
@@ -238,6 +244,27 @@ fun LogcatSubTab() {
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
+                
+                IconButton(
+                    onClick = {
+                        android.util.Log.d("LogcatSubTab", "Overlay button clicked. canDrawOverlays: ${android.provider.Settings.canDrawOverlays(context)}")
+                        if (android.provider.Settings.canDrawOverlays(context)) {
+                            context.startService(android.content.Intent(context, com.lucasdeeiroz.robotrunner.overlay.LogcatOverlayService::class.java))
+                        } else {
+                            val intent = android.content.Intent(
+                                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                android.net.Uri.parse("package:${context.packageName}")
+                            )
+                            context.startActivity(intent)
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
+                        contentDescription = "Open in Bubble",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
 
@@ -264,9 +291,10 @@ fun LogcatSubTab() {
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    reverseLayout = true
                 ) {
-                    items(logs.takeLast(300)) { msg ->
+                    items(logs.takeLast(300).reversed()) { msg ->
                         LogcatItemRow(msg = msg)
                     }
                 }

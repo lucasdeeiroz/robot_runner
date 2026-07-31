@@ -43,11 +43,11 @@ import com.lucasdeeiroz.robotrunner.apps.PackageManagerTabContent
 import com.lucasdeeiroz.robotrunner.bdd.BddTestRunnerTabContent
 import com.lucasdeeiroz.robotrunner.explorer.ExplorerTabContent
 import com.lucasdeeiroz.robotrunner.inspector.InspectorTabContent
-import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.LogcatSubTab
+// import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.LogcatSubTab
 import com.lucasdeeiroz.robotrunner.model.HardwareSpecCategory
 import com.lucasdeeiroz.robotrunner.model.LiveTelemetry
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.home.ConnectSubTab
-import com.lucasdeeiroz.robotrunner.performance.PerformanceTabContent
+import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.PerformanceSubTab
 import com.lucasdeeiroz.robotrunner.shell.ShellConsoleTabContent
 import com.lucasdeeiroz.robotrunner.stopwatch.StopwatchTabContent
 import kotlinx.coroutines.launch
@@ -174,7 +174,7 @@ fun HomePage(
                         2 -> {
                             PillTabBar(
                                 tabs = listOf(
-                                    PillTabItem(stringResource(id = R.string.tab_logcat), Icons.Rounded.FormatAlignLeft),
+                                    // PillTabItem(stringResource(id = R.string.tab_logcat), Icons.Rounded.FormatAlignLeft),
                                     PillTabItem(stringResource(id = R.string.tab_performance), Icons.Rounded.Speed),
                                     PillTabItem(stringResource(id = R.string.tab_stopwatch), Icons.Rounded.Timer),
                                     PillTabItem(stringResource(id = R.string.tab_shell), Icons.Rounded.Terminal),
@@ -390,8 +390,8 @@ fun HomePage(
                             3 -> PlaceholderTabContent(stringResource(id = R.string.tab_scenarios_ai))
                         }
                         2 -> when (subTabToolbox) {
-                            0 -> LogcatSubTab()
-                            1 -> PerformanceTabContent()
+                            // 0 -> LogcatSubTab()
+                            1 -> PerformanceSubTab()
                             2 -> StopwatchTabContent()
                             3 -> ShellConsoleTabContent()
                             4 -> PackageManagerTabContent()

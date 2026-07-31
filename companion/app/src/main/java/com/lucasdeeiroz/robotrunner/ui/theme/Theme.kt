@@ -87,9 +87,15 @@ fun RobotRunnerTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.surface.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            var context = view.context
+            while (context is android.content.ContextWrapper && context !is android.app.Activity) {
+                context = context.baseContext
+            }
+            if (context is android.app.Activity) {
+                val window = context.window
+                window.statusBarColor = colorScheme.surface.toArgb()
+                WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            }
         }
     }
 

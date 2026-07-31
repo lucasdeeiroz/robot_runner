@@ -92,6 +92,11 @@
             android:enabled="true"
             android:exported="false" />
 
+        <service
+            android:name=".overlay.LogcatOverlayService"
+            android:enabled="true"
+            android:exported="false" />
+
     </application>
 
 </manifest>

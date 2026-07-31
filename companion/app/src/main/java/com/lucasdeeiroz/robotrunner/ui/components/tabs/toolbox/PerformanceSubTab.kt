@@ -1,6 +1,8 @@
-package com.lucasdeeiroz.robotrunner.performance
+package com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox
 
-import com.lucasdeeiroz.robotrunner.ui.pages.GaugeCard
+import com.lucasdeeiroz.robotrunner.performance.PerformanceSample
+import com.lucasdeeiroz.robotrunner.performance.PerformanceCollector
+import com.lucasdeeiroz.robotrunner.performance.FloatingHudServiceimport com.lucasdeeiroz.robotrunner.ui.pages.GaugeCard
 
 import android.content.Intent
 import android.net.Uri
@@ -29,7 +31,7 @@ import com.lucasdeeiroz.robotrunner.R
 import kotlinx.coroutines.delay
 
 @Composable
-fun PerformanceTabContent() {
+fun PerformanceSubTab() {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var historySamples by remember { mutableStateOf<List<PerformanceSample>>(emptyList()) }
@@ -61,14 +63,14 @@ fun PerformanceTabContent() {
                 title = stringResource(id = R.string.gauge_cpu_title),
                 value = "${latestSample?.cpuUsagePercent?.toInt() ?: 0}%",
                 subtitle = stringResource(id = R.string.gauge_cpu_sub),
-                color = Color(0xFF38BDF8),
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f)
             )
             GaugeCard(
                 title = stringResource(id = R.string.gauge_ram_title),
                 value = "${((latestSample?.ramUsedMb?.toFloat() ?: 0f) / (latestSample?.ramTotalMb?.toFloat()?.takeIf { it > 0f } ?: 1f) * 100).toInt()}%",
                 subtitle = "${latestSample?.ramUsedMb ?: 0}/${latestSample?.ramTotalMb ?: 0} MB",
-                color = Color(0xFF10B981),
+                color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -121,7 +123,7 @@ fun PerformanceTabContent() {
                         }
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isHudRunning) Color(0xFFEF4444) else Color(0xFF6366F1)
+                        containerColor = if (isHudRunning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                     ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
@@ -155,7 +157,7 @@ fun PerformanceTabContent() {
                         text = "${latestSample?.cpuUsagePercent?.toInt() ?: 0}%",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF38BDF8)
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
 
@@ -164,7 +166,7 @@ fun PerformanceTabContent() {
                 PerformanceLineChart(
                     dataPoints = historySamples.map { it.cpuUsagePercent },
                     maxY = 100f,
-                    lineColor = Color(0xFF38BDF8)
+                    lineColor = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -190,7 +192,7 @@ fun PerformanceTabContent() {
                         text = "${latestSample?.ramUsedMb ?: 0} MB",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF22C55E)
+                        color = MaterialTheme.colorScheme.tertiary
                     )
                 }
 
@@ -200,7 +202,7 @@ fun PerformanceTabContent() {
                 PerformanceLineChart(
                     dataPoints = historySamples.map { it.ramUsedMb.toFloat() },
                     maxY = maxRam,
-                    lineColor = Color(0xFF22C55E)
+                    lineColor = MaterialTheme.colorScheme.tertiary
                 )
             }
         }
