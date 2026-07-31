@@ -143,6 +143,19 @@ export interface UiTextCheckConfig {
     isGoldenMatch?: boolean;
 }
 
+// Only the check definition (what to test) is safe to persist globally in localStorage.
+// Results (foundTexts/status/isGoldenMatch) are per-device outcomes and must never leak between devices.
+function toPersistableUiTextCheck(check: UiTextCheckConfig): UiTextCheckConfig {
+    return {
+        id: check.id,
+        name: check.name,
+        activity: check.activity,
+        delayMs: check.delayMs,
+        enabled: check.enabled,
+        expectedTexts: check.expectedTexts
+    };
+}
+
 interface CheckupSubTabProps {
     selectedDevice: string | null;
     isTestRunning: boolean;
@@ -274,11 +287,23 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     const [additionalCheckResults, setAdditionalCheckResults] = useState<Record<string, { status: 'idle' | 'running' | 'done', found?: string, goldenExpected?: string, isGoldenMatch?: boolean }>>(() => cachedCheckup?.additionalCheckResults ?? {});
     const [packageComparisons, setPackageComparisons] = useState<PackageComparison[]>(() => cachedCheckup?.packageComparisons ?? []);
 
-    // UI Text / Screen Checks state
+    // UI Text / Screen Checks state.
+    // Definitions (name/activity/delay/enabled/expectedTexts) may come from the global localStorage
+    // template, but results (foundTexts/status/isGoldenMatch) are device-specific and must only ever
+    // come from the per-device cache — never from the global template, or one device's scan results
+    // leak into another device that hasn't been checked yet.
     const [uiTextChecks, setUiTextChecks] = useState<UiTextCheckConfig[]>(() => {
         if (cachedCheckup?.uiTextChecks) return cachedCheckup.uiTextChecks;
         const stored = localStorage.getItem('checkup_uiTextChecks');
-        return stored ? JSON.parse(stored) : [
+        if (stored) {
+            try {
+                const parsed: UiTextCheckConfig[] = JSON.parse(stored);
+                return parsed.map(c => ({ ...toPersistableUiTextCheck(c), status: 'idle' as const }));
+            } catch (_) {
+                // Ignore malformed cache and fall through to defaults
+            }
+        }
+        return [
             {
                 id: 'ui_test',
                 name: 'UI Test',
@@ -296,7 +321,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     const [uiCheckDelayInput, setUiCheckDelayInput] = useState('1500');
 
     useEffect(() => {
-        localStorage.setItem('checkup_uiTextChecks', JSON.stringify(uiTextChecks));
+        localStorage.setItem('checkup_uiTextChecks', JSON.stringify(uiTextChecks.map(toPersistableUiTextCheck)));
     }, [uiTextChecks]);
 
     // Sync cache on change
@@ -2325,8 +2350,9 @@ ${html}`;
                                             const expected = check.expectedTexts?.[index] || '-';
                                             const found = check.foundTexts?.[index] || '-';
 
-                                            // Validation logic: If equal, it's a success (green), if different, it's an error (red)
-                                            const isMatch = expected === found;
+                                            // Validation logic: matches by existence (same rule as isGoldenMatch), not by position,
+                                            // since foundTexts order rarely matches expectedTexts order.
+                                            const isMatch = expected === '-' || !!check.foundTexts?.includes(expected);
 
                                             // Validation if both texts do not end with ':'
                                             const isValidTexts = !expected.endsWith(':') && !found.endsWith(':');
