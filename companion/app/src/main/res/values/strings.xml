@@ -359,4 +359,8 @@
     <string name="msg_waiting_keywords">Waiting for keywords...</string>
     <string name="label_keyword_format">Keyword: %1$s</string>
     <string name="msg_no_stopwatch_session">No stopwatch session running.</string>
+    <string name="title_export_logs">Export Logs</string>
+    <string name="msg_export_logs_choice">Do you want to export all logs or only the currently filtered logs?</string>
+    <string name="btn_filtered_only">Filtered Only</string>
+    <string name="btn_all_logs">All Logs</string>
 </resources>

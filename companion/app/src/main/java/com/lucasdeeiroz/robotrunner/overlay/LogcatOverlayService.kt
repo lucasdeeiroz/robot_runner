@@ -16,6 +16,10 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 
 class LogcatOverlayService : Service() {
 
+    companion object {
+        var isRunning = false
+    }
+
     private var windowManager: WindowManager? = null
     private var composeView: ComposeView? = null
     private val composeLifecycleOwner = ComposeLifecycleOwner()
@@ -24,6 +28,7 @@ class LogcatOverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         android.util.Log.d("LogcatOverlayService", "onCreate started")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
             android.util.Log.d("LogcatOverlayService", "Stopping self, no overlay permission")
@@ -88,6 +93,7 @@ class LogcatOverlayService : Service() {
     }
 
     override fun onDestroy() {
+        isRunning = false
         composeLifecycleOwner.stop()
         composeView?.let {
             try {

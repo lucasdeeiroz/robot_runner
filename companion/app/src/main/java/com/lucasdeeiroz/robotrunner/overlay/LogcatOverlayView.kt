@@ -40,7 +40,10 @@ fun LogcatOverlayView(
         while (true) {
             isPlaying = LogcatStreamer.isStreaming
             if (isExpanded) {
-                logs = LogcatStreamer.getFilteredLogs()
+                logs = LogcatStreamer.getFilteredLogs(
+                    com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.LogcatUiCache.selectedLevel,
+                    com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.LogcatUiCache.searchQuery
+                )
             }
             delay(500)
         }

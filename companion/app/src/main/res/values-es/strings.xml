@@ -332,4 +332,8 @@
     <string name="btn_save_round">Guardar Round</string>
     <string name="btn_discard">Descartar</string>
     <string name="msg_use_hud_for_redraw">Consejo: Usa el Floating HUD (Arriba) y abre otra app para probar el redraw. Tocar esta pantalla solo medirá esta app (generalmente 16ms).</string>
+    <string name="title_export_logs">Exportar Logs</string>
+    <string name="msg_export_logs_choice">¿Deseas exportar todos los logs o solo los logs filtrados actualmente?</string>
+    <string name="btn_filtered_only">Solo Filtrados</string>
+    <string name="btn_all_logs">Todos los Logs</string>
 </resources>

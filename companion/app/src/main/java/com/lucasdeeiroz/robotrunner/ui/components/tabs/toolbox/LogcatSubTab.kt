@@ -33,7 +33,6 @@ import com.lucasdeeiroz.robotrunner.R
 import com.lucasdeeiroz.robotrunner.logcat.LogcatMessage
 import com.lucasdeeiroz.robotrunner.logcat.LogcatStreamer
 import com.lucasdeeiroz.robotrunner.logcat.LogLevel
-import com.lucasdeeiroz.robotrunner.performance.FloatingHudService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -52,7 +51,8 @@ fun LogcatSubTab() {
     var selectedLevel by remember { mutableStateOf(LogcatUiCache.selectedLevel) }
     var isStreaming by remember { mutableStateOf(LogcatStreamer.isStreaming) }
     var logs by remember { mutableStateOf<List<LogcatMessage>>(emptyList()) }
-    var isHudRunning by remember { mutableStateOf(FloatingHudService.isRunning) }
+    var isHudRunning by remember { mutableStateOf(com.lucasdeeiroz.robotrunner.overlay.LogcatOverlayService.isRunning) }
+    var showExportDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(searchQuery, selectedLevel) {
         LogcatUiCache.searchQuery = searchQuery
@@ -61,7 +61,7 @@ fun LogcatSubTab() {
 
     LaunchedEffect(Unit) {
         while (true) {
-            isHudRunning = FloatingHudService.isRunning
+            isHudRunning = com.lucasdeeiroz.robotrunner.overlay.LogcatOverlayService.isRunning
             logs = LogcatStreamer.getFilteredLogs(selectedLevel, searchQuery)
             isStreaming = LogcatStreamer.isStreaming
             delay(500)
@@ -118,9 +118,7 @@ fun LogcatSubTab() {
                             context.startActivity(intent)
                             Toast.makeText(context, context.getString(R.string.msg_grant_overlay_permission), Toast.LENGTH_LONG).show()
                         } else {
-                            val serviceIntent = Intent(context, FloatingHudService::class.java).apply {
-                                putExtra(FloatingHudService.EXTRA_HUD_MODE, FloatingHudService.MODE_LOGCAT)
-                            }
+                            val serviceIntent = Intent(context, com.lucasdeeiroz.robotrunner.overlay.LogcatOverlayService::class.java)
                             if (isHudRunning) {
                                 context.stopService(serviceIntent)
                                 isHudRunning = false
@@ -229,14 +227,7 @@ fun LogcatSubTab() {
                 }
 
                 IconButton(
-                    onClick = {
-                        coroutineScope.launch {
-                            val file = LogcatStreamer.exportLogs()
-                            if (file != null) {
-                                Toast.makeText(context, context.getString(R.string.msg_logcat_exported, file.name), Toast.LENGTH_LONG).show()
-                            }
-                        }
-                    }
+                    onClick = { showExportDialog = true }
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Save,
@@ -245,26 +236,7 @@ fun LogcatSubTab() {
                     )
                 }
                 
-                IconButton(
-                    onClick = {
-                        android.util.Log.d("LogcatSubTab", "Overlay button clicked. canDrawOverlays: ${android.provider.Settings.canDrawOverlays(context)}")
-                        if (android.provider.Settings.canDrawOverlays(context)) {
-                            context.startService(android.content.Intent(context, com.lucasdeeiroz.robotrunner.overlay.LogcatOverlayService::class.java))
-                        } else {
-                            val intent = android.content.Intent(
-                                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                android.net.Uri.parse("package:${context.packageName}")
-                            )
-                            context.startActivity(intent)
-                        }
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
-                        contentDescription = stringResource(id = R.string.desc_open_bubble),
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
+
             }
         }
 
@@ -300,6 +272,47 @@ fun LogcatSubTab() {
                 }
             }
         }
+    }
+
+    if (showExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            title = { Text(text = stringResource(id = R.string.title_export_logs), fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(id = R.string.msg_export_logs_choice), fontSize = 14.sp) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExportDialog = false
+                    coroutineScope.launch {
+                        val file = LogcatStreamer.exportLogs(
+                            onlyFiltered = true,
+                            level = selectedLevel,
+                            query = searchQuery
+                        )
+                        if (file != null) {
+                            Toast.makeText(context, context.getString(R.string.msg_logcat_exported, file.name), Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }) {
+                    Text(stringResource(id = R.string.btn_filtered_only))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showExportDialog = false
+                    coroutineScope.launch {
+                        val file = LogcatStreamer.exportLogs(onlyFiltered = false)
+                        if (file != null) {
+                            Toast.makeText(context, context.getString(R.string.msg_logcat_exported, file.name), Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }) {
+                    Text(stringResource(id = R.string.btn_all_logs))
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
