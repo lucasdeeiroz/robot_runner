@@ -117,7 +117,29 @@
     <string name="btn_clear_console">Limpar</string>
     <string name="btn_copy_output">Copiar</string>
     <string name="msg_copied_clipboard">Saí­da copiada para a área de transferência</string>
-    <string name="shell_status_format">Exit Code: %1$d | Tempo de Execução: %2$dms</string>
+    <string name="shell_status_format">Código: %1$d | Tempo: %2$dms</string>
+    <string name="shell_console_output_header">Saída do Console</string>
+    <string name="shell_console_ready_msg">Pronto para executar comandos locais.\n</string>
+
+    <string name="commands_categories_network">Rede</string>
+    <string name="commands_categories_device">Dispositivo &amp; SO</string>
+    <string name="commands_categories_apps">Apps &amp; Pacotes</string>
+    <string name="commands_categories_ui">UI &amp; Tela</string>
+
+    <string name="commands_actions_ip_address">Endereço IP</string>
+    <string name="commands_actions_ping_google">Ping Google</string>
+    <string name="commands_actions_netstat">Netstat</string>
+    <string name="commands_actions_battery">Bateria</string>
+    <string name="commands_actions_reboot">Reiniciar</string>
+    <string name="commands_actions_uptime">Uptime</string>
+    <string name="commands_actions_device_info">Info Dispositivo</string>
+    <string name="commands_actions_list_packages">Apps Terceiros</string>
+    <string name="commands_actions_list_all_packages">Todos os Apps</string>
+    <string name="commands_actions_top">Top Processos</string>
+    <string name="commands_actions_dump_ui">Dump UI</string>
+    <string name="commands_actions_screen_size">Resolução</string>
+    <string name="commands_actions_screen_density">Densidade</string>
+    <string name="commands_actions_animation_scale">Escala de Animação</string>
     <!-- Phase 3 Strings (PT-BR) -->
     <string name="tab_network">Rede</string>
     <string name="header_wireless_adb">Depuração Sem Fio e Pareamento ADB</string>

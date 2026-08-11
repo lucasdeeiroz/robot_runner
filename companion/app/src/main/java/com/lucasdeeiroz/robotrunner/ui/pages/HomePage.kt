@@ -48,7 +48,7 @@ import com.lucasdeeiroz.robotrunner.model.HardwareSpecCategory
 import com.lucasdeeiroz.robotrunner.model.LiveTelemetry
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.home.ConnectSubTab
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.PerformanceSubTab
-import com.lucasdeeiroz.robotrunner.shell.ShellConsoleTabContent
+import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.CommandsSubTab
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.StopwatchSubTab
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.asImageBitmap
@@ -393,7 +393,7 @@ fun HomePage(
                             0 -> LogcatSubTab()
                             1 -> PerformanceSubTab()
                             2 -> StopwatchSubTab()
-                            3 -> ShellConsoleTabContent()
+                            3 -> CommandsSubTab()
                             4 -> PackageManagerTabContent()
                             5 -> HardwareSpecsTabContent(detailedSpecs = detailedSpecs)
                             6 -> DiagnosticsTabContent(

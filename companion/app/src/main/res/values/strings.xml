@@ -119,6 +119,28 @@
     <string name="btn_copy_output">Copy</string>
     <string name="msg_copied_clipboard">Output copied to clipboard</string>
     <string name="shell_status_format">Exit Code: %1$d | Execution Time: %2$dms</string>
+    <string name="shell_console_output_header">Console Output</string>
+    <string name="shell_console_ready_msg">Ready to execute local commands on device.\n</string>
+    
+    <string name="commands_categories_network">Network</string>
+    <string name="commands_categories_device">Device &amp; OS</string>
+    <string name="commands_categories_apps">Apps &amp; Packages</string>
+    <string name="commands_categories_ui">UI &amp; Display</string>
+    
+    <string name="commands_actions_ip_address">IP Address</string>
+    <string name="commands_actions_ping_google">Ping Google</string>
+    <string name="commands_actions_netstat">Netstat</string>
+    <string name="commands_actions_battery">Battery Status</string>
+    <string name="commands_actions_reboot">Reboot</string>
+    <string name="commands_actions_uptime">Uptime</string>
+    <string name="commands_actions_device_info">Device Info</string>
+    <string name="commands_actions_list_packages">3rd Party Apps</string>
+    <string name="commands_actions_list_all_packages">All Apps</string>
+    <string name="commands_actions_top">Top Processes</string>
+    <string name="commands_actions_dump_ui">Dump UI Hierarchy</string>
+    <string name="commands_actions_screen_size">Screen Res</string>
+    <string name="commands_actions_screen_density">Screen Density</string>
+    <string name="commands_actions_animation_scale">Animation Scale</string>
     <!-- Phase 3 Strings -->
     <string name="tab_network">Network</string>
     <string name="header_wireless_adb">Wireless Debugging &amp; ADB Pairing</string>

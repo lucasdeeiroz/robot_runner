@@ -114,6 +114,28 @@
     <string name="btn_copy_output">Copiar</string>
     <string name="msg_copied_clipboard">Salida copiada al portapapeles</string>
     <string name="shell_status_format">Exit Code: %1$d | Tiempo de Ejecución: %2$dms</string>
+    <string name="shell_console_output_header">Salida de Consola</string>
+    <string name="shell_console_ready_msg">Listo para ejecutar comandos locales.\n</string>
+
+    <string name="commands_categories_network">Red</string>
+    <string name="commands_categories_device">Dispositivo y SO</string>
+    <string name="commands_categories_apps">Apps y Paquetes</string>
+    <string name="commands_categories_ui">UI y Pantalla</string>
+
+    <string name="commands_actions_ip_address">Dirección IP</string>
+    <string name="commands_actions_ping_google">Ping Google</string>
+    <string name="commands_actions_netstat">Netstat</string>
+    <string name="commands_actions_battery">Batería</string>
+    <string name="commands_actions_reboot">Reiniciar</string>
+    <string name="commands_actions_uptime">Uptime</string>
+    <string name="commands_actions_device_info">Info Dispositivo</string>
+    <string name="commands_actions_list_packages">Apps Terceros</string>
+    <string name="commands_actions_list_all_packages">Todas las Apps</string>
+    <string name="commands_actions_top">Top Procesos</string>
+    <string name="commands_actions_dump_ui">Dump UI</string>
+    <string name="commands_actions_screen_size">Resolución</string>
+    <string name="commands_actions_screen_density">Densidad</string>
+    <string name="commands_actions_animation_scale">Escala Animación</string>
     <!-- Phase 3 Strings (ES) -->
     <string name="tab_network">Red</string>
     <string name="header_wireless_adb">Depuració Inalámbrica y Emparejamiento ADB</string>

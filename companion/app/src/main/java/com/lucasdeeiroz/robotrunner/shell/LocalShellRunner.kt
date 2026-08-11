@@ -2,9 +2,11 @@ package com.lucasdeeiroz.robotrunner.shell
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.awaitAll
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.util.concurrent.TimeUnit
 
 data class ShellResult(
     val command: String,
@@ -14,30 +16,13 @@ data class ShellResult(
     val executionTimeMs: Long
 )
 
-data class ShellTemplate(
-    val label: String,
-    val command: String,
-    val description: String
-)
-
 object LocalShellRunner {
-
-    val defaultTemplates = listOf(
-        ShellTemplate("Battery Stats", "dumpsys battery", "Inspect battery status and level"),
-        ShellTemplate("Memory Breakdown", "dumpsys meminfo", "Show system memory distribution"),
-        ShellTemplate("User Packages", "pm list packages -3", "List third-party user apps"),
-        ShellTemplate("Android OS Version", "getprop ro.build.version.release", "Check Android release version"),
-        ShellTemplate("Device Model", "getprop ro.product.model", "Check hardware model name"),
-        ShellTemplate("Screen Density", "wm density", "Inspect display screen density"),
-        ShellTemplate("Screen Resolution", "wm size", "Inspect display resolution"),
-        ShellTemplate("Animation Scale", "settings get global window_animation_scale", "Read window animation scale")
-    )
 
     suspend fun runCommand(command: String, timeoutMs: Long = 10000): ShellResult = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
         var process: Process? = null
-        val stdoutBuilder = StringBuilder()
-        val stderrBuilder = StringBuilder()
+        val stdoutBuilder = java.lang.StringBuilder()
+        val stderrBuilder = java.lang.StringBuilder()
         var exitCode = -1
 
         try {
@@ -46,38 +31,44 @@ object LocalShellRunner {
             val stdoutReader = BufferedReader(InputStreamReader(process.inputStream))
             val stderrReader = BufferedReader(InputStreamReader(process.errorStream))
 
-            val stdoutThread = Thread {
+            // Coroutine para leitura do stdout
+            val stdoutJob = async(Dispatchers.IO) {
                 try {
                     var line: String?
                     while (stdoutReader.readLine().also { line = it } != null) {
                         stdoutBuilder.append(line).append("\n")
                     }
                 } catch (e: Exception) {
-                    // Ignore stream closure
+                    // Ignora fechamento de stream
                 }
             }
 
-            val stderrThread = Thread {
+            // Coroutine para leitura do stderr
+            val stderrJob = async(Dispatchers.IO) {
                 try {
                     var line: String?
                     while (stderrReader.readLine().also { line = it } != null) {
                         stderrBuilder.append(line).append("\n")
                     }
                 } catch (e: Exception) {
-                    // Ignore stream closure
+                    // Ignora fechamento de stream
                 }
             }
 
-            stdoutThread.start()
-            stderrThread.start()
+            // Aguarda o processo com timeout seguro usando withTimeoutOrNull
+            val processCompleted = withTimeoutOrNull(timeoutMs) {
+                // Suspende esperando o processo
+                exitCode = process.waitFor()
+                true
+            }
 
-            val completed = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
-            if (completed) {
-                exitCode = process.exitValue()
-                stdoutThread.join(1000)
-                stderrThread.join(1000)
+            if (processCompleted != null) {
+                // Aguarda leitura dos buffers finalizar
+                awaitAll(stdoutJob, stderrJob)
             } else {
                 process.destroyForcibly()
+                stderrJob.cancel()
+                stdoutJob.cancel()
                 stderrBuilder.append("\n[Error: Command execution timed out after ${timeoutMs}ms]")
             }
         } catch (e: Exception) {

@@ -1,19 +1,24 @@
-package com.lucasdeeiroz.robotrunner.shell
+package com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox
 
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -22,15 +27,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lucasdeeiroz.robotrunner.R
+import com.lucasdeeiroz.robotrunner.shell.LocalShellRunner
+import com.lucasdeeiroz.robotrunner.shell.ShellResult
+import com.lucasdeeiroz.robotrunner.ui.components.glassmorphicBackground
 import kotlinx.coroutines.launch
 
+data class CommandAction(val labelResId: Int, val command: String)
+
+data class CommandCategory(
+    val nameResId: Int,
+    val actions: List<CommandAction>
+)
+
 @Composable
-fun ShellConsoleTabContent() {
+fun CommandsSubTab() {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     var commandInput by remember { mutableStateOf("") }
-    var consoleLogs by remember { mutableStateOf("Ready to execute local commands on device.\n") }
+    val readyMsg = stringResource(id = R.string.shell_console_ready_msg)
+    var consoleLogs by remember { mutableStateOf(readyMsg) }
     var lastResult by remember { mutableStateOf<ShellResult?>(null) }
     var isRunning by remember { mutableStateOf(false) }
 
@@ -52,40 +68,119 @@ fun ShellConsoleTabContent() {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Templates Header & Row
+    val categories = listOf(
+        CommandCategory(
+            nameResId = R.string.commands_categories_network,
+            actions = listOf(
+                CommandAction(R.string.commands_actions_ip_address, "ip addr show wlan0"),
+                CommandAction(R.string.commands_actions_ping_google, "ping -c 4 google.com"),
+                CommandAction(R.string.commands_actions_netstat, "netstat")
+            )
+        ),
+        CommandCategory(
+            nameResId = R.string.commands_categories_device,
+            actions = listOf(
+                CommandAction(R.string.commands_actions_battery, "dumpsys battery"),
+                CommandAction(R.string.commands_actions_reboot, "reboot"),
+                CommandAction(R.string.commands_actions_uptime, "uptime"),
+                CommandAction(R.string.commands_actions_device_info, "getprop ro.product.model")
+            )
+        ),
+        CommandCategory(
+            nameResId = R.string.commands_categories_apps,
+            actions = listOf(
+                CommandAction(R.string.commands_actions_list_packages, "pm list packages -3"),
+                CommandAction(R.string.commands_actions_list_all_packages, "pm list packages"),
+                CommandAction(R.string.commands_actions_top, "top -n 1")
+            )
+        ),
+        CommandCategory(
+            nameResId = R.string.commands_categories_ui,
+            actions = listOf(
+                CommandAction(R.string.commands_actions_dump_ui, "uiautomator dump"),
+                CommandAction(R.string.commands_actions_screen_size, "wm size"),
+                CommandAction(R.string.commands_actions_screen_density, "wm density"),
+                CommandAction(R.string.commands_actions_animation_scale, "settings get global window_animation_scale")
+            )
+        )
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(bottom = 100.dp) // Avoid tab bar obstruction
+    ) {
+        // Quick Actions Section (Scrollable horizontally or wrapped)
         Text(
-            text = stringResource(id = R.string.shell_header_templates),
+            text = stringResource(id = R.string.header_quick_actions),
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(bottom = 6.dp)
         )
 
+        var selectedCategoryIndex by remember { mutableIntStateOf(0) }
+
+        // Category Selection Row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(bottom = 10.dp),
+                .padding(bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            LocalShellRunner.defaultTemplates.forEach { template ->
-                SuggestionChip(
-                    onClick = {
-                        commandInput = template.command
-                        execute(template.command)
-                    },
-                    label = { Text(text = template.label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface) },
-                    colors = SuggestionChipDefaults.suggestionChipColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+            categories.forEachIndexed { index, category ->
+                FilterChip(
+                    selected = selectedCategoryIndex == index,
+                    onClick = { selectedCategoryIndex = index },
+                    label = { Text(text = stringResource(id = category.nameResId), fontSize = 12.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                        selectedLabelColor = MaterialTheme.colorScheme.primary
                     ),
-                    border = SuggestionChipDefaults.suggestionChipBorder(
+                    border = FilterChipDefaults.filterChipBorder(
                         enabled = true,
-                        borderColor = MaterialTheme.colorScheme.outlineVariant
+                        selected = selectedCategoryIndex == index,
+                        borderColor = if (selectedCategoryIndex == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
                 )
             }
         }
+
+        // Actions for selected category (Glassmorphic)
+        val selectedCategory = categories[selectedCategoryIndex]
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .glassmorphicBackground(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                .padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                selectedCategory.actions.forEach { action ->
+                    SuggestionChip(
+                        onClick = {
+                            commandInput = action.command
+                            execute(action.command)
+                        },
+                        label = { Text(text = stringResource(id = action.labelResId), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface) },
+                        colors = SuggestionChipDefaults.suggestionChipColors(
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                        ),
+                        border = SuggestionChipDefaults.suggestionChipBorder(
+                            enabled = true,
+                            borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Input & Run Row
         Row(
@@ -100,7 +195,7 @@ fun ShellConsoleTabContent() {
                 placeholder = { Text(text = stringResource(id = R.string.shell_input_placeholder), fontSize = 12.sp) },
                 modifier = Modifier.weight(1f),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF6366F1),
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -116,17 +211,19 @@ fun ShellConsoleTabContent() {
             Button(
                 onClick = { execute(commandInput) },
                 enabled = !isRunning && commandInput.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(8.dp),
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)
             ) {
                 if (isRunning) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(16.dp),
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = MaterialTheme.colorScheme.onPrimary,
                         strokeWidth = 2.dp
                     )
                 } else {
+                    Icon(imageVector = Icons.Default.PlayArrow, contentDescription = "Run", modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(text = stringResource(id = R.string.btn_run_shell), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
@@ -137,14 +234,14 @@ fun ShellConsoleTabContent() {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
+                    .glassmorphicBackground(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
                     .padding(horizontal = 10.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
                     text = stringResource(id = R.string.shell_status_format, res.exitCode, res.executionTimeMs),
                     fontSize = 11.sp,
-                    color = if (res.exitCode == 0) Color(0xFF22C55E) else Color(0xFFEF4444),
+                    color = if (res.exitCode == 0) Color(0xFF34D399) else MaterialTheme.colorScheme.error,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -157,7 +254,7 @@ fun ShellConsoleTabContent() {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "Console Output", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = stringResource(id = R.string.shell_console_output_header), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 TextButton(
@@ -179,7 +276,7 @@ fun ShellConsoleTabContent() {
                     },
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                 ) {
-                    Text(text = stringResource(id = R.string.btn_clear_console), fontSize = 11.sp, color = Color(0xFFEF4444))
+                    Text(text = stringResource(id = R.string.btn_clear_console), fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
                 }
             }
         }
@@ -193,13 +290,14 @@ fun ShellConsoleTabContent() {
                 .weight(1f),
             color = Color(0xFF060911),
             shape = RoundedCornerShape(8.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         ) {
             SelectionContainer {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(12.dp)
+                        .verticalScroll(rememberScrollState())
                 ) {
                     Text(
                         text = consoleLogs,
@@ -211,7 +309,5 @@ fun ShellConsoleTabContent() {
                 }
             }
         }
-        
-        Spacer(modifier = Modifier.height(100.dp))
     }
 }
