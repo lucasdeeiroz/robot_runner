@@ -20,8 +20,15 @@ data class LogcatLap(
     val deltaMs: Long
 )
 
+data class LogcatSavedRound(
+    val id: String,
+    val totalTimeMs: Long,
+    val laps: List<LogcatLap>
+)
+
 object LogcatStopwatchEngine {
     private val lapsList = Collections.synchronizedList(mutableListOf<LogcatLap>())
+    private val savedRounds = Collections.synchronizedList(mutableListOf<LogcatSavedRound>())
     private var keywordsList = listOf<String>()
     
     private val _sharedKeywords = MutableStateFlow(listOf("ActivityResume", "NetworkSuccess"))
@@ -96,14 +103,64 @@ object LogcatStopwatchEngine {
     fun getLapsSnapshot(): List<LogcatLap> {
         return synchronized(lapsList) { ArrayList(lapsList) }
     }
+    
+    fun getSavedRoundsSnapshot(): List<LogcatSavedRound> {
+        return synchronized(savedRounds) { ArrayList(savedRounds) }
+    }
 
-    fun clearSession() {
-        isRecordingSession = false
-        LogcatStreamer.removeObserver(logcatObserver)
+    fun removeLap(index: Int) {
+        synchronized(lapsList) {
+            if (index in lapsList.indices) {
+                lapsList.removeAt(index)
+                for (i in lapsList.indices) {
+                    val current = lapsList[i]
+                    val newDelta = if (i == 0) 0L else Math.max(0L, current.timestamp - lapsList[i - 1].timestamp)
+                    lapsList[i] = current.copy(lapNumber = i + 1, deltaMs = newDelta)
+                }
+                lapCounter = lapsList.size
+            }
+        }
+    }
+
+    fun saveRound() {
+        val currentLaps = synchronized(lapsList) { ArrayList(lapsList) }
+        if (currentLaps.isEmpty()) return
+        
+        val totalTime = currentLaps.sumOf { it.deltaMs }
+        val round = LogcatSavedRound(
+            id = "round_${System.currentTimeMillis()}",
+            totalTimeMs = totalTime,
+            laps = currentLaps
+        )
+        synchronized(savedRounds) {
+            savedRounds.add(round)
+        }
+        clearLaps()
+    }
+
+    fun clearLaps() {
         synchronized(lapsList) {
             lapsList.clear()
         }
         lapCounter = 0
+    }
+    
+    fun clearAllSavedRounds() {
+        synchronized(savedRounds) {
+            savedRounds.clear()
+        }
+    }
+
+    fun removeSavedRound(id: String) {
+        synchronized(savedRounds) {
+            savedRounds.removeAll { it.id == id }
+        }
+    }
+    fun clearSession() {
+        isRecordingSession = false
+        LogcatStreamer.removeObserver(logcatObserver)
+        clearLaps()
+        clearAllSavedRounds()
     }
 
     suspend fun exportSessionJson(): File? = withContext(Dispatchers.IO) {

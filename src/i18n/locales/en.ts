@@ -1168,7 +1168,12 @@ export const en = {
                 scanner_tip2: "The first captured keyword starts the timer (0ms). Subsequent matches will show the exact hardware delta.",
                 tti_badge: "Hardware TTI: +{{tti}}ms",
                 tti_ready: "Hardware TTI: Active",
-                tti_tooltip: "Millisecond-accurate UI redraw latency from Companion Hardware"
+                tti_tooltip: "Millisecond-accurate UI redraw latency from Companion Hardware",
+                scanner_offline: "Companion disconnected or Scanner Stopwatch not running.",
+                scanner_content: "Content",
+                scanner_latency: "Latency (3-step)",
+                scanner_match: "Match",
+                compare_barcode: "Compare with Display"
             },
             auto: "Auto",
             na: "N/A",

@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import Barcode from 'react-barcode';
 import { QRCodeSVG } from 'qrcode.react';
-import { Play, Square, Zap, Trash2, Timer, PackageIcon, Save, Download, Columns2, X, ScanLine, ZoomIn } from "lucide-react";
+import { Play, Square, Zap, Trash2, Timer, PackageIcon, Save, Download, Columns2, X, ScanLine, ZoomIn, CheckCircle2, XCircle } from "lucide-react";
 import clsx from "clsx";
 import { feedback } from "@/lib/feedback";
 import { useLogcatStopwatch } from "@/hooks/useLogcatStopwatch";
+import { useScannerStopwatch } from "@/hooks/useScannerStopwatch";
 import { Button } from "@/components/atoms/Button";
 import { Select } from "@/components/atoms/Select";
 import { TagInput } from "@/components/atoms/TagInput";
@@ -52,23 +53,17 @@ interface StopwatchSubTabProps {
     onPairWithConsole?: () => void;
 }
 
-interface SavedRound {
-    id: string;
-    totalTimeMs: number;
-    laps: any[];
-}
-
 export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowActionsDuringTest = false, onPairWithConsole }: StopwatchSubTabProps) {
     const { t } = useTranslation();
     const { settings, updateSetting } = useSettings();
     const [logLevel, setLogLevel] = useState<string>(settings.logcatLevel || "V");
     const [extraTags, setExtraTags] = useState<string>(settings.logcatExtraTags || "");
     const [selectedPackage, setSelectedPackage] = useState(() => settings.stopwatchSelectedPackage || "");
-    const [savedRounds, setSavedRounds] = useState<SavedRound[]>([]);
 
     const [mode, setMode] = useState<'standard' | 'scanner'>('standard');
     const [symbology, setSymbology] = useState<string>('EAN13');
     const [payload, setPayload] = useState<string>('7891000315507');
+    const [compareBarcode, setCompareBarcode] = useState<boolean>(true);
 
     const [barcodeScale, setBarcodeScale] = useState<number>(1.0);
     const [leftPaneWidth, setLeftPaneWidth] = useState<number>(50);
@@ -109,31 +104,30 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
 
     const {
         laps,
-        setLaps,
         deltaUnit,
         setDeltaUnit,
         isStopwatchRunning,
         handleRemoveLap,
+        handleClearLaps,
+        handleSaveRound,
+        handleClearAllRounds,
         handleToggleStopwatch,
         keywords,
         hardwareFrameDelta,
+        savedRounds,
+        handleRemoveSavedRound,
     } = useLogcatStopwatch(selectedDevice, selectedPackage);
+
+    const {
+        scannerLaps,
+        pendingLap,
+        isCompanionActive: isScannerCompanionActive,
+        clearScannerLaps
+    } = useScannerStopwatch(selectedDevice);
 
     const isActionDisabled = isTestRunning && !allowActionsDuringTest;
 
     const totalTimeMs = laps.reduce((sum, lap) => sum + lap.deltaMs, 0);
-
-    const handleSaveLaps = () => {
-        if (laps.length === 0) return;
-        const newRound: SavedRound = {
-            id: `round_${Date.now()}`,
-            totalTimeMs,
-            laps: [...laps]
-        };
-        setSavedRounds([...savedRounds, newRound]);
-        setLaps?.([]);
-        feedback.toast.success(t('performance.stopwatch.saved', 'Stopwatch results saved!'));
-    };
 
     const handleExportCsv = () => {
         if (savedRounds.length === 0) return;
@@ -169,6 +163,27 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
         const link = document.createElement("a");
         link.setAttribute("href", url);
         link.setAttribute("download", `stopwatch_benchmark_${Date.now()}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        feedback.toast.success(t('common.export_success', 'Exported successfully!'));
+    };
+
+    const handleExportScannerCsv = () => {
+        if (scannerLaps.length === 0) return;
+
+        let csvContent = "#,Content,Init(ms),Search(ms),Decode(ms),Total(ms),Match\n";
+        scannerLaps.forEach((lap, i) => {
+            const isValid = compareBarcode ? (lap.barcodeValue === payload ? "Yes" : "No") : "N/A";
+            csvContent += `${i + 1},"${lap.barcodeValue}",${lap.cameraInitMs},${lap.searchMs},${lap.decodeMs},${lap.totalLatencyMs},${isValid}\n`;
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `scanner_benchmark_${Date.now()}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -246,9 +261,6 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
                     </div>
                 }
             >
-                {/* <div className="mb-4 text-on-surface-variant text-sm">
-                    {t('performance.stopwatch.description', 'Record timestamp deltas for specific logcat events.')}
-                </div> */}
                 <div className="flex-1 min-h-0 bg-surface text-on-surface/80 font-mono text-xs relative border border-outline-variant/30 rounded-2xl">
                     <div 
                         ref={containerRef}
@@ -295,6 +307,18 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
                                             placeholder={t('performance.stopwatch.scanner_payload', 'Barcode content...')}
                                             className="flex-1"
                                         />
+                                    </div>
+                                    <div className="flex items-center gap-2 px-1">
+                                        <input
+                                            type="checkbox"
+                                            id="compareBarcode"
+                                            checked={compareBarcode}
+                                            onChange={(e) => setCompareBarcode(e.target.checked)}
+                                            className="w-4 h-4 rounded border-outline-variant/30 text-primary focus:ring-primary/50 bg-surface-variant/20"
+                                        />
+                                        <label htmlFor="compareBarcode" className="text-sm cursor-pointer select-none">
+                                            {t('performance.stopwatch.compare_barcode', 'Compare with display')}
+                                        </label>
                                     </div>
                                     <div className="bg-white rounded-xl border border-outline-variant/30 flex flex-col relative min-h-[150px] shrink-0 p-8 pt-12 items-center justify-start overflow-visible shadow-sm">
                                         <div className="absolute top-2 left-2 text-[10px] text-black/40 font-mono select-none z-[100] pointer-events-none">
@@ -344,158 +368,230 @@ export function StopwatchSubTab({ selectedDevice, isTestRunning = false, allowAc
                                         <Zap size={16} className="text-yellow-500" />
                                         {t('performance.stopwatch.laps', 'Checkpoints')}
                                     </span>
-                                    <Select
-                                        value={deltaUnit}
-                                        onChange={(e) => setDeltaUnit?.(e.target.value as any)}
-                                        options={[
-                                            { label: 'ms', value: 'ms' },
-                                            { label: 's', value: 's' },
-                                            { label: 'min', value: 'min' },
-                                            { label: 'h', value: 'h' },
-                                        ]}
-                                        containerClassName="w-24"
-                                    />
+                                    {mode === 'standard' && (
+                                        <Select
+                                            value={deltaUnit}
+                                            onChange={(e) => setDeltaUnit?.(e.target.value as any)}
+                                            options={[
+                                                { label: 'ms', value: 'ms' },
+                                                { label: 's', value: 's' },
+                                                { label: 'min', value: 'min' },
+                                                { label: 'h', value: 'h' },
+                                            ]}
+                                            containerClassName="w-24"
+                                        />
+                                    )}
                                 </div>
-                                {laps.length > 0 && (
+                                {laps.length > 0 && mode === 'standard' && (
                                     <div className="flex items-center gap-2">
                                         <div className="text-xs font-semibold px-2 py-1 bg-surface-variant/20 border border-outline-variant/30 rounded-md">
                                             {t('performance.stopwatch.total_time', 'Total')}: <span className="text-success">{formatDelta(totalTimeMs, deltaUnit)}</span>
                                         </div>
-                                        <Button onClick={handleSaveLaps} variant="ghost" size="sm" className="h-6 text-xs hover:bg-primary/10">
+                                        <Button onClick={handleSaveRound} variant="ghost" size="sm" className="h-6 text-xs hover:bg-primary/10">
                                             <Save size={14} className="mr-1" />
                                             {t('common.save', 'Save')}
                                         </Button>
-                                        <Button onClick={() => setLaps?.([])} variant="ghost" size="sm" className="h-6 text-xs text-error/80 hover:bg-error/10">
+                                        <Button onClick={handleClearLaps} variant="ghost" size="sm" className="h-6 text-xs text-error/80 hover:bg-error/10">
                                             {t('common.clear', 'Clear')}
                                         </Button>
                                     </div>
                                 )}
                             </div>
 
-                            {laps.length === 0 ? (
-                                <div className="text-center p-8 border border-dashed border-outline-variant/30 rounded-xl text-xs opacity-50 bg-surface-variant/10 shrink-0">
-                                    {t('performance.stopwatch.waiting', 'Waiting for keywords in Logcat... (Make sure Logcat is running)')}
-                                </div>
-                            ) : (
-                                <div className="flex-1 min-h-0 overflow-y-auto border border-outline-variant/30 rounded-xl custom-scrollbar bg-surface-variant/5">
-                                    <table className="w-full text-xs text-left">
-                                        <thead className="bg-surface-variant/50 sticky top-0 backdrop-blur-sm z-10">
-                                            <tr>
-                                                <th className="px-4 py-3 font-medium opacity-70 w-12 text-center">#</th>
-                                                <th className="px-4 py-3 font-medium opacity-70">{t('performance.stopwatch.keyword', 'Keyword')}</th>
-                                                <th className="px-4 py-3 font-medium opacity-70">{t('performance.stopwatch.time', 'Time')}</th>
-                                                <th className="px-4 py-3 font-medium opacity-70">{t('performance.stopwatch.delta', 'Delta')}</th>
-                                                <th className="px-4 py-3 font-medium opacity-70 w-12"></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-outline-variant/20">
-                                            {laps.map((lap, i) => (
-                                                <tr key={i} className="hover:bg-surface-variant/20 group transition-colors">
-                                                    <td className="px-4 py-3 opacity-50 text-center">{i + 1}</td>
-                                                    <td className="px-4 py-3 font-mono">{lap.keyword}</td>
-                                                    <td className="px-4 py-3 opacity-80">{new Date(lap.timestamp).toLocaleTimeString()}</td>
-                                                    <td className="px-4 py-3 font-mono text-success font-semibold">{formatDelta(lap.deltaMs, deltaUnit)}</td>
-                                                    <td className="px-4 py-3 text-right">
-                                                        <Button
-                                                            onClick={() => handleRemoveLap?.(i)}
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="h-8 w-8 p-0 text-error/50 hover:text-error hover:bg-error/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                                                            title={t('common.remove', 'Remove')}
-                                                        >
-                                                            <Trash2 size={14} />
-                                                        </Button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-
-                            {/* Saved Rounds Table */}
-                            {savedRounds.length > 0 && (
-                                <div className="mt-4 border-t border-outline-variant/30 pt-4 flex flex-col min-h-[150px]">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-sm font-medium opacity-80">{t('common.saved_rounds', 'Saved Rounds')}</span>
-                                        <div className="flex items-center gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 text-xs text-primary/80 hover:bg-primary/10"
-                                                onClick={handleExportCsv}
-                                            >
-                                                <Download size={12} className="mr-1" />
-                                                {t('common.export', 'Export')}
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 text-xs text-error/80 hover:bg-error/10"
-                                                onClick={() => setSavedRounds([])}
-                                            >
-                                                <Trash2 size={12} className="mr-1" />
-                                                {t('common.clear_all', 'Clear All')}
-                                            </Button>
+                            {mode === 'standard' ? (
+                                <>
+                                    {laps.length === 0 ? (
+                                        <div className="text-center p-8 border border-dashed border-outline-variant/30 rounded-xl text-xs opacity-50 bg-surface-variant/10 shrink-0">
+                                            {t('performance.stopwatch.waiting', 'Waiting for keywords in Logcat... (Make sure Logcat is running)')}
                                         </div>
-                                    </div>
-                                    <div className="flex-1 overflow-x-auto overflow-y-auto border border-outline-variant/30 rounded-xl custom-scrollbar bg-surface-variant/5">
-                                        <table className="w-full text-left text-xs min-w-max">
-                                            <thead className="bg-surface-variant/50 sticky top-0 backdrop-blur-sm z-10">
-                                                <tr>
-                                                    <th className="px-4 py-2 font-medium opacity-70 w-12 text-center border-r border-outline-variant/20">#</th>
-                                                    {savedRounds.map((round, i) => (
-                                                        <th key={round.id} className="px-4 py-2 font-medium opacity-70 text-center border-r border-outline-variant/20 last:border-0 relative group">
-                                                            <div className="flex items-center justify-center gap-2">
-                                                                {t('common.round', 'Round')} {i + 1}
+                                    ) : (
+                                        <div className="flex-1 min-h-0 overflow-y-auto border border-outline-variant/30 rounded-xl custom-scrollbar bg-surface-variant/5">
+                                            <table className="w-full text-xs text-left">
+                                                <thead className="bg-surface-variant/50 sticky top-0 backdrop-blur-sm z-10">
+                                                    <tr>
+                                                        <th className="px-4 py-3 font-medium opacity-70 w-12 text-center">#</th>
+                                                        <th className="px-4 py-3 font-medium opacity-70">{t('performance.stopwatch.keyword', 'Keyword')}</th>
+                                                        <th className="px-4 py-3 font-medium opacity-70">{t('performance.stopwatch.time', 'Time')}</th>
+                                                        <th className="px-4 py-3 font-medium opacity-70">{t('performance.stopwatch.delta', 'Delta')}</th>
+                                                        <th className="px-4 py-3 font-medium opacity-70 w-12"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-outline-variant/20">
+                                                    {laps.map((lap, i) => (
+                                                        <tr key={i} className="hover:bg-surface-variant/20 group transition-colors">
+                                                            <td className="px-4 py-3 opacity-50 text-center">{i + 1}</td>
+                                                            <td className="px-4 py-3 font-mono">{lap.keyword}</td>
+                                                            <td className="px-4 py-3 opacity-80">{new Date(lap.timestamp).toLocaleTimeString()}</td>
+                                                            <td className="px-4 py-3 font-mono text-success font-semibold">{formatDelta(lap.deltaMs, deltaUnit)}</td>
+                                                            <td className="px-4 py-3 text-right">
                                                                 <Button
+                                                                    onClick={() => handleRemoveLap?.(i)}
                                                                     variant="ghost"
                                                                     size="sm"
-                                                                    className="h-5 w-5 p-0 text-error opacity-0 group-hover:opacity-100 transition-opacity absolute right-1"
-                                                                    onClick={() => setSavedRounds(prev => prev.filter(r => r.id !== round.id))}
+                                                                    className="h-8 w-8 p-0 text-error/50 hover:text-error hover:bg-error/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                                                                     title={t('common.remove', 'Remove')}
                                                                 >
-                                                                    <X size={12} />
+                                                                    <Trash2 size={14} />
                                                                 </Button>
-                                                            </div>
-                                                        </th>
+                                                            </td>
+                                                        </tr>
                                                     ))}
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-outline-variant/20">
-                                                {Array.from({ length: Math.max(0, ...savedRounds.map(r => r.laps.length)) }).map((_, lapIndex) => (
-                                                    <tr key={lapIndex} className="hover:bg-surface-variant/20 transition-colors">
-                                                        <td className="px-4 py-2 opacity-50 text-center font-medium border-r border-outline-variant/20">{lapIndex + 1}</td>
-                                                        {savedRounds.map((round) => {
-                                                            const lap = round.laps[lapIndex];
-                                                            return (
-                                                                <td key={round.id} className="px-4 py-2 font-mono text-center border-r border-outline-variant/20 last:border-0">
-                                                                    {lap ? (
-                                                                        <span className="text-success">{formatDelta(lap.deltaMs, deltaUnit)}</span>
-                                                                    ) : (
-                                                                        <span className="opacity-30">-</span>
-                                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+
+                                    {savedRounds.length > 0 && (
+                                        <div className="mt-4 border-t border-outline-variant/30 pt-4 flex flex-col min-h-[150px]">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-sm font-medium opacity-80">{t('common.saved_rounds', 'Saved Rounds')}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-6 text-xs text-primary/80 hover:bg-primary/10"
+                                                        onClick={handleExportCsv}
+                                                    >
+                                                        <Download size={12} className="mr-1" />
+                                                        {t('common.export', 'Export')}
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-6 text-xs text-error/80 hover:bg-error/10"
+                                                        onClick={handleClearAllRounds}
+                                                    >
+                                                        <Trash2 size={12} className="mr-1" />
+                                                        {t('common.clear_all', 'Clear All')}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                            <div className="flex-1 overflow-x-auto overflow-y-auto border border-outline-variant/30 rounded-xl custom-scrollbar bg-surface-variant/5">
+                                                <table className="w-full text-left text-xs min-w-max">
+                                                    <thead className="bg-surface-variant/50 sticky top-0 backdrop-blur-sm z-10">
+                                                        <tr>
+                                                            <th className="px-4 py-2 font-medium opacity-70 w-12 text-center border-r border-outline-variant/20">#</th>
+                                                            {savedRounds.map((round, i) => (
+                                                                <th key={round.id} className="px-4 py-2 font-medium opacity-70 text-center border-r border-outline-variant/20 last:border-0 relative group">
+                                                                    <div className="flex items-center justify-center gap-2">
+                                                                        {t('common.round', 'Round')} {i + 1}
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            className="h-5 w-5 p-0 text-error opacity-0 group-hover:opacity-100 transition-opacity absolute right-1"
+                                                                            onClick={() => handleRemoveSavedRound(round.id)}
+                                                                            title={t('common.remove', 'Remove')}
+                                                                        >
+                                                                            <X size={12} />
+                                                                        </Button>
+                                                                    </div>
+                                                                </th>
+                                                            ))}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-outline-variant/20">
+                                                        {Array.from({ length: Math.max(0, ...savedRounds.map(r => r.laps.length)) }).map((_, lapIndex) => (
+                                                            <tr key={lapIndex} className="hover:bg-surface-variant/20 transition-colors">
+                                                                <td className="px-4 py-2 opacity-50 text-center font-medium border-r border-outline-variant/20">{lapIndex + 1}</td>
+                                                                {savedRounds.map((round) => {
+                                                                    const lap = round.laps[lapIndex];
+                                                                    return (
+                                                                        <td key={round.id} className="px-4 py-2 font-mono text-center border-r border-outline-variant/20 last:border-0">
+                                                                            {lap ? (
+                                                                                <span className="text-success">{formatDelta(lap.deltaMs, deltaUnit)}</span>
+                                                                            ) : (
+                                                                                <span className="opacity-30">-</span>
+                                                                            )}
+                                                                        </td>
+                                                                    );
+                                                                })}
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                    <tfoot className="sticky bottom-0 bg-surface-variant/80 backdrop-blur-sm border-t border-outline-variant/30 z-10">
+                                                        <tr>
+                                                            <td className="px-4 py-3 font-semibold opacity-80 text-center border-r border-outline-variant/20">{t('common.total', 'Total')}</td>
+                                                            {savedRounds.map(round => (
+                                                                <td key={round.id} className="px-4 py-3 font-mono font-bold text-success text-center border-r border-outline-variant/20 last:border-0">
+                                                                    {formatDelta(round.totalTimeMs, deltaUnit)}
                                                                 </td>
-                                                            );
-                                                        })}
+                                                            ))}
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                // Scanner Laps View
+                                <div className="flex-1 min-h-0 flex flex-col">
+                                    {!isScannerCompanionActive ? (
+                                        <div className="text-center p-8 border border-dashed border-outline-variant/30 rounded-xl text-xs opacity-50 bg-surface-variant/10 shrink-0">
+                                            {t('performance.stopwatch.scanner_offline', 'Companion disconnected or Scanner Stopwatch not running.')}
+                                        </div>
+                                    ) : (
+                                        <div className="flex-1 min-h-0 flex flex-col">
+                                            {scannerLaps.length > 0 && (
+                                                <div className="flex items-center justify-end gap-2 mb-2 shrink-0 pr-2 pt-2">
+                                                    <Button onClick={handleExportScannerCsv} variant="ghost" size="sm" className="h-6 text-xs text-primary/80 hover:bg-primary/10">
+                                                        <Download size={12} className="mr-1" />
+                                                        {t('common.export', 'Export')}
+                                                    </Button>
+                                                    <Button onClick={clearScannerLaps} variant="ghost" size="sm" className="h-6 text-xs text-error/80 hover:bg-error/10">
+                                                        <Trash2 size={12} className="mr-1" />
+                                                        {t('common.clear_all', 'Clear All')}
+                                                    </Button>
+                                                </div>
+                                            )}
+                                            <div className="flex-1 min-h-0 overflow-y-auto border border-outline-variant/30 rounded-xl custom-scrollbar bg-surface-variant/5">
+                                            <table className="w-full text-xs text-left">
+                                                <thead className="bg-surface-variant/50 sticky top-0 backdrop-blur-sm z-10">
+                                                    <tr>
+                                                        <th className="px-4 py-3 font-medium opacity-70 w-12 text-center">#</th>
+                                                        <th className="px-4 py-3 font-medium opacity-70">{t('performance.stopwatch.scanner_content', 'Content')}</th>
+                                                        <th className="px-4 py-3 font-medium opacity-70" title="Init + Search + Decode">{t('performance.stopwatch.scanner_latency', 'Latency (3-step)')}</th>
+                                                        {compareBarcode && <th className="px-4 py-3 font-medium opacity-70 w-16 text-center">{t('performance.stopwatch.scanner_match', 'Match')}</th>}
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                            <tfoot className="sticky bottom-0 bg-surface-variant/80 backdrop-blur-sm border-t border-outline-variant/30 z-10">
-                                                <tr>
-                                                    <td className="px-4 py-3 font-semibold opacity-80 text-center border-r border-outline-variant/20">{t('common.total', 'Total')}</td>
-                                                    {savedRounds.map(round => (
-                                                        <td key={round.id} className="px-4 py-3 font-mono font-bold text-success text-center border-r border-outline-variant/20 last:border-0">
-                                                            {formatDelta(round.totalTimeMs, deltaUnit)}
-                                                        </td>
-                                                    ))}
-                                                </tr>
-                                            </tfoot>
-                                        </table>
-                                    </div>
+                                                </thead>
+                                                <tbody className="divide-y divide-outline-variant/20">
+                                                    {scannerLaps.map((lap, i) => {
+                                                        const isValid = compareBarcode ? lap.barcodeValue === payload : null;
+                                                        return (
+                                                            <tr key={i} className="hover:bg-surface-variant/20 group transition-colors">
+                                                                <td className="px-4 py-3 opacity-50 text-center">{i + 1}</td>
+                                                                <td className="px-4 py-3 font-mono">{lap.barcodeValue}</td>
+                                                                <td className="px-4 py-3">
+                                                                    <div className="flex flex-col gap-0.5">
+                                                                        <span className="font-semibold text-success">{lap.totalLatencyMs}ms total</span>
+                                                                        <span className="text-[10px] opacity-60">Init: {lap.cameraInitMs}ms</span>
+                                                                        <span className="text-[10px] opacity-60">Search: {lap.searchMs}ms</span>
+                                                                        <span className="text-[10px] opacity-60">Decode: {lap.decodeMs}ms</span>
+                                                                    </div>
+                                                                </td>
+                                                                {compareBarcode && (
+                                                                    <td className="px-4 py-3 text-center">
+                                                                        {isValid ? <CheckCircle2 size={16} className="text-success mx-auto" /> : <XCircle size={16} className="text-error mx-auto" />}
+                                                                    </td>
+                                                                )}
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                    {pendingLap && (
+                                                        <tr className="bg-primary/5 animate-pulse">
+                                                            <td className="px-4 py-3 opacity-50 text-center">-</td>
+                                                            <td className="px-4 py-3 opacity-60 italic">Processing...</td>
+                                                            <td className="px-4 py-3 opacity-60 italic">-</td>
+                                                            {compareBarcode && <td className="px-4 py-3">-</td>}
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
-
                         </div>
                     </div>
                 </div>

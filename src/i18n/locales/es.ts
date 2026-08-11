@@ -1172,7 +1172,12 @@ export const es = {
                 scanner_tip2: "La primera palabra clave capturada inicia el temporizador (0ms). Las siguientes coincidencias mostrarán el delta de hardware exacto.",
                 tti_badge: "Hardware TTI: +{{tti}}ms",
                 tti_ready: "Hardware TTI: Activo",
-                tti_tooltip: "Latencia de redibujado de la interfaz con precisión en milisegundos mediante el Companion"
+                tti_tooltip: "Latencia de redibujado de la interfaz con precisión en milisegundos mediante el Companion",
+                scanner_offline: "Companion desconectado o Scanner Stopwatch no está en marcha.",
+                scanner_content: "Contenido",
+                scanner_latency: "Latencia (3-pasos)",
+                scanner_match: "Coincidencia",
+                compare_barcode: "Comparar con Display"
             },
             auto: "Auto",
             na: "N/D",

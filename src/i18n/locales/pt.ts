@@ -1170,7 +1170,12 @@ export const pt = {
                 scanner_tip2: "A primeira keyword capturada inicia o timer (0ms). As próximas correspondências mostrarão o delta exato de hardware.",
                 tti_badge: "Hardware TTI: +{{tti}}ms",
                 tti_ready: "Hardware TTI: Ativo",
-                tti_tooltip: "Latência de redesenho de interface com precisão em milissegundos via Companion"
+                tti_tooltip: "Latência de redesenho de interface com precisão em milissegundos via Companion",
+                scanner_offline: "Companion desconectado ou Scanner Stopwatch não está rodando.",
+                scanner_content: "Conteúdo",
+                scanner_latency: "Latência (3-passos)",
+                scanner_match: "Match",
+                compare_barcode: "Comparar com Display"
             },
             auto: "Auto",
             na: "N/D",

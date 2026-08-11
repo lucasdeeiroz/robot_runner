@@ -229,6 +229,7 @@ class CompanionHttpServer(
             "/apps" -> getInstalledAppsPayload()
 
             "/app/icon" -> {
+                @Suppress("DEPRECATION")
                 val params = session.parms
                 val pkg = params["package"] ?: params["pkg"] ?: ""
                 if (pkg.isNotEmpty()) {
@@ -376,6 +377,86 @@ class CompanionHttpServer(
                     }
                 } else {
                     JsonObject().apply { addProperty("error", "Method not allowed") }
+                }
+            }
+
+            "/stopwatch/logcat/laps" -> {
+                val engine = com.lucasdeeiroz.robotrunner.stopwatch.LogcatStopwatchEngine
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    add("laps", gson.toJsonTree(engine.getLapsSnapshot()))
+                    add("savedRounds", gson.toJsonTree(engine.getSavedRoundsSnapshot()))
+                    addProperty("isRecording", engine.isRecordingSession)
+                }
+            }
+
+            "/stopwatch/logcat/action" -> {
+                if (session.method == Method.POST) {
+                    try {
+                        val body = mutableMapOf<String, String>()
+                        session.parseBody(body)
+                        val jsonStr = body["postData"]
+                        val json = gson.fromJson(jsonStr, JsonObject::class.java)
+                        val action = json.get("action")?.asString
+                        val engine = com.lucasdeeiroz.robotrunner.stopwatch.LogcatStopwatchEngine
+
+                        when (action) {
+                            "removeLap" -> {
+                                val index = json.get("index")?.asInt ?: -1
+                                if (index >= 0) engine.removeLap(index)
+                            }
+                            "saveRound" -> engine.saveRound()
+                            "clearLaps" -> engine.clearLaps()
+                            "clearAllSavedRounds" -> engine.clearAllSavedRounds()
+                            "removeSavedRound" -> {
+                                val id = json.get("id")?.asString
+                                if (id != null) engine.removeSavedRound(id)
+                            }
+                        }
+                        JsonObject().apply { addProperty("status", "ok") }
+                    } catch (e: Exception) {
+                        JsonObject().apply {
+                            addProperty("status", "error")
+                            addProperty("message", e.message)
+                        }
+                    }
+                } else {
+                    JsonObject().apply { addProperty("error", "Method not allowed") }
+                }
+            }
+
+            "/stopwatch/scanner/action" -> {
+                if (session.method == Method.POST) {
+                    try {
+                        val body = mutableMapOf<String, String>()
+                        session.parseBody(body)
+                        val jsonStr = body["postData"]
+                        val json = gson.fromJson(jsonStr, JsonObject::class.java)
+                        val action = json.get("action")?.asString
+                        val engine = com.lucasdeeiroz.robotrunner.stopwatch.ScannerStopwatchEngine
+
+                        when (action) {
+                            "clearLaps" -> engine.clearLaps()
+                        }
+                        JsonObject().apply { addProperty("status", "ok") }
+                    } catch (e: Exception) {
+                        JsonObject().apply {
+                            addProperty("status", "error")
+                            addProperty("message", e.message)
+                        }
+                    }
+                } else {
+                    JsonObject().apply { addProperty("error", "Method not allowed") }
+                }
+            }
+
+            "/stopwatch/scanner/laps" -> {
+                val engine = com.lucasdeeiroz.robotrunner.stopwatch.ScannerStopwatchEngine
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    add("laps", gson.toJsonTree(engine.getLapsSnapshot()))
+                    add("pendingLap", gson.toJsonTree(engine.pendingLap))
+                    addProperty("isScanning", engine.isScanning)
                 }
             }
 
@@ -634,7 +715,9 @@ class CompanionHttpServer(
             addProperty("brand", Build.BRAND)
             addProperty("androidVersion", Build.VERSION.RELEASE)
             addProperty("sdkInt", Build.VERSION.SDK_INT)
-            addProperty("serial", try { Build.getSerial() } catch (e: Throwable) { Build.SERIAL })
+            @Suppress("DEPRECATION")
+            val serial = try { Build.getSerial() } catch (e: Throwable) { Build.SERIAL }
+            addProperty("serial", serial)
             addProperty("isAccessibilityEnabled", CompanionAccessibilityService.isRunning)
 
             // Battery Info
@@ -1037,6 +1120,7 @@ class CompanionHttpServer(
             var wifiIp = ""
             try {
                 val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+                @Suppress("DEPRECATION")
                 val ipInt = wifiManager?.connectionInfo?.ipAddress ?: 0
                 if (ipInt != 0) {
                     wifiIp = String.format(

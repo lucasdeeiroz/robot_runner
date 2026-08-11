@@ -17,8 +17,15 @@ export interface HardwareFrameDelta {
     source: string;
 }
 
+export interface SavedRound {
+    id: string;
+    totalTimeMs: number;
+    laps: StopwatchLap[];
+}
+
 interface StopwatchCacheEntry {
     laps: StopwatchLap[];
+    savedRounds: SavedRound[];
     isStopwatchRunning: boolean;
     startTime: number | null;
 }
@@ -51,11 +58,17 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
     // Stopwatch State
     const keywords = settings.logcatKeywords || [];
     const [laps, setLaps] = useState<StopwatchLap[]>(() => cached?.laps ?? []);
+    const [savedRounds, setSavedRounds] = useState<SavedRound[]>(() => cached?.savedRounds ?? []);
     const [deltaUnit, setDeltaUnit] = useState<'ms' | 's' | 'min' | 'h'>('ms');
     const [isStopwatchRunning, setIsStopwatchRunning] = useState(() => cached?.isStopwatchRunning ?? false);
     const [newKeyword, setNewKeyword] = useState("");
     const [startTime, setStartTime] = useState<number | null>(() => cached?.startTime ?? null);
     const [hardwareFrameDelta, setHardwareFrameDelta] = useState<HardwareFrameDelta | null>(null);
+
+    // Companion Sync State
+    const [companionLaps, setCompanionLaps] = useState<StopwatchLap[]>([]);
+    const [companionSavedRounds, setCompanionSavedRounds] = useState<SavedRound[]>([]);
+    const [isCompanionActive, setIsCompanionActive] = useState(false);
 
     useEffect(() => {
         if (isStopwatchRunning && selectedDevice) {
@@ -77,11 +90,12 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
         if (selectedDevice) {
             stopwatchCacheMap.set(selectedDevice, {
                 laps,
+                savedRounds,
                 isStopwatchRunning,
                 startTime
             });
         }
-    }, [selectedDevice, laps, isStopwatchRunning, startTime]);
+    }, [selectedDevice, laps, savedRounds, isStopwatchRunning, startTime]);
 
     // Check backend status on mount
     useEffect(() => {
@@ -107,7 +121,45 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
         }
     }, [keywords, selectedDevice]);
 
+    // Poll Companion Logcat Laps
+    useEffect(() => {
+        if (!selectedDevice) return;
+        const interval = setInterval(() => {
+            fetch('http://127.0.0.1:9876/stopwatch/logcat/laps')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'ok') {
+                        setIsCompanionActive(true);
+                        setCompanionLaps(data.laps || []);
+                        setCompanionSavedRounds(data.savedRounds || []);
+                    } else {
+                        setIsCompanionActive(false);
+                    }
+                })
+                .catch(() => {
+                    setIsCompanionActive(false);
+                });
+        }, 2000);
+        return () => clearInterval(interval);
+    }, [selectedDevice]);
+
+    const handleCompanionAction = async (action: string, payload: any = {}) => {
+        try {
+            await fetch('http://127.0.0.1:9876/stopwatch/logcat/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, ...payload })
+            });
+        } catch (e) {
+            console.error('Failed to send companion action', e);
+        }
+    };
+
     const handleRemoveLap = (index: number) => {
+        if (isCompanionActive) {
+            handleCompanionAction('removeLap', { index });
+            return;
+        }
         setLaps(prev => {
             const newLaps = prev.filter((_, i) => i !== index);
             return newLaps.map((lap, i) => {
@@ -122,6 +174,47 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
                 return { ...lap, deltaMs: Number(Math.max(0, deltaMsRaw).toFixed(3)) };
             });
         });
+    };
+
+    const handleSaveRound = () => {
+        if (isCompanionActive) {
+            handleCompanionAction('saveRound');
+            return;
+        }
+        if (laps.length === 0) return;
+        const totalTimeMs = laps.reduce((sum, lap) => sum + lap.deltaMs, 0);
+        const newRound: SavedRound = {
+            id: `round_${Date.now()}`,
+            totalTimeMs,
+            laps: [...laps]
+        };
+        setSavedRounds(prev => [...prev, newRound]);
+        setLaps([]);
+        feedback.toast.success('Stopwatch results saved!');
+    };
+
+    const handleClearLaps = () => {
+        if (isCompanionActive) {
+            handleCompanionAction('clearLaps');
+            return;
+        }
+        setLaps([]);
+    };
+
+    const handleClearAllRounds = () => {
+        if (isCompanionActive) {
+            handleCompanionAction('clearAllSavedRounds');
+            return;
+        }
+        setSavedRounds([]);
+    };
+
+    const handleRemoveSavedRound = (id: string) => {
+        if (isCompanionActive) {
+            handleCompanionAction('removeSavedRound', { id });
+            return;
+        }
+        setSavedRounds(prev => prev.filter(r => r.id !== id));
     };
 
     const handleToggleStopwatch = async () => {
@@ -194,8 +287,14 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
     }, [isStopwatchRunning, keywords, selectedDevice]);
 
     return {
-        laps,
-        setLaps,
+        laps: isCompanionActive ? companionLaps : laps,
+        savedRounds: isCompanionActive ? companionSavedRounds : savedRounds,
+        isCompanionActive,
+        setLaps: handleClearLaps, // legacy
+        handleClearLaps,
+        handleSaveRound,
+        handleRemoveSavedRound,
+        handleClearAllRounds,
         deltaUnit,
         setDeltaUnit,
         isStopwatchRunning,

@@ -10,9 +10,9 @@ import com.google.mlkit.vision.common.InputImage
 import java.util.Collections
 
 data class ScannerLap(
-    val frameTimestamp: Long,
-    val detectTimestamp: Long,
-    val decodeTimestamp: Long,
+    val cameraInitMs: Long,
+    val searchMs: Long,
+    val decodeMs: Long,
     val totalLatencyMs: Long,
     val barcodeValue: String,
     val format: Int
@@ -32,6 +32,14 @@ object ScannerStopwatchEngine {
     var sessionStartTime: Long = 0
         private set
         
+    @Volatile
+    var isCameraReady: Boolean = false
+        private set
+        
+    @Volatile
+    var firstFrameTimestamp: Long = 0
+        private set
+        
     private val scannerOptions = BarcodeScannerOptions.Builder()
         .setBarcodeFormats(Barcode.FORMAT_ALL_FORMATS)
         .build()
@@ -46,6 +54,7 @@ object ScannerStopwatchEngine {
         lastScannedValue = null
         lastScannedTimestamp = 0
         pendingLap = null
+        isCameraReady = false // Stopwatch will start on first frame
         sessionStartTime = System.currentTimeMillis()
         isScanning = true
     }
@@ -62,12 +71,14 @@ object ScannerStopwatchEngine {
             }
         }
         pendingLap = null
+        isCameraReady = false
         sessionStartTime = System.currentTimeMillis()
         isScanning = true // Resume scanning after save
     }
     
     fun discardPendingLap() {
         pendingLap = null
+        isCameraReady = false
         sessionStartTime = System.currentTimeMillis()
         isScanning = true // Resume scanning after discard
     }
@@ -77,6 +88,11 @@ object ScannerStopwatchEngine {
         if (!isScanning) {
             imageProxy.close()
             return
+        }
+
+        if (!isCameraReady) {
+            isCameraReady = true
+            firstFrameTimestamp = System.currentTimeMillis()
         }
 
         val mediaImage = imageProxy.image
@@ -101,12 +117,15 @@ object ScannerStopwatchEngine {
                         lastScannedValue = rawValue
                         lastScannedTimestamp = decodeTimestamp
                         
+                        val cameraInitMs = firstFrameTimestamp - sessionStartTime
+                        val searchMs = frameTimestamp - firstFrameTimestamp
+                        val decodeMs = decodeTimestamp - frameTimestamp
                         val totalLatency = decodeTimestamp - sessionStartTime
                         
                         val lap = ScannerLap(
-                            frameTimestamp = frameTimestamp,
-                            detectTimestamp = detectTimestamp,
-                            decodeTimestamp = decodeTimestamp,
+                            cameraInitMs = cameraInitMs,
+                            searchMs = searchMs,
+                            decodeMs = decodeMs,
                             totalLatencyMs = totalLatency,
                             barcodeValue = rawValue,
                             format = format
@@ -122,6 +141,12 @@ object ScannerStopwatchEngine {
                 }
         } else {
             imageProxy.close()
+        }
+    }
+    
+    fun clearLaps() {
+        synchronized(lapsList) {
+            lapsList.clear()
         }
     }
     
