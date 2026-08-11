@@ -357,6 +357,28 @@ class CompanionHttpServer(
                 }
             }
 
+            "/stopwatch/keywords" -> {
+                if (session.method == Method.POST) {
+                    try {
+                        val body = mutableMapOf<String, String>()
+                        session.parseBody(body)
+                        val jsonStr = body["postData"]
+                        val json = gson.fromJson(jsonStr, JsonObject::class.java)
+                        val keywordsArr = json.getAsJsonArray("keywords")
+                        val keywords = keywordsArr.map { it.asString }
+                        com.lucasdeeiroz.robotrunner.stopwatch.LogcatStopwatchEngine.updateSharedKeywords(keywords)
+                        JsonObject().apply { addProperty("status", "ok") }
+                    } catch (e: Exception) {
+                        JsonObject().apply {
+                            addProperty("status", "error")
+                            addProperty("message", e.message)
+                        }
+                    }
+                } else {
+                    JsonObject().apply { addProperty("error", "Method not allowed") }
+                }
+            }
+
             "/bdd/suites" -> {
                 val suites = com.lucasdeeiroz.robotrunner.bdd.BddRunnerEngine.getSampleSuites()
                 JsonObject().apply {

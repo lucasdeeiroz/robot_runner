@@ -94,6 +94,19 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
         }
     }, [selectedDevice]);
 
+    // Sync keywords to Companion App
+    useEffect(() => {
+        if (selectedDevice) {
+            fetch('http://127.0.0.1:9876/stopwatch/keywords', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ keywords })
+            }).catch(() => {
+                // Ignore errors if companion is not running
+            });
+        }
+    }, [keywords, selectedDevice]);
+
     const handleRemoveLap = (index: number) => {
         setLaps(prev => {
             const newLaps = prev.filter((_, i) => i !== index);

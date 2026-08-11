@@ -329,10 +329,18 @@
     <string name="btn_start_scanner_session">Start Camera Scanner</string>
     <string name="label_keywords">Keywords (comma separated)</string>
     <string name="msg_camera_permission">Camera permission required for Scanner Mode.</string>
-    <string name="label_format">Format: %1$d</string>
+    <string name="msg_camera_error">Camera error</string>
+    <string name="label_format">Format: %1$s</string>
     <string name="btn_save_round">Save Round</string>
     <string name="btn_discard">Discard</string>
-    <string name="msg_use_hud_for_redraw">Tip: Use the Floating HUD (Above) and open another app to test redraws. Tapping this screen will only measure this app (usually 16ms).</string>    <!-- Logcat Tab -->
+    <string name="msg_use_hud_for_redraw">Tip: Use the Floating HUD (Above) and open another app to test redraws. Tapping this screen will only measure this app (usually 16ms).</string>
+    
+    <string name="label_captured_redraw_splits">Captured Redraw Splits (%1$d)</string>
+    <string name="msg_no_redraw_splits">No redraw splits recorded yet. Tap Start Recording.</string>
+    <string name="label_logcat_laps">Logcat Laps (%1$d)</string>
+    <string name="msg_no_logcat_laps">No logcat laps recorded yet. Tap Start Session.</string>
+    <string name="label_scanner_laps">Scanner Laps (%1$d)</string>
+    <string name="msg_no_scanner_laps">No barcodes scanned yet.</string>    <!-- Logcat Tab -->
     <string name="desc_start_stop_logcat">Start/Stop Logcat</string>
     <string name="desc_clear_logcat">Clear Logcat</string>
     <string name="desc_save_logcat">Save Logcat</string>
@@ -344,4 +352,11 @@
     <string name="desc_expand_collapse">Expand/Collapse</string>
     <string name="desc_open_app">Open App</string>
     <string name="desc_close">Close</string>
+    <string name="title_stopwatch_hud">Stopwatch HUD</string>
+    <string name="label_redraw_tti">REDRAW TTI</string>
+    <string name="btn_record_split">Record Split</string>
+    <string name="label_logcat_watcher">LOGCAT WATCHER</string>
+    <string name="msg_waiting_keywords">Waiting for keywords...</string>
+    <string name="label_keyword_format">Keyword: %1$s</string>
+    <string name="msg_no_stopwatch_session">No stopwatch session running.</string>
 </resources>

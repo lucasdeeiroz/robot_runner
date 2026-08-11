@@ -26,6 +26,8 @@ import com.lucasdeeiroz.robotrunner.stopwatch.RedrawStopwatchEngine
 import com.lucasdeeiroz.robotrunner.ui.theme.RobotRunnerTheme
 import com.lucasdeeiroz.robotrunner.service.CompanionAccessibilityService
 import kotlinx.coroutines.delay
+import com.lucasdeeiroz.robotrunner.R
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun StopwatchOverlayView(
@@ -75,7 +77,7 @@ fun StopwatchOverlayView(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Stopwatch HUD",
+                        text = LocalContext.current.getString(R.string.title_stopwatch_hud),
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
@@ -89,7 +91,7 @@ fun StopwatchOverlayView(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
-                                contentDescription = "Open App",
+                                contentDescription = LocalContext.current.getString(R.string.desc_open_app),
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -101,7 +103,7 @@ fun StopwatchOverlayView(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Close,
-                                contentDescription = "Close",
+                                contentDescription = LocalContext.current.getString(R.string.desc_close),
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -112,7 +114,7 @@ fun StopwatchOverlayView(
                 Column(modifier = Modifier.padding(12.dp)) {
                     if (isRedrawRecording) {
                         Text(
-                            text = "REDRAW TTI",
+                            text = LocalContext.current.getString(R.string.label_redraw_tti),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -123,7 +125,7 @@ fun StopwatchOverlayView(
                             fontSize = 32.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = if (lastRedrawDelta < 50) Color(0xFF22C55E) else if (lastRedrawDelta < 200) Color(0xFF38BDF8) else Color(0xFFEF4444)
+                            color = if (lastRedrawDelta < 50) MaterialTheme.colorScheme.primary else if (lastRedrawDelta < 200) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Button(
@@ -143,7 +145,7 @@ fun StopwatchOverlayView(
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(4.dp)
                         ) {
-                            Text(text = "Record Split", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text(text = LocalContext.current.getString(R.string.btn_record_split), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                     
@@ -153,14 +155,14 @@ fun StopwatchOverlayView(
                     
                     if (isLogcatRecording) {
                         Text(
-                            text = "LOGCAT WATCHER",
+                            text = LocalContext.current.getString(R.string.label_logcat_watcher),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.secondary
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         if (logcatLaps.isEmpty()) {
-                            Text(text = "Waiting for keywords...", fontSize = 11.sp, color = Color.Gray)
+                            Text(text = LocalContext.current.getString(R.string.msg_waiting_keywords), fontSize = 11.sp, color = Color.Gray)
                         } else {
                             val lastLap = logcatLaps.last()
                             Text(
@@ -171,7 +173,7 @@ fun StopwatchOverlayView(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Keyword: ${lastLap.keyword}",
+                                text = LocalContext.current.getString(R.string.label_keyword_format, lastLap.keyword),
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -180,7 +182,7 @@ fun StopwatchOverlayView(
                     
                     if (!isRedrawRecording && !isLogcatRecording) {
                         Text(
-                            text = "No stopwatch session running.",
+                            text = LocalContext.current.getString(R.string.msg_no_stopwatch_session),
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

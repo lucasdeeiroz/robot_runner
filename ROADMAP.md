@@ -108,12 +108,12 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
 - [x] Otimizar gráficos e captura multi-tier de CPU/RAM em tempo real.
 
 ## Fase: Revisão da Aba Stopwatch (Toolbox)
-  - [ ] Internacionalizar todos os textos.
-  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
-  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
-  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
-  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
-- [ ] Revisar a engine de Redraw para cálculos precisos (deltas de renderização) entre comandos de clique e redraw de UI.
+  - [x] Internacionalizar todos os textos.
+  - [x] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [x] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [x] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
+- [x] Revisar a engine de Redraw para cálculos precisos (deltas de renderização) entre comandos de clique e redraw de UI.
 
 ## Fase: Revisão da Aba Shell Console (Toolbox)
   - [ ] Internacionalizar todos os textos.

@@ -8,6 +8,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.Collections
 
 data class LogcatLap(
@@ -21,6 +24,14 @@ object LogcatStopwatchEngine {
     private val lapsList = Collections.synchronizedList(mutableListOf<LogcatLap>())
     private var keywordsList = listOf<String>()
     
+    private val _sharedKeywords = MutableStateFlow(listOf("ActivityResume", "NetworkSuccess"))
+    val sharedKeywords: StateFlow<List<String>> = _sharedKeywords.asStateFlow()
+    
+    fun updateSharedKeywords(keywords: List<String>) {
+        _sharedKeywords.value = keywords
+        keywordsList = keywords.filter { it.isNotBlank() }
+    }
+    
     @Volatile
     var isRecordingSession = false
         private set
@@ -30,11 +41,25 @@ object LogcatStopwatchEngine {
 
     private val logcatObserver: (LogcatMessage) -> Unit = { msg ->
         if (isRecordingSession) {
-            val text = "${msg.tag} ${msg.message}"
-            val matchedKeyword = keywordsList.find { text.contains(it, ignoreCase = true) }
+            val text = msg.rawLine
+            android.util.Log.d("StopwatchDebug", "Checking log line against keywords: $keywordsList | Text: $text")
+            val matchedKeyword = keywordsList.find { kw -> 
+                if (kw.contains("*")) {
+                    try {
+                        val regexStr = kw.split("*").joinToString(".*") { Regex.escape(it) }
+                        Regex(regexStr, RegexOption.IGNORE_CASE).containsMatchIn(text)
+                    } catch (e: Exception) {
+                        text.contains(kw, ignoreCase = true)
+                    }
+                } else {
+                    text.contains(kw, ignoreCase = true)
+                }
+            }
             if (matchedKeyword != null) {
                 val now = System.currentTimeMillis()
-                val delta = now - sessionStartTime
+                val delta = synchronized(lapsList) {
+                    if (lapsList.isEmpty()) 0L else Math.max(0L, now - lapsList.last().timestamp)
+                }
                 recordLap(matchedKeyword, now, delta)
             }
         }
@@ -46,8 +71,10 @@ object LogcatStopwatchEngine {
         keywordsList = keywords.filter { it.isNotBlank() }
         sessionStartTime = System.currentTimeMillis()
         isRecordingSession = true
+        android.util.Log.d("StopwatchDebug", "Session started with keywords: $keywordsList")
         LogcatStreamer.addObserver(logcatObserver)
         if (!LogcatStreamer.isStreaming) {
+            android.util.Log.d("StopwatchDebug", "Starting LogcatStreamer...")
             LogcatStreamer.startStreaming()
         }
     }

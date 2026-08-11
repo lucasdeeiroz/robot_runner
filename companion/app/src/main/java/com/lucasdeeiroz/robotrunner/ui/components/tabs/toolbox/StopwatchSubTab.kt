@@ -150,10 +150,10 @@ fun RedrawStopwatchContent() {
     }
 
     val deltaStatusColor = when {
-        lastDeltaMs <= 0 -> Color(0xFF64748B)
-        lastDeltaMs < 50 -> Color(0xFF22C55E)
-        lastDeltaMs < 200 -> Color(0xFFF59E0B)
-        else -> Color(0xFFEF4444)
+        lastDeltaMs <= 0 -> MaterialTheme.colorScheme.onSurfaceVariant
+        lastDeltaMs < 50 -> MaterialTheme.colorScheme.primary
+        lastDeltaMs < 200 -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.error
     }
 
     val deltaStatusText = when {
@@ -214,7 +214,7 @@ fun RedrawStopwatchContent() {
                         }
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isHudRunning) Color(0xFFEF4444) else Color(0xFF6366F1)
+                        containerColor = if (isHudRunning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                     ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
@@ -273,7 +273,7 @@ fun RedrawStopwatchContent() {
                 Text(
                     text = stringResource(id = R.string.msg_use_hud_for_redraw),
                     fontSize = 11.sp,
-                    color = Color(0xFF64748B),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
             }
@@ -302,7 +302,7 @@ fun RedrawStopwatchContent() {
                         },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isRecording) Color(0xFFEF4444) else Color(0xFF6366F1)
+                            containerColor = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                         ),
                         shape = RoundedCornerShape(8.dp)
                     ) {
@@ -346,7 +346,7 @@ fun RedrawStopwatchContent() {
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(text = stringResource(id = R.string.btn_export_benchmark), fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -359,10 +359,10 @@ fun RedrawStopwatchContent() {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                StatCard(label = stringResource(id = R.string.label_min_delta), value = "${sess.minDeltaMs} ms", color = Color(0xFF22C55E), modifier = Modifier.weight(1f))
-                StatCard(label = stringResource(id = R.string.label_avg_delta), value = "${sess.avgDeltaMs} ms", color = Color(0xFF38BDF8), modifier = Modifier.weight(1f))
-                StatCard(label = stringResource(id = R.string.label_max_delta), value = "${sess.maxDeltaMs} ms", color = Color(0xFFEF4444), modifier = Modifier.weight(1f))
-                StatCard(label = stringResource(id = R.string.label_p95_delta), value = "${sess.p95DeltaMs} ms", color = Color(0xFFA855F7), modifier = Modifier.weight(1f))
+                StatCard(label = stringResource(id = R.string.label_min_delta), value = "${sess.minDeltaMs} ms", color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                StatCard(label = stringResource(id = R.string.label_avg_delta), value = "${sess.avgDeltaMs} ms", color = MaterialTheme.colorScheme.secondary, modifier = Modifier.weight(1f))
+                StatCard(label = stringResource(id = R.string.label_max_delta), value = "${sess.maxDeltaMs} ms", color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+                StatCard(label = stringResource(id = R.string.label_p95_delta), value = "${sess.p95DeltaMs} ms", color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.weight(1f))
             }
         }
 
@@ -373,7 +373,7 @@ fun RedrawStopwatchContent() {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "Captured Redraw Splits (${laps.size})",
+                    text = stringResource(id = R.string.label_captured_redraw_splits, laps.size),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -382,7 +382,7 @@ fun RedrawStopwatchContent() {
                 Spacer(modifier = Modifier.height(10.dp))
 
                 if (laps.isEmpty()) {
-                    Text(text = "No redraw splits recorded yet. Tap Start Recording.", fontSize = 12.sp, color = Color(0xFF64748B))
+                    Text(text = stringResource(id = R.string.msg_no_redraw_splits), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         laps.takeLast(20).reversed().forEach { lap ->
@@ -400,7 +400,8 @@ fun LogcatStopwatchContent() {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var isRecording by remember { mutableStateOf(LogcatStopwatchEngine.isRecordingSession) }
-    var keywordsText by remember { mutableStateOf("ActivityResume, NetworkSuccess") }
+    val syncedKeywords by LogcatStopwatchEngine.sharedKeywords.collectAsState()
+    var keywordsText by remember(syncedKeywords) { mutableStateOf(syncedKeywords.joinToString(", ")) }
     var laps by remember { mutableStateOf<List<LogcatLap>>(emptyList()) }
 
     var isHudRunning by remember { mutableStateOf(com.lucasdeeiroz.robotrunner.overlay.StopwatchOverlayService.isRunning) }
@@ -465,7 +466,7 @@ fun LogcatStopwatchContent() {
                         }
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isHudRunning) Color(0xFFEF4444) else Color(0xFF6366F1)
+                        containerColor = if (isHudRunning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                     ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
@@ -527,7 +528,7 @@ fun LogcatStopwatchContent() {
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isRecording) Color(0xFFEF4444) else Color(0xFF6366F1)
+                        containerColor = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                     ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
@@ -550,7 +551,7 @@ fun LogcatStopwatchContent() {
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(text = stringResource(id = R.string.btn_export_benchmark), fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -566,7 +567,7 @@ fun LogcatStopwatchContent() {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "Logcat Laps (${laps.size})",
+                    text = stringResource(id = R.string.label_logcat_laps, laps.size),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -575,7 +576,7 @@ fun LogcatStopwatchContent() {
                 Spacer(modifier = Modifier.height(10.dp))
 
                 if (laps.isEmpty()) {
-                    Text(text = "No logcat laps recorded yet. Tap Start Session.", fontSize = 12.sp, color = Color(0xFF64748B))
+                    Text(text = stringResource(id = R.string.msg_no_logcat_laps), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         laps.reversed().forEach { lap ->
@@ -660,7 +661,7 @@ fun ScannerStopwatchContent() {
                                 fontSize = 32.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
-                                color = if (lap.totalLatencyMs < 200) Color(0xFF22C55E) else Color(0xFFF59E0B)
+                                color = if (lap.totalLatencyMs < 200) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Row(
@@ -678,7 +679,7 @@ fun ScannerStopwatchContent() {
                                 Button(
                                     onClick = { ScannerStopwatchEngine.savePendingLap() },
                                     modifier = Modifier.weight(1f),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22C55E)),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text(text = stringResource(id = R.string.btn_save_round))
@@ -718,7 +719,7 @@ fun ScannerStopwatchContent() {
                                             lifecycleOwner, cameraSelector, preview, imageAnalysis
                                         )
                                     } catch (exc: Exception) {
-                                        Toast.makeText(ctx, "Camera error", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(ctx, context.getString(R.string.msg_camera_error), Toast.LENGTH_SHORT).show()
                                     }
                                 }, ContextCompat.getMainExecutor(ctx))
                                 previewView
@@ -745,7 +746,7 @@ fun ScannerStopwatchContent() {
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isScanning) Color(0xFFEF4444) else Color(0xFF6366F1)
+                            containerColor = if (isScanning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                         ),
                         shape = RoundedCornerShape(8.dp)
                     ) {
@@ -766,7 +767,7 @@ fun ScannerStopwatchContent() {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "Scanner Laps (${laps.size})",
+                    text = stringResource(id = R.string.label_scanner_laps, laps.size),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -775,7 +776,7 @@ fun ScannerStopwatchContent() {
                 Spacer(modifier = Modifier.height(10.dp))
 
                 if (laps.isEmpty()) {
-                    Text(text = "No barcodes scanned yet.", fontSize = 12.sp, color = Color(0xFF64748B))
+                    Text(text = stringResource(id = R.string.msg_no_scanner_laps), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         laps.reversed().forEach { lap ->
@@ -819,7 +820,7 @@ fun RedrawLapItemRow(lap: RedrawLap) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "#${lap.lapNumber}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF6366F1))
+                Text(text = "#${lap.lapNumber}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(text = lap.packageName.substringAfterLast('.'), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
             }
@@ -828,7 +829,7 @@ fun RedrawLapItemRow(lap: RedrawLap) {
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
-                color = if (lap.deltaMs < 50) Color(0xFF22C55E) else Color(0xFFF59E0B)
+                color = if (lap.deltaMs < 50) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
             )
         }
     }
@@ -847,14 +848,14 @@ fun LogcatLapItemRow(lap: LogcatLap) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = "#${lap.lapNumber} - ${lap.keyword}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF6366F1))
+                Text(text = "#${lap.lapNumber} - ${lap.keyword}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Text(
                 text = "${lap.deltaMs} ms",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
-                color = Color(0xFF38BDF8)
+                color = MaterialTheme.colorScheme.secondary
             )
         }
     }
@@ -881,7 +882,7 @@ fun ScannerLapItemRow(lap: ScannerLap) {
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
-                color = if (lap.totalLatencyMs < 200) Color(0xFF22C55E) else Color(0xFFF59E0B)
+                color = if (lap.totalLatencyMs < 200) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
             )
         }
     }
