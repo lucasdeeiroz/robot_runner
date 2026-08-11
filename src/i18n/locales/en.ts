@@ -1166,8 +1166,8 @@ export const en = {
                 scanner_visualizer: "Virtual Code Visualizer",
                 scanner_tip1: "Point the device at the screen. Make sure the stopwatch is running and the correct keywords are set in the side panel.",
                 scanner_tip2: "The first captured keyword starts the timer (0ms). Subsequent matches will show the exact hardware delta.",
-                tti_badge: "🎯 Hardware TTI: +{{tti}}ms",
-                tti_ready: "🎯 Hardware TTI: Active",
+                tti_badge: "Hardware TTI: +{{tti}}ms",
+                tti_ready: "Hardware TTI: Active",
                 tti_tooltip: "Millisecond-accurate UI redraw latency from Companion Hardware"
             },
             auto: "Auto",

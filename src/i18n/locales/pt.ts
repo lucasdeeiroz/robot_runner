@@ -1168,8 +1168,8 @@ export const pt = {
                 scanner_visualizer: "Visualizador de Código Virtual",
                 scanner_tip1: "Aponte o dispositivo para a tela. Certifique-se de que o cronômetro esteja rodando e as keywords corretas estejam configuradas no painel lateral.",
                 scanner_tip2: "A primeira keyword capturada inicia o timer (0ms). As próximas correspondências mostrarão o delta exato de hardware.",
-                tti_badge: "🎯 Hardware TTI: +{{tti}}ms",
-                tti_ready: "🎯 Hardware TTI: Ativo",
+                tti_badge: "Hardware TTI: +{{tti}}ms",
+                tti_ready: "Hardware TTI: Ativo",
                 tti_tooltip: "Latência de redesenho de interface com precisão em milissegundos via Companion"
             },
             auto: "Auto",
