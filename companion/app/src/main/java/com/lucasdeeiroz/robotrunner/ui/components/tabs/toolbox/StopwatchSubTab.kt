@@ -157,7 +157,7 @@ fun RedrawStopwatchContent() {
     }
 
     val deltaStatusText = when {
-        lastDeltaMs <= 0 -> "STANDBY"
+        lastDeltaMs <= 0 -> stringResource(id = R.string.status_standby)
         lastDeltaMs < 50 -> stringResource(id = R.string.status_fast_ui)
         lastDeltaMs < 200 -> stringResource(id = R.string.status_normal_ui)
         else -> stringResource(id = R.string.status_slow_ui)

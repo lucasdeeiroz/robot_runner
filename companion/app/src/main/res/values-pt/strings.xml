@@ -116,7 +116,7 @@
     <string name="btn_run_shell">Executar</string>
     <string name="btn_clear_console">Limpar</string>
     <string name="btn_copy_output">Copiar</string>
-    <string name="msg_copied_clipboard">Saída copiada para a área de transferência</string>
+    <string name="msg_copied_clipboard">Saí­da copiada para a área de transferência</string>
     <string name="shell_status_format">Exit Code: %1$d | Tempo de Execução: %2$dms</string>
     <!-- Phase 3 Strings (PT-BR) -->
     <string name="tab_network">Rede</string>
@@ -163,7 +163,7 @@
     <string name="label_app_name">App / UID</string>
     <string name="label_consumption">Consumo</string>
     <string name="btn_reset">RESETAR</string>
-    <string name="msg_stats_reset">Estatísticas de bateria zeradas com sucesso.</string>
+    <string name="msg_stats_reset">Estatí­sticas de bateria zeradas com sucesso.</string>
     <string name="chart_cpu_title">Histórico de Uso de CPU (%)</string>
     <string name="chart_ram_title">Memória RAM do App (MB)</string>
     <string name="chart_power_title">Consumo de Energia (mA)</string>
@@ -197,7 +197,7 @@
     <string name="tab_bdd_runner">Testes BDD</string>
     <string name="header_bdd_runner">Motor de Execução de Testes BDD no Dispositivo</string>
     <string name="desc_bdd_runner">Executa cenários Gherkin nativamente no dispositivo sem necessidade de PC ou servidor Appium.</string>
-    <string name="btn_run_suite">Executar Suíte de Testes</string>
+    <string name="btn_run_suite">Executar Suí­te de Testes</string>
     <string name="btn_stop_suite">Parar Execução</string>
     <string name="btn_export_html_report">Exportar Relatório HTML</string>
     <string name="label_pass_rate">TAXA DE SUCESSO</string>
@@ -286,7 +286,7 @@
     <string name="msg_about_soon">Sobre em breve</string>
     <string name="tab_scenarios_ai">Cenários (IA)</string>
     <string name="desc_hardware_diagnostic">Checklist de diagnóstico abrangente para bateria, memória, NFC e impressoras térmicas POS.</string>
-    <string name="msg_pos_printer_unavailable">Impressora térmica POS indisponível ou sem papel</string>
+    <string name="msg_pos_printer_unavailable">Impressora térmica POS indispon­ível ou sem papel</string>
     <string name="text_audit_match">Auditoria de Texto: %1$s%% de correspondência</string>
     <string name="label_active_screen">Tela Ativa</string>
     <string name="label_screen_name">Tela: %1$s</string>
@@ -327,7 +327,7 @@
     <string name="btn_start_logcat_session">Iniciar Sessão Logcat</string>
     <string name="btn_start_scanner_session">Iniciar Leitor de Câmera</string>
     <string name="label_keywords">Palavras-chave (separadas por vírgula)</string>
-    <string name="msg_camera_permission">Permissão de Câmera é necessária para o Leitor.</string>
+    <string name="msg_camera_permission">Permissão de Câmera é necessáriápara o Leitor.</string>
     <string name="label_format">Formato: %1$d</string>
     <string name="btn_save_round">Salvar Round</string>
     <string name="btn_discard">Descartar</string>
@@ -336,4 +336,20 @@
     <string name="msg_export_logs_choice">Deseja exportar todos os logs ou apenas os logs filtrados atualmente?</string>
     <string name="btn_filtered_only">Apenas Filtrados</string>
     <string name="btn_all_logs">Todos os Logs</string>
+    <string name="status_standby">STANDBY</string>
+    <string name="label_captured_redraw_splits">Splits de Redraw Capturados (%1$d)</string>
+    <string name="msg_no_redraw_splits">Nenhum split gravado ainda. Toque em Iniciar Gravação.</string>
+    <string name="label_logcat_laps">Laps do Logcat (%1$d)</string>
+    <string name="msg_no_logcat_laps">Nenhum lap de logcat gravado ainda. Toque em Iniciar Sessão.</string>
+    <string name="label_scanner_laps">Laps do Leitor (%1$d)</string>
+    <string name="msg_no_scanner_laps">Nenhum código lido ainda.</string>
+    
+    <!-- Stopwatch Overlay -->
+    <string name="title_stopwatch_hud">HUD do Cronômetro</string>
+    <string name="label_redraw_tti">TTI DE REDRAW</string>
+    <string name="btn_record_split">Gravar Split</string>
+    <string name="label_logcat_watcher">OBSERVADOR DO LOGCAT</string>
+    <string name="msg_waiting_keywords">Aguardando palavras-chave...</string>
+    <string name="label_keyword_format">Palavra-chave: %1$s</string>
+    <string name="msg_no_stopwatch_session">Nenhuma sessão de cronômetro rodando.</string>
 </resources>

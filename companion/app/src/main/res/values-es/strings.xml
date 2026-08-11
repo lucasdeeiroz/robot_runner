@@ -116,9 +116,9 @@
     <string name="shell_status_format">Exit Code: %1$d | Tiempo de Ejecución: %2$dms</string>
     <!-- Phase 3 Strings (ES) -->
     <string name="tab_network">Red</string>
-    <string name="header_wireless_adb">Depuración Inalámbrica y Emparejamiento ADB</string>
+    <string name="header_wireless_adb">Depuració Inalámbrica y Emparejamiento ADB</string>
     <string name="desc_wireless_adb">Conecte Robot Runner Desktop sin cables vía Wi-Fi (Android 11+).</string>
-    <string name="label_pairing_pin">Código PIN de Emparejamiento</string>
+    <string name="label_pairing_pin">Cóigo PIN de Emparejamiento</string>
     <string name="btn_gen_pin">Generar PIN</string>
     <string name="label_pairing_port">Puerto de Emparejamiento</string>
     <string name="label_pairing_cmd">Comando de Emparejamiento en Terminal</string>
@@ -228,17 +228,17 @@
     <string name="btn_print_test_receipt">Imprimir Recibo de Prueba</string>
     <string name="btn_verify_ui_text">Verificar Texto de Pantalla vs Golden</string>
     <string name="btn_export_golden_json">Exportar Archivo Golden JSON</string>
-    <string name="header_pdf_audit_report">Informe de Auditoría Técnica PDF</string>
-    <string name="desc_pdf_audit_report">Genere un informe técnico certificado en PDF con especificaciones de hardware, estado POS y auditoría de texto.</string>
-    <string name="btn_generate_pdf_audit">Generar Informe PDF de Auditoría</string>
+    <string name="header_pdf_audit_report">Informe de AuditorÃ­a TÃ©cnica PDF</string>
+    <string name="desc_pdf_audit_report">Genere un informe tÃ©cnico certificado en PDF con especificaciones de hardware, estado POS y auditorÃ­a de texto.</string>
+    <string name="btn_generate_pdf_audit">Generar Informe PDF de AuditorÃ­a</string>
     <string name="btn_share_pdf_report">Compartir Informe PDF</string>
     <string name="msg_golden_file_exported">Archivo Golden JSON guardado en Descargas: %1$s</string>
-    <string name="msg_pdf_report_generated">Informe de Auditoría PDF generado: %1$s</string>
-    <string name="msg_receipt_printed">¡Recibo térmico impreso con éxito!</string>
+    <string name="msg_pdf_report_generated">Informe de AuditorÃ­a PDF generado: %1$s</string>
+    <string name="msg_receipt_printed">Â¡Recibo tÃ©rmico impreso con Ã©xito!</string>
     <!-- Phase 10 Strings (Sync & Fleet P2P ES) -->
     <string name="header_sync_center">Sincronización Bidireccional y Puente de Escritorio</string>
-    <string name="desc_sync_center">Sincronice artefactos de prueba, Archivos Golden y configuraciones de proyectos con Robot Runner Desktop vía REST / Wi-Fi.</string>
-    <string name="btn_refresh_vault">Actualizar Índice de la Bóveda</string>
+    <string name="desc_sync_center">Sincronice artefactos de prueba, Archivos Golden y configuraciones de proyectos con Robot Runner Desktop vÃ­a REST / Wi-Fi.</string>
+    <string name="btn_refresh_vault">Actualizar Ãndice de la Bóveda</string>
     <string name="btn_export_all_desktop">Exportar Todo al Escritorio</string>
     <string name="header_fleet_radar">Radar P2P de la Flota de Dispositivos</string>
     <string name="desc_fleet_radar">Descubra dispositivos Robot Runner Companion y servidores de escritorio activos en la subred Wi-Fi local.</string>
@@ -263,7 +263,7 @@
     <string name="desc_local_device_status">Descripción general de la salud de este dispositivo</string>
     <string name="status_charging">Cargando</string>
     <string name="status_discharging">Descargando</string>
-    <string name="desc_accessibility_grants">Permite la inspección del árbol de UI en menos de 10 ms, envío de clics y exploración autónoma.</string>
+    <string name="desc_accessibility_grants">Permite la inspección del árbol de UI en menos de 10 ms, enví­o de clics y exploración autónoma.</string>
     <string name="tab_ui_inspector">Inspector de UI</string>
     <string name="tab_scenarios">Escenarios</string>
     <string name="tab_run_console">Consola</string>
@@ -282,7 +282,7 @@
     <string name="msg_settings_soon">Ajustes próximamente</string>
     <string name="msg_about_soon">Acerca de próximamente</string>
     <string name="tab_scenarios_ai">Escenarios (IA)</string>
-    <string name="desc_hardware_diagnostic">Lista de diagnóstico completo de hardware para batería, memoria, NFC e impresoras térmicas POS.</string>
+    <string name="desc_hardware_diagnostic">Lista de diagnótico completo de hardware para batería, memoria, NFC e impresoras térmicas POS.</string>
     <string name="msg_pos_printer_unavailable">Impresora térmica POS no disponible o sin papel</string>
     <string name="text_audit_match">Auditoría de Texto: %1$s%% coincidencia</string>
     <string name="label_active_screen">Pantalla Activa</string>
@@ -336,4 +336,20 @@
     <string name="msg_export_logs_choice">¿Deseas exportar todos los logs o solo los logs filtrados actualmente?</string>
     <string name="btn_filtered_only">Solo Filtrados</string>
     <string name="btn_all_logs">Todos los Logs</string>
+    <string name="status_standby">ESPERA</string>
+    <string name="label_captured_redraw_splits">Splits de Redraw Capturados (%1$d)</string>
+    <string name="msg_no_redraw_splits">Aún no hay splits grabados. Toca Iniciar Grabación.</string>
+    <string name="label_logcat_laps">Laps de Logcat (%1$d)</string>
+    <string name="msg_no_logcat_laps">Aún no hay laps de logcat grabados. Toca Iniciar Sesión.</string>
+    <string name="label_scanner_laps">Laps del Lector (%1$d)</string>
+    <string name="msg_no_scanner_laps">Aún no se han escaneado códigos.</string>
+    
+    <!-- Stopwatch Overlay -->
+    <string name="title_stopwatch_hud">HUD del Cronómetro</string>
+    <string name="label_redraw_tti">TTI DE REDRAW</string>
+    <string name="btn_record_split">Grabar Split</string>
+    <string name="label_logcat_watcher">OBSERVADOR DEL LOGCAT</string>
+    <string name="msg_waiting_keywords">Esperando palabras clave...</string>
+    <string name="label_keyword_format">Palabra clave: %1$s</string>
+    <string name="msg_no_stopwatch_session">Ninguna sesión de cronómetro en ejecución.</string>
 </resources>
