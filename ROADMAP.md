@@ -92,12 +92,12 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
 - [ ] Revisar a lógica de busca heurística e exploração (DFS Grafo) do aplicativo.
 
 ## Fase: Revisão da Aba Logcat (Toolbox)
-  - [ ] Internacionalizar todos os textos.
-  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
-  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
-  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
-  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
-- [ ] Garantir o limite em memória circular e evitar memory leaks no streaming local de logcat.
+  - [x] Internacionalizar todos os textos.
+  - [x] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [x] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [x] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
+- [x] Garantir o limite em memória circular e evitar memory leaks no streaming local de logcat.
 
 ## Fase: Revisão da Aba Performance (Toolbox)
   - [x] Internacionalizar todos os textos.

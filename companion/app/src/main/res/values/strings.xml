@@ -332,5 +332,16 @@
     <string name="label_format">Format: %1$d</string>
     <string name="btn_save_round">Save Round</string>
     <string name="btn_discard">Discard</string>
-    <string name="msg_use_hud_for_redraw">Tip: Use the Floating HUD (Above) and open another app to test redraws. Tapping this screen will only measure this app (usually 16ms).</string>
+    <string name="msg_use_hud_for_redraw">Tip: Use the Floating HUD (Above) and open another app to test redraws. Tapping this screen will only measure this app (usually 16ms).</string>    <!-- Logcat Tab -->
+    <string name="desc_start_stop_logcat">Start/Stop Logcat</string>
+    <string name="desc_clear_logcat">Clear Logcat</string>
+    <string name="desc_save_logcat">Save Logcat</string>
+    <string name="desc_open_bubble">Open in Bubble</string>
+    
+    <!-- Logcat Overlay -->
+    <string name="title_logcat_overlay">Robot Runner Logcat</string>
+    <string name="desc_play_pause">Play/Pause</string>
+    <string name="desc_expand_collapse">Expand/Collapse</string>
+    <string name="desc_open_app">Open App</string>
+    <string name="desc_close">Close</string>
 </resources>

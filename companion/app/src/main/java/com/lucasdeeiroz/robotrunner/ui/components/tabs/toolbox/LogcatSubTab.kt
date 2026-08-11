@@ -213,7 +213,7 @@ fun LogcatSubTab() {
                 ) {
                     Icon(
                         imageVector = if (isStreaming) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
-                        contentDescription = "Start/Stop Logcat",
+                        contentDescription = stringResource(id = R.string.desc_start_stop_logcat),
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -223,7 +223,7 @@ fun LogcatSubTab() {
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Delete,
-                        contentDescription = "Clear Logcat",
+                        contentDescription = stringResource(id = R.string.desc_clear_logcat),
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -240,7 +240,7 @@ fun LogcatSubTab() {
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Save,
-                        contentDescription = "Save Logcat",
+                        contentDescription = stringResource(id = R.string.desc_save_logcat),
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -261,7 +261,7 @@ fun LogcatSubTab() {
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
-                        contentDescription = "Open in Bubble",
+                        contentDescription = stringResource(id = R.string.desc_open_bubble),
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -307,9 +307,9 @@ fun LogcatSubTab() {
 fun LogcatItemRow(msg: LogcatMessage) {
     val levelColor = when (msg.level) {
         LogLevel.ERROR, LogLevel.FATAL -> MaterialTheme.colorScheme.error
-        LogLevel.WARN -> Color(0xFFF59E0B) // Warning is not a native MD3 color, keeping amber
-        LogLevel.INFO -> Color(0xFF22C55E) // Success is not native, keeping green
-        LogLevel.DEBUG -> Color(0xFF38BDF8) // Info blue
+        LogLevel.WARN -> MaterialTheme.colorScheme.tertiary
+        LogLevel.INFO -> MaterialTheme.colorScheme.primary
+        LogLevel.DEBUG -> MaterialTheme.colorScheme.secondary
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 

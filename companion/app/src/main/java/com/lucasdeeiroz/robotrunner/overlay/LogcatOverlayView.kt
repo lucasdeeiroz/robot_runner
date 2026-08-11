@@ -15,10 +15,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lucasdeeiroz.robotrunner.R
 import com.lucasdeeiroz.robotrunner.logcat.LogcatStreamer
 import com.lucasdeeiroz.robotrunner.logcat.LogcatMessage
 import com.lucasdeeiroz.robotrunner.ui.theme.RobotRunnerTheme
@@ -70,7 +72,7 @@ fun LogcatOverlayView(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Robot Runner Logcat",
+                        text = stringResource(id = R.string.title_logcat_overlay),
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
@@ -87,7 +89,7 @@ fun LogcatOverlayView(
                         ) {
                             Icon(
                                 imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                contentDescription = "Play/Pause",
+                                contentDescription = stringResource(id = R.string.desc_play_pause),
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -99,7 +101,7 @@ fun LogcatOverlayView(
                         ) {
                             Icon(
                                 imageVector = if (isExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
-                                contentDescription = "Expand/Collapse",
+                                contentDescription = stringResource(id = R.string.desc_expand_collapse),
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -111,7 +113,7 @@ fun LogcatOverlayView(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
-                                contentDescription = "Open App",
+                                contentDescription = stringResource(id = R.string.desc_open_app),
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -123,7 +125,7 @@ fun LogcatOverlayView(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Close,
-                                contentDescription = "Close",
+                                contentDescription = stringResource(id = R.string.desc_close),
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(16.dp)
                             )
