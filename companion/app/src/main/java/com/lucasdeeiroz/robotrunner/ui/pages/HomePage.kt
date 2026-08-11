@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.List
+import androidx.compose.material.icons.automirrored.rounded.FormatAlignLeft
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -174,7 +175,7 @@ fun HomePage(
                         2 -> {
                             PillTabBar(
                                 tabs = listOf(
-                                    PillTabItem(stringResource(id = R.string.tab_logcat), Icons.Rounded.FormatAlignLeft),
+                                    PillTabItem(stringResource(id = R.string.tab_logcat), Icons.AutoMirrored.Rounded.FormatAlignLeft),
                                     PillTabItem(stringResource(id = R.string.tab_performance), Icons.Rounded.Speed),
                                     PillTabItem(stringResource(id = R.string.tab_stopwatch), Icons.Rounded.Timer),
                                     PillTabItem(stringResource(id = R.string.tab_shell), Icons.Rounded.Terminal),
@@ -304,7 +305,7 @@ fun HomePage(
                     }
                 }
                     
-                    TabRow(
+                    PrimaryTabRow(
                         selectedTabIndex = if (currentSection > 2) -1 else currentSection,
                         containerColor = colorScheme.surface,
                         contentColor = MaterialTheme.colorScheme.primary,

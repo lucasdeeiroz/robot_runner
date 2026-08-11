@@ -167,7 +167,7 @@ scrcpy*/
 recordings/
 screenshots/
 logs/
-logcat*/
+/logcat*/
 frontend/
 .allure
 .gemini_cache
