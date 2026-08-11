@@ -285,6 +285,13 @@ export function useCompanion(selectedDevice: string | null) {
             } catch (e) {
                 console.warn("[useCompanion] Auto enable accessibility failed silently:", e);
             }
+            
+            // Grant necessary permissions via ADB (READ_LOGS, DUMP, etc)
+            try {
+                await invoke('grant_companion_permissions', { device: selectedDevice });
+            } catch (e) {
+                console.warn("[useCompanion] Auto grant permissions failed silently:", e);
+            }
 
             // Initial fetch
             const success = await fetchDeviceStats(port);

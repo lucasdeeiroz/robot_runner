@@ -158,6 +158,7 @@ macro_rules! generate_robot_runner_handler {
             crate::companion::fetch_companion_ui_tree,
             crate::companion::fetch_companion_events,
             crate::companion::enable_companion_accessibility,
+            crate::companion::grant_companion_permissions,
             crate::companion::run_companion_standalone_checkup,
             crate::companion::generate_companion_pdf_report,
             crate::companion::fetch_companion_screenshot,

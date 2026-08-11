@@ -121,6 +121,30 @@ pub async fn enable_companion_accessibility(app: AppHandle, device: String) -> A
 }
 
 #[command]
+pub async fn grant_companion_permissions(app: AppHandle, device: String) -> AppResult<()> {
+    let pkg = "com.lucasdeeiroz.robotrunner";
+    let permissions = vec![
+        "android.permission.DUMP",
+        "android.permission.PACKAGE_USAGE_STATS",
+        "android.permission.BATTERY_STATS",
+        "android.permission.READ_LOGS",
+    ];
+    
+    eprintln!("[Companion Rust] Granting necessary permissions via ADB on {}", device);
+    for perm in permissions {
+        let args = vec![
+            "shell".to_string(),
+            "pm".to_string(),
+            "grant".to_string(),
+            pkg.to_string(),
+            perm.to_string(),
+        ];
+        let _ = execute_adb_with_recovery(&app, Some(&device), args).await;
+    }
+    Ok(())
+}
+
+#[command]
 pub async fn fetch_companion_info(port: Option<u16>) -> AppResult<String> {
     let p = port.unwrap_or(9876);
     let url = format!("http://127.0.0.1:{}/device-info", p);
