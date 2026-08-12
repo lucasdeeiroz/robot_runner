@@ -9,6 +9,7 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import java.util.Collections
 
+@androidx.annotation.Keep
 data class ScannerLap(
     val cameraInitMs: Long,
     val searchMs: Long,
@@ -40,11 +41,20 @@ object ScannerStopwatchEngine {
     var firstFrameTimestamp: Long = 0
         private set
         
-    private val scannerOptions = BarcodeScannerOptions.Builder()
-        .setBarcodeFormats(Barcode.FORMAT_ALL_FORMATS)
-        .build()
+    private val scannerOptions by lazy {
+        BarcodeScannerOptions.Builder()
+            .setBarcodeFormats(Barcode.FORMAT_ALL_FORMATS)
+            .build()
+    }
         
-    private val scanner = BarcodeScanning.getClient(scannerOptions)
+    private val scanner by lazy {
+        try {
+            BarcodeScanning.getClient(scannerOptions)
+        } catch (e: Throwable) {
+            android.util.Log.e("ScannerStopwatch", "Failed to initialize MLKit BarcodeScanner", e)
+            null
+        }
+    }
     
     private var lastScannedValue: String? = null
     private var lastScannedTimestamp: Long = 0
@@ -100,8 +110,8 @@ object ScannerStopwatchEngine {
             val frameTimestamp = System.currentTimeMillis()
             val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
             
-            scanner.process(image)
-                .addOnSuccessListener { barcodes ->
+            scanner?.process(image)
+                ?.addOnSuccessListener { barcodes ->
                     val detectTimestamp = System.currentTimeMillis()
                     for (barcode in barcodes) {
                         val rawValue = barcode.rawValue ?: continue
@@ -136,7 +146,7 @@ object ScannerStopwatchEngine {
                         break
                     }
                 }
-                .addOnCompleteListener {
+                ?.addOnCompleteListener {
                     imageProxy.close()
                 }
         } else {

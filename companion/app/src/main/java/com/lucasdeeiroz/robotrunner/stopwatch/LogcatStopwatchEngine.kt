@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.Collections
 
+@androidx.annotation.Keep
 data class LogcatLap(
     val lapNumber: Int,
     val keyword: String,
@@ -20,6 +21,7 @@ data class LogcatLap(
     val deltaMs: Long
 )
 
+@androidx.annotation.Keep
 data class LogcatSavedRound(
     val id: String,
     val totalTimeMs: Long,
