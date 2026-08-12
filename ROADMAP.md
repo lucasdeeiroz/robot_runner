@@ -116,20 +116,20 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
   - [x] Revisar a engine de Redraw para cálculos precisos (deltas de renderização) entre comandos de clique e redraw de UI.
 
 ## Fase: Revisão da Aba Shell Console (Toolbox)
-  - [ ] Internacionalizar todos os textos.
-  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
-  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
-  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
-  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
-  - [ ] Otimizar isolamento de streams Stdout/Stderr e timeouts seguros via Coroutines.
+  - [x] Internacionalizar todos os textos.
+  - [x] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [x] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [x] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
+  - [x] Otimizar isolamento de streams Stdout/Stderr e timeouts seguros via Coroutines.
 
 ## Fase: Revisão da Aba Apps (Toolbox)
-  - [ ] Internacionalizar todos os textos.
-  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
-  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
-  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
-  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
-  - [ ] Revisar a renderização da lista de apps via PackageManager no Companion App.
+  - [x] Internacionalizar todos os textos.
+  - [x] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [x] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [x] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
+  - [x] Revisar a renderização da lista de apps via PackageManager no Companion App.
 
 ## Fase: Revisão da Aba Hardware Specs (Toolbox)
   - [ ] Internacionalizar todos os textos.

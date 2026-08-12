@@ -112,6 +112,9 @@
     <string name="header_permissions">Requested Permissions Inspector</string>
     <string name="perm_granted">GRANTED</string>
     <string name="perm_denied">DENIED</string>
+    <string name="no_requested_permissions">No requested permissions.</string>
+    <string name="sort_by_name">Sort: Name</string>
+    <string name="sort_by_package">Sort: Package</string>
     <string name="shell_header_templates">Command Templates</string>
     <string name="shell_input_placeholder">Enter command (e.g. dumpsys battery)...</string>
     <string name="btn_run_shell">Run</string>

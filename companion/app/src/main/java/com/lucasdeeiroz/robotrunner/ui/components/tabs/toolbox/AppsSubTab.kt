@@ -1,5 +1,7 @@
-package com.lucasdeeiroz.robotrunner.apps
+package com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox
 
+import com.lucasdeeiroz.robotrunner.apps.PackageManagerHelper
+import com.lucasdeeiroz.robotrunner.apps.AppInfo
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
@@ -43,7 +45,7 @@ private fun drawableToBitmap(drawable: Drawable?): Bitmap? {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PackageManagerTabContent() {
+fun AppsSubTab() {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -51,6 +53,7 @@ fun PackageManagerTabContent() {
     var isLoading by remember { mutableStateOf(true) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableIntStateOf(0) } // 0 = All, 1 = User, 2 = System
+    var sortBy by remember { mutableIntStateOf(0) } // 0 = Name, 1 = Package
     var selectedApp by remember { mutableStateOf<AppInfo?>(null) }
 
     LaunchedEffect(Unit) {
@@ -58,7 +61,7 @@ fun PackageManagerTabContent() {
         isLoading = false
     }
 
-    val filteredApps = remember(appsList, searchQuery, selectedFilter) {
+    val filteredApps = remember(appsList, searchQuery, selectedFilter, sortBy) {
         appsList.filter { app ->
             val matchesFilter = when (selectedFilter) {
                 1 -> !app.isSystemApp
@@ -69,7 +72,13 @@ fun PackageManagerTabContent() {
                     app.appName.contains(searchQuery, ignoreCase = true) ||
                     app.packageName.contains(searchQuery, ignoreCase = true)
             matchesFilter && matchesQuery
-        }
+        }.sortedWith(Comparator { a, b ->
+            if (sortBy == 0) {
+                a.appName.compareTo(b.appName, ignoreCase = true)
+            } else {
+                a.packageName.compareTo(b.packageName, ignoreCase = true)
+            }
+        })
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -98,7 +107,8 @@ fun PackageManagerTabContent() {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             FilterChip(
                 selected = selectedFilter == 0,
@@ -115,6 +125,15 @@ fun PackageManagerTabContent() {
                 onClick = { selectedFilter = 2 },
                 label = { Text(text = stringResource(id = R.string.chip_system_apps), fontSize = 12.sp) }
             )
+            Spacer(modifier = Modifier.weight(1f))
+            // Sort Button
+            TextButton(onClick = { sortBy = if (sortBy == 0) 1 else 0 }) {
+                Text(
+                    text = if (sortBy == 0) stringResource(id = R.string.sort_by_name) else stringResource(id = R.string.sort_by_package),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
 
         // App List or Loading
@@ -207,7 +226,10 @@ fun PackageManagerTabContent() {
                         Button(
                             onClick = { PackageManagerHelper.launchApp(context, app.packageName) },
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
                         ) {
                             Text(text = stringResource(id = R.string.action_launch_app), fontSize = 12.sp)
                         }
@@ -215,7 +237,10 @@ fun PackageManagerTabContent() {
                         Button(
                             onClick = { PackageManagerHelper.openAppDetails(context, app.packageName) },
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.outlineVariant)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         ) {
                             Text(text = stringResource(id = R.string.action_app_details), fontSize = 12.sp)
                         }
@@ -245,7 +270,10 @@ fun PackageManagerTabContent() {
                                 }
                             },
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7))
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondary,
+                                contentColor = MaterialTheme.colorScheme.onSecondary
+                            )
                         ) {
                             Text(text = stringResource(id = R.string.action_backup_apk), fontSize = 11.sp)
                         }
@@ -257,7 +285,10 @@ fun PackageManagerTabContent() {
                                 }
                             },
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D9488))
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.tertiary,
+                                contentColor = MaterialTheme.colorScheme.onTertiary
+                            )
                         ) {
                             Text(text = stringResource(id = R.string.action_share_apk), fontSize = 11.sp)
                         }
@@ -270,7 +301,10 @@ fun PackageManagerTabContent() {
                                 selectedApp = null
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError
+                            )
                         ) {
                             Text(text = stringResource(id = R.string.action_uninstall_app), fontSize = 12.sp)
                         }
@@ -290,7 +324,7 @@ fun PackageManagerTabContent() {
                 Spacer(modifier = Modifier.height(8.dp))
 
                 if (app.permissions.isEmpty()) {
-                    Text(text = "No requested permissions.", fontSize = 12.sp, color = Color(0xFF64748B))
+                    Text(text = stringResource(id = R.string.no_requested_permissions), fontSize = 12.sp, color = Color(0xFF64748B))
                 } else {
                     LazyColumn(
                         modifier = Modifier

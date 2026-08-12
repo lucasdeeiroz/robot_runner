@@ -124,10 +124,32 @@ pub async fn enable_companion_accessibility(app: AppHandle, device: String) -> A
 pub async fn grant_companion_permissions(app: AppHandle, device: String) -> AppResult<()> {
     let pkg = "com.lucasdeeiroz.robotrunner";
     let permissions = vec![
-        "android.permission.DUMP",
-        "android.permission.PACKAGE_USAGE_STATS",
+        "android.permission.POST_NOTIFICATIONS",
+        // "android.permission.USE_ICC_ID",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
+        "android.permission.NEARBY_WIFI_DEVICES",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH",
+        // "android.permission.ACCESS_SURFACE_FLINGER",
+        "android.permission.INTERNET",
         "android.permission.BATTERY_STATS",
+        "android.permission.PACKAGE_USAGE_STATS",
+        // "android.permission.DREAM_SERVICE",
+        "android.permission.READ_PHONE_STATE",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
         "android.permission.READ_LOGS",
+        "android.permission.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+        "android.permission.BLUETOOTH_ADVERTISE",
+        "android.permission.VIBRATE",
+        "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.QUERY_ALL_PACKAGES",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.DUMP",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH_SCAN",
     ];
     
     eprintln!("[Companion Rust] Granting necessary permissions via ADB on {}", device);

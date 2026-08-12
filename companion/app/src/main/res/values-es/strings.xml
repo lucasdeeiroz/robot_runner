@@ -107,6 +107,9 @@
     <string name="header_permissions">Inspector de Permisos Solicitados</string>
     <string name="perm_granted">CONCEDIDO</string>
     <string name="perm_denied">DENEGADO</string>
+    <string name="no_requested_permissions">No se solicitaron permisos.</string>
+    <string name="sort_by_name">Ordenar: Nombre</string>
+    <string name="sort_by_package">Ordenar: Paquete</string>
     <string name="shell_header_templates">Plantillas de Comandos</string>
     <string name="shell_input_placeholder">Ingrese el comando (ej: dumpsys battery)...</string>
     <string name="btn_run_shell">Ejecutar</string>

@@ -40,7 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lucasdeeiroz.robotrunner.R
-import com.lucasdeeiroz.robotrunner.apps.PackageManagerTabContent
+import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.AppsSubTab
 import com.lucasdeeiroz.robotrunner.bdd.BddTestRunnerTabContent
 import com.lucasdeeiroz.robotrunner.explorer.ExplorerTabContent
 import com.lucasdeeiroz.robotrunner.inspector.InspectorTabContent
@@ -395,7 +395,7 @@ fun HomePage(
                             1 -> PerformanceSubTab()
                             2 -> StopwatchSubTab()
                             3 -> CommandsSubTab()
-                            4 -> PackageManagerTabContent()
+                            4 -> AppsSubTab()
                             5 -> HardwareSpecsTabContent(detailedSpecs = detailedSpecs)
                             6 -> DiagnosticsTabContent(
                                 onRunOfflineCheckup = onRunOfflineCheckup,
