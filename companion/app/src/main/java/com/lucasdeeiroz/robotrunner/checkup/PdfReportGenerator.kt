@@ -114,9 +114,23 @@ class PdfReportGenerator(private val context: Context) {
         drawRow("Accessibility Inspection Service", if (result.isAccessibilityEnabled) "Active (Sub-10ms UI Inspection)" else "Disabled")
         y += 15f
 
-        // Section 5: UI Text Audit & Golden File Verification
+        // Section 5: Interactive Hardware Tests
+        if (result.interactiveTestResults.isNotEmpty()) {
+            drawSectionHeader("5. Interactive Hardware Tests")
+            result.interactiveTestResults.forEach { (key, passed) ->
+                val statusText = when (passed) {
+                    true -> "PASS"
+                    false -> "FAIL"
+                    null -> "NOT TESTED"
+                }
+                drawRow(key.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }, statusText)
+            }
+            y += 15f
+        }
+
+        // Section 6: UI Text Audit & Golden File Verification
         if (uiTextResult != null) {
-            drawSectionHeader("5. UI Text Audit & Golden File Verification")
+            drawSectionHeader("6. UI Text Audit & Golden File Verification")
             drawRow("Screen Name", uiTextResult.screenName)
             drawRow("Text Match Score", "${uiTextResult.matchPercentage}% (${uiTextResult.totalMatched} / ${uiTextResult.totalExpected})")
             drawRow("Missing Strings", "${uiTextResult.missingTexts.size} strings missing")

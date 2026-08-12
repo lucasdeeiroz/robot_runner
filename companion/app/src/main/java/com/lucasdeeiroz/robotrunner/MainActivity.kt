@@ -132,15 +132,6 @@ class MainActivity : ComponentActivity() {
                         updateState()
                     }
                 },
-                onRunOfflineCheckup = {
-                    val result = checkupRunner.runLocalCheckup()
-                    val pdfFile = pdfGenerator.generatePdfReport(result)
-                    if (pdfFile != null) {
-                        Toast.makeText(this, getString(R.string.msg_pdf_exported), Toast.LENGTH_LONG).show()
-                    } else {
-                        Toast.makeText(this, "Checkup done, but failed to save PDF", Toast.LENGTH_SHORT).show()
-                    }
-                },
                 onLaunchDisplayTest = {
                     try {
                         val intent = Intent(this, com.lucasdeeiroz.robotrunner.hardware.DisplayTestActivity::class.java)
@@ -192,8 +183,7 @@ fun CompanionAppUI(
     activeClients: Int,
     ipAddress: String,
     port: Int,
-    onToggleService: () -> Unit,
-    onRunOfflineCheckup: () -> Unit
+    onToggleService: () -> Unit
 ) {
     MaterialTheme(
         colorScheme = darkColorScheme(
@@ -291,21 +281,6 @@ fun CompanionAppUI(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = onRunOfflineCheckup,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8))
-                    ) {
-                        Text(
-                            text = stringResource(id = R.string.btn_export_pdf),
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-
                     Button(
                         onClick = onToggleService,
                         modifier = Modifier

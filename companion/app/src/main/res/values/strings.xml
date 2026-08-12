@@ -30,7 +30,7 @@
 
     <!-- Phase 1 Strings -->
     <string name="tab_dashboard">Dashboard</string>
-    <string name="tab_hardware_specs">Hardware Specs</string>
+    <string name="tab_checkup">Checkup</string>
     <string name="tab_diagnostics">Diagnostics</string>
     <string name="label_rest_server">RR Server</string>
     <string name="status_port_active">Port %1$d Active</string>
@@ -400,4 +400,30 @@
     <string name="btn_filtered_only">Filtered Only</string>
     <string name="btn_all_logs">All Logs</string>
     <string name="status_standby">STANDBY</string>
+    <string name="header_golden_json">Hardware Golden JSON</string>
+    <string name="desc_golden_json">Export hardware specifications and installed packages as a Golden File JSON to compare with Desktop.</string>
+    <string name="msg_golden_saved">Golden File saved as %1$s</string>
+    <string name="msg_golden_error">Error exporting Golden File</string>
+
+    <string name="header_interactive_tests">Interactive Hardware Tests</string>
+    <string name="desc_interactive_tests">Run diagnostics on physical components.</string>
+    <string name="test_scanner">Scanner</string>
+    <string name="test_screen_pixels">Screen Colors</string>
+    <string name="test_touch_screen">Touch Screen</string>
+    <string name="test_vibration">Vibration</string>
+    <string name="test_camera_flash">Camera Flash</string>
+    <string name="test_audio_speaker">Audio Speaker</string>
+    <string name="test_microphone">Microphone</string>
+    <string name="test_pos_printer">POS Printer</string>
+    <string name="dialog_test_pass_title">Did the test pass?</string>
+    <string name="dialog_test_pass_desc">Confirm if the %1$s behaved correctly.</string>
+    <string name="btn_pass">Pass</string>
+    <string name="btn_fail">Fail</string>
+    <string name="status_passed">Passed</string>
+    <string name="status_failed">Failed</string>
+    <string name="status_waiting">Waiting</string>
+    <string name="btn_test">Test</string>
+    <string name="msg_recording_audio">Recording 3 seconds...</string>
+    <string name="msg_playing_audio">Playing back...</string>
+    <string name="msg_failed_mic">Failed to start microphone</string>
 </resources>

@@ -58,6 +58,17 @@
             android:exported="false"
             android:theme="@style/Theme.RobotRunnerCompanion" />
 
+        <activity
+            android:name=".hardware.ScannerTestActivity"
+            android:exported="false"
+            android:theme="@style/Theme.RobotRunnerCompanion" />
+
+        <activity
+            android:name=".hardware.TouchTestActivity"
+            android:exported="false"
+            android:theme="@style/Theme.RobotRunnerCompanion" />
+
+
         <service
             android:name=".CompanionServerService"
             android:enabled="true"

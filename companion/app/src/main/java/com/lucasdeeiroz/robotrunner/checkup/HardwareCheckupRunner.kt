@@ -7,10 +7,21 @@ import android.content.IntentFilter
 import android.nfc.NfcAdapter
 import android.os.BatteryManager
 import android.os.Build
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 import android.os.Environment
 import android.os.StatFs
+import android.util.Log
+import com.google.gson.GsonBuilder
 import com.lucasdeeiroz.robotrunner.hardware.PrinterHelper
 import com.lucasdeeiroz.robotrunner.service.CompanionAccessibilityService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class HardwareCheckupRunner(private val context: Context) {
 
@@ -85,12 +96,68 @@ class HardwareCheckupRunner(private val context: Context) {
             isPrinterSupported = printerStatus.isSupported,
             printerVendor = printerStatus.vendor,
             isPrinterHasPaper = printerStatus.hasPaper,
-            isAccessibilityEnabled = CompanionAccessibilityService.isRunning
+            isAccessibilityEnabled = CompanionAccessibilityService.isRunning,
+            interactiveTestResults = com.lucasdeeiroz.robotrunner.hardware.InteractiveHardwareTester.testResults.value
         )
     }
 
     fun printTestReceipt(): Boolean {
         return printerHelper.printTestReceipt()
+    }
+
+    suspend fun exportHardwareGoldenFile(result: LocalCheckupResult): File? = withContext(Dispatchers.IO) {
+        try {
+            val pm = context.packageManager
+            val packages = pm.getInstalledPackages(0)
+            val installedPackages = packages.map { pkg ->
+                mapOf(
+                    "name" to pkg.packageName,
+                    "version" to (pkg.versionName ?: ""),
+                    "is_system" to (((pkg.applicationInfo?.flags ?: 0) and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0)
+                )
+            }
+
+            val properties = mapOf(
+                "ro.product.manufacturer" to result.manufacturer,
+                "ro.product.model" to result.model,
+                "ro.product.brand" to result.brand,
+                "ro.build.version.release" to result.androidVersion,
+                "ro.build.version.sdk" to result.sdkInt.toString(),
+                "ro.serialno" to result.serial
+            )
+
+            val timestampStr = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
+                timeZone = java.util.TimeZone.getTimeZone("UTC")
+            }.format(Date(result.timestamp))
+
+            val goldenData = mapOf(
+                "device" to result.serial,
+                "timestamp" to timestampStr,
+                "properties" to properties,
+                "standard_checks" to emptyMap<String, Any>(),
+                "additional_checks" to emptyMap<String, Any>(),
+                "installed_packages" to installedPackages,
+                "ui_text_checks" to emptyList<Any>()
+            )
+
+            val gson = GsonBuilder().setPrettyPrinting().create()
+            val jsonStr = gson.toJson(goldenData)
+
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            if (!downloadsDir.exists()) downloadsDir.mkdirs()
+
+            val safeSerial = result.serial.replace(Regex("[^a-zA-Z0-9]"), "_")
+            val fileName = "golden_${safeSerial}.json"
+            val file = File(downloadsDir, fileName)
+
+            FileOutputStream(file).use { out ->
+                out.write(jsonStr.toByteArray())
+            }
+            file
+        } catch (e: Exception) {
+            Log.e("HardwareCheckupRunner", "Error exporting Hardware Golden File JSON", e)
+            null
+        }
     }
 }
 
@@ -118,5 +185,6 @@ data class LocalCheckupResult(
     val isPrinterSupported: Boolean,
     val printerVendor: String,
     val isPrinterHasPaper: Boolean,
-    val isAccessibilityEnabled: Boolean
+    val isAccessibilityEnabled: Boolean,
+    val interactiveTestResults: Map<String, Boolean?>
 )

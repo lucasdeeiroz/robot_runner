@@ -51,7 +51,7 @@ import com.lucasdeeiroz.robotrunner.ui.components.tabs.home.ConnectSubTab
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.PerformanceSubTab
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.CommandsSubTab
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.StopwatchSubTab
-import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.HardwareSpecsSubTab
+import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.CheckupSubTab
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.draw.clip
@@ -107,7 +107,6 @@ fun HomePage(
     ipAddress: String,
     port: Int,
     onToggleServer: () -> Unit,
-    onRunOfflineCheckup: () -> Unit,
     onLaunchDisplayTest: () -> Unit
 ) {
     var currentSection by remember { mutableIntStateOf(0) } // 0: Home, 1: Run, 2: Toolbox
@@ -181,8 +180,8 @@ fun HomePage(
                                     PillTabItem(stringResource(id = R.string.tab_stopwatch), Icons.Rounded.Timer),
                                     PillTabItem(stringResource(id = R.string.tab_shell), Icons.Rounded.Terminal),
                                     PillTabItem(stringResource(id = R.string.tab_apps), Icons.Rounded.Apps),
-                                    PillTabItem(stringResource(id = R.string.tab_hardware_specs), Icons.Rounded.Memory),
-                                    PillTabItem(stringResource(id = R.string.tab_diagnostics), Icons.Rounded.Build),
+                                    PillTabItem(stringResource(id = R.string.tab_checkup), Icons.Rounded.Memory),
+                                    
                                     // PillTabItem(stringResource(id = R.string.tab_webview), Icons.Rounded.Language),
                                     PillTabItem(stringResource(id = R.string.tab_run_console), Icons.Rounded.Code),
                                     PillTabItem(stringResource(id = R.string.tab_history), Icons.Rounded.History)
@@ -397,9 +396,8 @@ fun HomePage(
                             2 -> StopwatchSubTab()
                             3 -> CommandsSubTab()
                             4 -> AppsSubTab()
-                            5 -> HardwareSpecsSubTab(detailedSpecs = detailedSpecs)
-                            6 -> DiagnosticsTabContent(
-                                onRunOfflineCheckup = onRunOfflineCheckup,
+                            5 -> CheckupSubTab(
+                                detailedSpecs = detailedSpecs,
                                 onLaunchDisplayTest = onLaunchDisplayTest
                             )
                             7 -> PlaceholderTabContent(stringResource(id = R.string.tab_run_console))
@@ -437,230 +435,6 @@ fun GaugeCard(
 }
 
 
-@Composable
-fun DiagnosticsTabContent(
-    onRunOfflineCheckup: () -> Unit,
-    onLaunchDisplayTest: () -> Unit
-) {
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    var uiTextResult by remember { mutableStateOf<com.lucasdeeiroz.robotrunner.checkup.UiTextVerificationResult?>(null) }
-    var generatedPdfFile by remember { mutableStateOf<java.io.File?>(null) }
-
-    Column(
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = 24.dp)
-    ) {
-        // POS & Hardware Diagnostics Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(stringResource(id = R.string.header_pos_hardware_checklist), color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    stringResource(id = R.string.desc_hardware_diagnostic),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = onRunOfflineCheckup,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))
-                    ) {
-                        Text(stringResource(id = R.string.btn_offline_checkup), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            val runner = com.lucasdeeiroz.robotrunner.checkup.HardwareCheckupRunner(context)
-                            val printed = runner.printTestReceipt()
-                            if (printed) {
-                                Toast.makeText(context, context.getString(R.string.msg_receipt_printed), Toast.LENGTH_SHORT).show()
-                            } else {
-                                Toast.makeText(context, context.getString(R.string.msg_pos_printer_unavailable), Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8))
-                    ) {
-                        Text(stringResource(id = R.string.btn_print_test_receipt), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-
-        // UI Text Verification & Golden File Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(stringResource(id = R.string.header_ui_text_verification), color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    stringResource(id = R.string.desc_ui_text_verification),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            uiTextResult = com.lucasdeeiroz.robotrunner.checkup.UiTextVerifier.verifyActiveScreenText()
-                            Toast.makeText(context, context.getString(R.string.text_audit_match, uiTextResult?.matchPercentage ?: 0), Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22C55E)),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(stringResource(id = R.string.btn_verify_ui_text), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    Button(
-                        onClick = {
-                            coroutineScope.launch {
-                                val file = com.lucasdeeiroz.robotrunner.checkup.UiTextVerifier.exportGoldenFileJson("Active Screen")
-                                if (file != null) {
-                                    Toast.makeText(context, context.getString(R.string.msg_golden_file_exported, file.name), Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(stringResource(id = R.string.btn_export_golden_json), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-
-                uiTextResult?.let { res ->
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(text = stringResource(id = R.string.label_screen_name, res.screenName), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8))
-                            Text(text = stringResource(id = R.string.label_match_score, res.matchPercentage, res.totalMatched, res.totalExpected), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
-                            if (res.missingTexts.isNotEmpty()) {
-                                Text(text = stringResource(id = R.string.label_missing_texts, res.missingTexts.take(3).joinToString(", ")), fontSize = 10.5.sp, color = Color(0xFFEF4444))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Technical Audit PDF Report Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(stringResource(id = R.string.header_pdf_audit_report), color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    stringResource(id = R.string.desc_pdf_audit_report),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Button(
-                    onClick = {
-                        val checkupRunner = com.lucasdeeiroz.robotrunner.checkup.HardwareCheckupRunner(context)
-                        val checkupResult = checkupRunner.runLocalCheckup()
-                        val pdfGen = com.lucasdeeiroz.robotrunner.checkup.PdfReportGenerator(context)
-                        val file = pdfGen.generatePdfReport(checkupResult, uiTextResult)
-                        generatedPdfFile = file
-                        if (file != null) {
-                            Toast.makeText(context, context.getString(R.string.msg_pdf_report_generated, file.name), Toast.LENGTH_LONG).show()
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text(stringResource(id = R.string.btn_generate_pdf_audit), fontWeight = FontWeight.Bold)
-                }
-
-                generatedPdfFile?.let { pdfFile ->
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedButton(
-                        onClick = {
-                            try {
-                                val uri = androidx.core.content.FileProvider.getUriForFile(
-                                    context,
-                                    "${context.packageName}.fileprovider",
-                                    pdfFile
-                                )
-                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "application/pdf"
-                                    putExtra(Intent.EXTRA_STREAM, uri)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }
-                                context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.btn_share_audit_pdf)))
-                            } catch (e: Exception) {
-                                Toast.makeText(context, context.getString(R.string.msg_error_opening_pdf, e.message ?: ""), Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8))
-                    ) {
-                        Text(stringResource(id = R.string.btn_share_pdf_report), fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-
-        // Display Test Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(stringResource(id = R.string.header_display_calibration), color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    stringResource(id = R.string.desc_display_calibration),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-                OutlinedButton(
-                    onClick = onLaunchDisplayTest,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8))
-                ) {
-                    Text(stringResource(id = R.string.btn_launch_display_test), fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-    }
-}
 
 data class PillTabItem(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 

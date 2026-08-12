@@ -549,6 +549,17 @@ class CompanionHttpServer(
 
             "/device/info" -> buildDeviceInfoPayload()
 
+            "/hardware/interactive-tests" -> {
+                val results = com.lucasdeeiroz.robotrunner.hardware.InteractiveHardwareTester.testResults.value
+                val json = JsonObject()
+                results.forEach { (key, passed) ->
+                    if (passed != null) {
+                        json.addProperty(key, passed)
+                    }
+                }
+                json
+            }
+
             "/hardware/additional-specs" -> {
                 if (method == Method.POST) {
                     try {

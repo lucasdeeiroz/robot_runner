@@ -6,7 +6,7 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { tempDir, join } from '@tauri-apps/api/path';
 import { Button } from '@/components/atoms/Button';
-import { Upload, ShieldCheck, CheckCircle2, XCircle, Search, FileText, ListPlus, Info, Download, Filter, FilterX, Play, Plus, Trash2, Edit3, Tv, Check } from 'lucide-react';
+import { Upload, ShieldCheck, CheckCircle2, XCircle, Search, FileText, ListPlus, Info, Download, Filter, FilterX, Play, Plus, Trash2, Edit3, Tv, Check, Smartphone } from 'lucide-react';
 import { Section } from '@/components/organisms/Section';
 import { Modal } from '@/components/organisms/Modal';
 import { ActionCard } from '@/components/atoms/ActionCard';
@@ -194,6 +194,7 @@ interface CheckupCacheEntry {
     additionalCheckResults: Record<string, any>;
     packageComparisons: PackageComparison[];
     uiTextChecks?: UiTextCheckConfig[];
+    interactiveTestResults?: Record<string, boolean | null>;
 }
 const checkupCacheMap = new Map<string, CheckupCacheEntry>();
 
@@ -286,6 +287,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
 
     const [additionalCheckResults, setAdditionalCheckResults] = useState<Record<string, { status: 'idle' | 'running' | 'done', found?: string, goldenExpected?: string, isGoldenMatch?: boolean }>>(() => cachedCheckup?.additionalCheckResults ?? {});
     const [packageComparisons, setPackageComparisons] = useState<PackageComparison[]>(() => cachedCheckup?.packageComparisons ?? []);
+    const [interactiveTestResults, setInteractiveTestResults] = useState<Record<string, boolean | null>>(() => cachedCheckup?.interactiveTestResults ?? {});
 
     // UI Text / Screen Checks state.
     // Definitions (name/activity/delay/enabled/expectedTexts) may come from the global localStorage
@@ -362,7 +364,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                 ...(c.specs || {})
                             };
                             setDevicePropsCache(prev => ({ ...prev, ...newProps }));
-                            
+
                             setComparisons(prev => {
                                 const newComps = [...prev];
                                 let changed = false;
@@ -386,15 +388,15 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                             if (existingComp.isExtra) return false;
                                             const existingValLower = existingComp.found.toLowerCase();
                                             if (!existingValLower) return false;
-                                            
+
                                             if (existingValLower === valLower) return true;
-                                            
+
                                             // Handle special case for Android Version like "16 (API 36)"
                                             if (existingComp.key === 'ro.build.version.release' && valLower.startsWith(existingValLower + ' (api')) return true;
-                                            
+
                                             // Handle special case for Board/Hardware which might just be lowercase match
                                             if ((existingComp.key === 'ro.board.platform' || existingComp.key === 'ro.boot.hardware') && existingValLower === valLower) return true;
-                                            
+
                                             return false;
                                         });
 
@@ -414,7 +416,15 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                             });
                         }
                     }
-                } catch (e) {}
+                } catch (e) { }
+
+                try {
+                    const interactiveResp = await fetch('http://127.0.0.1:9876/hardware/interactive-tests');
+                    if (interactiveResp.ok) {
+                        const results = await interactiveResp.json();
+                        setInteractiveTestResults(results);
+                    }
+                } catch (e) { }
             };
             syncCompanionSpecs();
             const interval = setInterval(syncCompanionSpecs, 10000);
@@ -431,10 +441,11 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 checkResults,
                 additionalCheckResults,
                 packageComparisons,
-                uiTextChecks
+                uiTextChecks,
+                interactiveTestResults
             });
         }
-    }, [selectedDevice, comparisons, devicePropsCache, checkResults, additionalCheckResults, packageComparisons, uiTextChecks]);
+    }, [selectedDevice, comparisons, devicePropsCache, checkResults, additionalCheckResults, packageComparisons, uiTextChecks, interactiveTestResults]);
 
     const runSingleUiTextCheck = async (check: UiTextCheckConfig) => {
         if (!selectedDevice) return;
@@ -1453,6 +1464,35 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                         <td class="${statusClass}">${statusText}</td>
                                     </tr>
                             `;
+                });
+                html += `</tbody></table></div>`;
+            }
+
+            const interactiveKeys = Object.keys(interactiveTestResults);
+            if (interactiveKeys.length > 0) {
+                html += `
+                <div class="section">
+                    <div class="section-header">${t('toolbox.checkup.interactive_tests', 'Interactive Hardware Tests')}</div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>${t('toolbox.checkup.test', 'Test')}</th>
+                                <th>${t('toolbox.checkup.status', 'Status')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                interactiveKeys.forEach(key => {
+                    const passed = interactiveTestResults[key];
+                    const statusText = passed === true ? t('common.passed', 'Passed') : (passed === false ? t('common.failed', 'Failed') : t('common.waiting', 'Waiting'));
+                    const statusClass = passed === true ? 'success' : (passed === false ? 'error' : 'info');
+                    const testName = t(`toolbox.checkup.test_${key}`, key.charAt(0).toUpperCase() + key.slice(1));
+                    html += `
+                            <tr>
+                                <td><strong>${testName}</strong></td>
+                                <td class="${statusClass}">${statusText}</td>
+                            </tr>
+                    `;
                 });
                 html += `</tbody></table></div>`;
             }
@@ -2477,6 +2517,42 @@ ${html}`;
                                 )}
                             </div>
                         ))}
+                    </Section>
+
+                    {/* Interactive Hardware Tests */}
+                    <Section
+                        title={t('toolbox.checkup.interactive_tests', 'Interactive Hardware Tests')}
+                        icon={Smartphone}
+                        className="flex-1 flex flex-col min-h-[300px] xl:min-h-0 overflow-hidden"
+                        contentClassName="flex-1 overflow-y-auto pr-2 space-y-3 min-h-0"
+                        actions={
+                            <div className="text-xs text-on-surface-variant flex items-center gap-2">
+                                {companionStatus === 'connected' ? (
+                                    <><span className="w-2 h-2 rounded-full bg-success animate-pulse"></span> {t('toolbox.checkup.live_sync', 'Live Sync')}</>
+                                ) : (
+                                    <><span className="w-2 h-2 rounded-full bg-error"></span> {t('toolbox.checkup.offline', 'Offline')}</>
+                                )}
+                            </div>
+                        }
+                    >
+                        {Object.keys(interactiveTestResults).length === 0 ? (
+                            <div className="text-sm text-on-surface-variant py-4 text-center border border-dashed border-outline-variant rounded-md bg-surface/30">
+                                {t('toolbox.checkup.no_interactive_tests', 'No interactive tests executed yet. Run them on the Companion app.')}
+                            </div>
+                        ) : (
+                            Object.entries(interactiveTestResults).map(([key, passed]) => (
+                                <div key={key} className="flex flex-col gap-2 p-3 rounded-md bg-surface border border-outline-variant hover:border-outline/50 transition-colors">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium text-on-surface">
+                                            {t(`toolbox.checkup.test_${key}`, key.charAt(0).toUpperCase() + key.slice(1))}
+                                        </span>
+                                        {passed === true && <span className="text-xs px-2 py-1 bg-success/10 text-success border border-success/20 rounded-md">{t('common.passed', 'Passed')}</span>}
+                                        {passed === false && <span className="text-xs px-2 py-1 bg-error/10 text-error border border-error/20 rounded-md">{t('common.failed', 'Failed')}</span>}
+                                        {passed === null && <span className="text-xs px-2 py-1 bg-warning/10 text-warning border border-warning/20 rounded-md">{t('common.waiting', 'Waiting')}</span>}
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </Section>
                 </div>
 

@@ -30,7 +30,7 @@
 
     <!-- Phase 1 Strings (ES) -->
     <string name="tab_dashboard">Panel</string>
-    <string name="tab_hardware_specs">Especificaciones</string>
+    <string name="tab_checkup">Checkup</string>
     <string name="tab_diagnostics">Diagnósticos</string>
     <string name="label_rest_server">Servidor RR</string>
     <string name="status_port_active">Puerto %1$d Activo</string>
@@ -388,4 +388,30 @@
     <string name="msg_waiting_keywords">Esperando palabras clave...</string>
     <string name="label_keyword_format">Palabra clave: %1$s</string>
     <string name="msg_no_stopwatch_session">Ninguna sesión de cronómetro en ejecución.</string>
+    <string name="header_golden_json">Golden JSON (Hardware)</string>
+    <string name="desc_golden_json">Exportar especificaciones de hardware y paquetes instalados como un Golden File JSON para comparar con el Desktop.</string>
+    <string name="msg_golden_saved">Golden File guardado como %1$s</string>
+    <string name="msg_golden_error">Error al exportar Golden File</string>
+
+    <string name="header_interactive_tests">Pruebas Interactivas de Hardware</string>
+    <string name="desc_interactive_tests">Ejecutar diagnósticos en componentes físicos.</string>
+    <string name="test_scanner">Escáner</string>
+    <string name="test_screen_pixels">Colores de Pantalla</string>
+    <string name="test_touch_screen">Táctil de Pantalla</string>
+    <string name="test_vibration">Vibración</string>
+    <string name="test_camera_flash">Flash de Cámara</string>
+    <string name="test_audio_speaker">Altavoz</string>
+    <string name="test_microphone">Micrófono</string>
+    <string name="test_pos_printer">Impresora POS</string>
+    <string name="dialog_test_pass_title">¿Pasó la prueba?</string>
+    <string name="dialog_test_pass_desc">Confirme si el componente %1$s se comportó correctamente.</string>
+    <string name="btn_pass">Pasó</string>
+    <string name="btn_fail">Falló</string>
+    <string name="status_passed">Aprobado</string>
+    <string name="status_failed">Reprobado</string>
+    <string name="status_waiting">Esperando</string>
+    <string name="btn_test">Probar</string>
+    <string name="msg_recording_audio">Grabando 3 segundos...</string>
+    <string name="msg_playing_audio">Reproduciendo...</string>
+    <string name="msg_failed_mic">Fallo al iniciar el micrófono</string>
 </resources>
