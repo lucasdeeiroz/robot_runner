@@ -428,18 +428,18 @@ class CompanionHttpServer(
             "/stopwatch/scanner/action" -> {
                 if (session.method == Method.POST) {
                     try {
-                        val body = mutableMapOf<String, String>()
-                        session.parseBody(body)
-                        val jsonStr = body["postData"]
+                        val jsonStr = safeGetPostBody(session)
                         val json = gson.fromJson(jsonStr, JsonObject::class.java)
                         val action = json.get("action")?.asString
+                        
                         val engine = com.lucasdeeiroz.robotrunner.stopwatch.ScannerStopwatchEngine
-
+                        
                         when (action) {
                             "clearLaps" -> engine.clearLaps()
                         }
+                        
                         JsonObject().apply { addProperty("status", "ok") }
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         JsonObject().apply {
                             addProperty("status", "error")
                             addProperty("message", e.message)
@@ -451,12 +451,20 @@ class CompanionHttpServer(
             }
 
             "/stopwatch/scanner/laps" -> {
-                val engine = com.lucasdeeiroz.robotrunner.stopwatch.ScannerStopwatchEngine
-                JsonObject().apply {
-                    addProperty("status", "ok")
-                    add("laps", gson.toJsonTree(engine.getLapsSnapshot()))
-                    add("pendingLap", gson.toJsonTree(engine.pendingLap))
-                    addProperty("isScanning", engine.isScanning)
+                try {
+                    val engine = com.lucasdeeiroz.robotrunner.stopwatch.ScannerStopwatchEngine
+                    JsonObject().apply {
+                        addProperty("status", "ok")
+                        add("laps", gson.toJsonTree(engine.getLapsSnapshot()))
+                        add("pendingLap", gson.toJsonTree(engine.pendingLap))
+                        addProperty("isScanning", engine.isScanning)
+                    }
+                } catch (e: Throwable) {
+                    JsonObject().apply {
+                        addProperty("status", "ok")
+                        add("laps", gson.toJsonTree(emptyList<Any>()))
+                        addProperty("isScanning", false)
+                    }
                 }
             }
 
@@ -539,7 +547,39 @@ class CompanionHttpServer(
                 }
             }
 
-            "/device/info" -> getDeviceInfoPayload()
+            "/device/info" -> buildDeviceInfoPayload()
+
+            "/hardware/additional-specs" -> {
+                if (method == Method.POST) {
+                    try {
+                        val jsonStr = safeGetPostBody(session)
+                        val json = gson.fromJson(jsonStr, JsonObject::class.java)
+                        
+                        val additionalSpecs = mutableMapOf<String, String>()
+                        json.entrySet().forEach { (key, value) ->
+                            if (!value.isJsonNull) {
+                                additionalSpecs[key] = value.asString
+                            }
+                        }
+                        com.lucasdeeiroz.robotrunner.hardware.HardwareSpecsProvider.updateAdditionalSpecs(additionalSpecs)
+
+                        JsonObject().apply {
+                            addProperty("status", "ok")
+                            addProperty("message", "Additional specs updated")
+                        }
+                    } catch (e: Exception) {
+                        JsonObject().apply {
+                            addProperty("status", "error")
+                            addProperty("message", e.message ?: "Failed to parse additional specs body")
+                        }
+                    }
+                } else {
+                    JsonObject().apply {
+                        addProperty("status", "error")
+                        addProperty("message", "Method not allowed")
+                    }
+                }
+            }
 
             "/checkup/run" -> {
                 val result = checkupRunner.runLocalCheckup()
@@ -695,15 +735,27 @@ class CompanionHttpServer(
             }
         }
 
-        val res = newFixedLengthResponse(
-            Response.Status.OK,
-            "application/json",
-            gson.toJson(responseJson)
-        )
-        res.addHeader("Access-Control-Allow-Origin", "*")
-        res.addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        res.addHeader("Access-Control-Allow-Headers", "Content-Type")
-        return res
+        val response = newFixedLengthResponse(Response.Status.OK, "application/json", gson.toJson(responseJson))
+        
+        response.addHeader("Access-Control-Allow-Origin", "*")
+        response.addHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        response.addHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        
+        return response
+    }
+    
+    private fun safeGetPostBody(session: IHTTPSession): String? {
+        val map = mutableMapOf<String, String>()
+        session.parseBody(map)
+        val postData = map["postData"] ?: return null
+        if (postData.trimStart().startsWith("{") || postData.trimStart().startsWith("[")) {
+            return postData
+        }
+        val file = java.io.File(postData)
+        if (file.exists() && file.isFile) {
+            return file.readText(Charsets.UTF_8)
+        }
+        return postData
     }
 
     private fun buildDeviceInfoPayload(): JsonObject {
@@ -719,6 +771,14 @@ class CompanionHttpServer(
             val serial = try { Build.getSerial() } catch (e: Throwable) { Build.SERIAL }
             addProperty("serial", serial)
             addProperty("isAccessibilityEnabled", CompanionAccessibilityService.isRunning)
+
+            val specsObj = JsonObject()
+            com.lucasdeeiroz.robotrunner.hardware.HardwareSpecsProvider.getDetailedSpecs(context).forEach { category ->
+                category.items.forEach { item ->
+                    specsObj.addProperty(item.label, item.value)
+                }
+            }
+            add("specs", specsObj)
 
             // Battery Info
             val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager

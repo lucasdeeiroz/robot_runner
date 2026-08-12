@@ -51,6 +51,7 @@ import com.lucasdeeiroz.robotrunner.ui.components.tabs.home.ConnectSubTab
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.PerformanceSubTab
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.CommandsSubTab
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.StopwatchSubTab
+import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.HardwareSpecsSubTab
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.draw.clip
@@ -396,7 +397,7 @@ fun HomePage(
                             2 -> StopwatchSubTab()
                             3 -> CommandsSubTab()
                             4 -> AppsSubTab()
-                            5 -> HardwareSpecsTabContent(detailedSpecs = detailedSpecs)
+                            5 -> HardwareSpecsSubTab(detailedSpecs = detailedSpecs)
                             6 -> DiagnosticsTabContent(
                                 onRunOfflineCheckup = onRunOfflineCheckup,
                                 onLaunchDisplayTest = onLaunchDisplayTest
@@ -435,85 +436,6 @@ fun GaugeCard(
     }
 }
 
-@Composable
-fun HardwareSpecsTabContent(detailedSpecs: List<HardwareSpecCategory>) {
-    LazyColumn(
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-        contentPadding = PaddingValues(bottom = 24.dp)
-    ) {
-        items(detailedSpecs) { category ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = category.categoryName,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF38BDF8)
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    category.items.forEachIndexed { index, item ->
-                        // Heuristic: if combined text is long, stack vertically
-                        val shouldStack = (item.label.length + item.value.length) > 45
-
-                        if (shouldStack) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = item.label,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 12.sp
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = item.value,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    textAlign = TextAlign.End
-                                )
-                            }
-                        } else {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = item.label,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 12.sp,
-                                    modifier = Modifier.weight(1f, fill = false)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = item.value,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    textAlign = TextAlign.End
-                                )
-                            }
-                        }
-
-                        if (index < category.items.size - 1) {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 4.dp))
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun DiagnosticsTabContent(

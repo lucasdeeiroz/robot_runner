@@ -228,7 +228,7 @@ fun AppsSubTab() {
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                contentColor = Color.White
                             )
                         ) {
                             Text(text = stringResource(id = R.string.action_launch_app), fontSize = 12.sp)
@@ -271,8 +271,8 @@ fun AppsSubTab() {
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondary,
-                                contentColor = MaterialTheme.colorScheme.onSecondary
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.secondary
                             )
                         ) {
                             Text(text = stringResource(id = R.string.action_backup_apk), fontSize = 11.sp)
@@ -286,8 +286,8 @@ fun AppsSubTab() {
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.tertiary,
-                                contentColor = MaterialTheme.colorScheme.onTertiary
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.tertiary
                             )
                         ) {
                             Text(text = stringResource(id = R.string.action_share_apk), fontSize = 11.sp)
@@ -302,8 +302,8 @@ fun AppsSubTab() {
                             },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.error,
-                                contentColor = MaterialTheme.colorScheme.onError
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.error
                             )
                         ) {
                             Text(text = stringResource(id = R.string.action_uninstall_app), fontSize = 12.sp)

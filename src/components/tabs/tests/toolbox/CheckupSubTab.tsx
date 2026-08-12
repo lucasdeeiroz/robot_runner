@@ -324,6 +324,104 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         localStorage.setItem('checkup_uiTextChecks', JSON.stringify(uiTextChecks.map(toPersistableUiTextCheck)));
     }, [uiTextChecks]);
 
+    // Push additional specs to Companion Server
+    useEffect(() => {
+        if (companionStatus === 'connected' && Object.keys(additionalCheckResults).length > 0) {
+            const payload: Record<string, string> = {};
+            for (const [key, result] of Object.entries(additionalCheckResults)) {
+                if (result.status === 'done' && result.found && result.found !== t('toolbox.checkup.not_found', 'Not found')) {
+                    payload[key] = result.found;
+                }
+            }
+            if (Object.keys(payload).length > 0) {
+                fetch('http://127.0.0.1:9876/hardware/additional-specs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                    body: JSON.stringify(payload)
+                }).catch(e => console.error("Failed to push additional specs to Companion", e));
+            }
+        }
+    }, [additionalCheckResults, companionStatus, t]);
+
+    // Auto-sync hardware specs from Companion
+    useEffect(() => {
+        if (companionStatus === 'connected' && selectedDevice) {
+            const syncCompanionSpecs = async () => {
+                try {
+                    const resp = await fetch('http://127.0.0.1:9876/device/info');
+                    if (resp.ok) {
+                        const c = await resp.json();
+                        if (c.status === 'ok') {
+                            const newProps: Record<string, string> = {
+                                'ro.product.manufacturer': c.manufacturer || '',
+                                'ro.product.model': c.model || '',
+                                'ro.product.brand': c.brand || '',
+                                'ro.build.version.release': c.androidVersion || '',
+                                'ro.build.version.sdk': String(c.sdkInt || ''),
+                                'ro.serialno': c.serial || '',
+                                ...(c.specs || {})
+                            };
+                            setDevicePropsCache(prev => ({ ...prev, ...newProps }));
+                            
+                            setComparisons(prev => {
+                                const newComps = [...prev];
+                                let changed = false;
+
+                                for (const [key, value] of Object.entries(newProps)) {
+                                    const existingIdx = newComps.findIndex(comp => comp.key === key);
+                                    if (existingIdx >= 0) {
+                                        if (newComps[existingIdx].found !== value) {
+                                            newComps[existingIdx] = {
+                                                ...newComps[existingIdx],
+                                                found: value,
+                                                isMatch: newComps[existingIdx].expected === value
+                                            };
+                                            changed = true;
+                                        }
+                                    } else if (c.specs && c.specs[key] !== undefined) {
+                                        // Automatically append companion-specific specs if not in list
+                                        // But prevent duplication if a base property with the exact same value is already present
+                                        const valLower = value.toLowerCase();
+                                        const isDuplicate = newComps.some(existingComp => {
+                                            if (existingComp.isExtra) return false;
+                                            const existingValLower = existingComp.found.toLowerCase();
+                                            if (!existingValLower) return false;
+                                            
+                                            if (existingValLower === valLower) return true;
+                                            
+                                            // Handle special case for Android Version like "16 (API 36)"
+                                            if (existingComp.key === 'ro.build.version.release' && valLower.startsWith(existingValLower + ' (api')) return true;
+                                            
+                                            // Handle special case for Board/Hardware which might just be lowercase match
+                                            if ((existingComp.key === 'ro.board.platform' || existingComp.key === 'ro.boot.hardware') && existingValLower === valLower) return true;
+                                            
+                                            return false;
+                                        });
+
+                                        if (!isDuplicate) {
+                                            newComps.push({
+                                                key,
+                                                expected: t('toolbox.checkup.not_found', 'Not found'),
+                                                found: value,
+                                                isMatch: false,
+                                                isExtra: true
+                                            });
+                                            changed = true;
+                                        }
+                                    }
+                                }
+                                return changed ? newComps : prev;
+                            });
+                        }
+                    }
+                } catch (e) {}
+            };
+            syncCompanionSpecs();
+            const interval = setInterval(syncCompanionSpecs, 10000);
+            return () => clearInterval(interval);
+        }
+    }, [companionStatus, selectedDevice, t]);
+
     // Sync cache on change
     useEffect(() => {
         if (selectedDevice) {
@@ -711,6 +809,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                             'ro.build.version.release': c.androidVersion || '',
                             'ro.build.version.sdk': String(c.sdkInt || ''),
                             'ro.serialno': c.serial || '',
+                            ...(c.specs || {})
                         };
                         try {
                             const deviceOutput: string = await invoke('run_adb_command', {
@@ -930,8 +1029,9 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 const expectedProps = parsePropsFile(content);
 
                 let currentDeviceProps = devicePropsCache;
-                if (!currentDeviceProps || Object.keys(currentDeviceProps).length === 0) {
-                    currentDeviceProps = await fetchDeviceProperties(selectedDevice);
+                if (!currentDeviceProps || !currentDeviceProps['sys.boot_completed']) {
+                    const fullProps = await fetchDeviceProperties(selectedDevice);
+                    currentDeviceProps = { ...currentDeviceProps, ...fullProps };
                     setDevicePropsCache(currentDeviceProps);
                 }
 
@@ -976,8 +1076,9 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         setIsLoading(true);
         try {
             let currentDeviceProps = devicePropsCache;
-            if (!currentDeviceProps || Object.keys(currentDeviceProps).length === 0) {
-                currentDeviceProps = await fetchDeviceProperties(selectedDevice);
+            if (!currentDeviceProps || !currentDeviceProps['sys.boot_completed']) {
+                const fullProps = await fetchDeviceProperties(selectedDevice);
+                currentDeviceProps = { ...currentDeviceProps, ...fullProps };
                 setDevicePropsCache(currentDeviceProps);
             }
 
@@ -1104,8 +1205,9 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         if (!selectedDevice) return null;
         try {
             let currentDeviceProps = devicePropsCache;
-            if (!currentDeviceProps || Object.keys(currentDeviceProps).length === 0) {
-                currentDeviceProps = await fetchDeviceProperties(selectedDevice);
+            if (!currentDeviceProps || !currentDeviceProps['sys.boot_completed']) {
+                const fullProps = await fetchDeviceProperties(selectedDevice);
+                currentDeviceProps = { ...currentDeviceProps, ...fullProps };
                 setDevicePropsCache(currentDeviceProps);
             }
 
@@ -1472,12 +1574,13 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         try {
             // Fetch everything we need
             let currentDeviceProps = devicePropsCache;
-            if (!currentDeviceProps || Object.keys(currentDeviceProps).length === 0) {
+            if (!currentDeviceProps || !currentDeviceProps['sys.boot_completed']) {
                 const deviceOutput: string = await invoke('run_adb_command', {
                     device: selectedDevice,
                     args: ['shell', 'getprop']
                 });
-                currentDeviceProps = parseDeviceProps(deviceOutput);
+                const fullProps = parseDeviceProps(deviceOutput);
+                currentDeviceProps = { ...currentDeviceProps, ...fullProps };
                 setDevicePropsCache(currentDeviceProps);
             }
 

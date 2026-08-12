@@ -70,7 +70,8 @@
     <string name="spec_resolution">Resolution</string>
     <string name="spec_density">Density DPI</string>
     <string name="spec_refresh_rate">Refresh Rate</string>
-    <string name="category_memory_storage">Memory &amp; Internal Storage</string>
+    <string name="category_memory_storage">Memory &amp; Storage</string>
+    <string name="category_network_extra">Network &amp; Extra</string>
     <string name="spec_total_ram">Total RAM</string>
     <string name="spec_low_mem_threshold">Low Memory Threshold</string>
     <string name="spec_total_storage">Total Internal Storage</string>
@@ -113,6 +114,16 @@
     <string name="perm_granted">GRANTED</string>
     <string name="perm_denied">DENIED</string>
     <string name="no_requested_permissions">No requested permissions.</string>
+
+    <!-- Hardware Specs Formats -->
+    <string name="spec_cores_format">%1$d Cores</string>
+    <string name="spec_hz_format">%1$d Hz</string>
+    <string name="spec_gb_format">%.2f GB</string>
+    <string name="spec_mb_format">%1$d MB</string>
+    <string name="spec_px_format">%1$d x %2$d px</string>
+    <string name="spec_dpi_format">%1$d dpi (%2$.2fx)</string>
+    <string name="spec_sensor_type">Type %1$d</string>
+
     <string name="sort_by_name">Sort: Name</string>
     <string name="sort_by_package">Sort: Package</string>
     <string name="shell_header_templates">Command Templates</string>

@@ -23,9 +23,18 @@ import com.lucasdeeiroz.robotrunner.model.HardwareSpecItem
 import com.lucasdeeiroz.robotrunner.model.LiveTelemetry
 import com.lucasdeeiroz.robotrunner.service.CompanionAccessibilityService
 import java.io.RandomAccessFile
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlin.math.roundToInt
 
 object HardwareSpecsProvider {
+    
+    private val _additionalSpecsFlow = MutableStateFlow<Map<String, String>>(emptyMap())
+    val additionalSpecsFlow = _additionalSpecsFlow.asStateFlow()
+
+    fun updateAdditionalSpecs(map: Map<String, String>) {
+        _additionalSpecsFlow.value = map
+    }
 
     private var lastCpuTime: Long = 0
     private var lastIdleTime: Long = 0
@@ -88,7 +97,7 @@ object HardwareSpecsProvider {
         )
     }
 
-    fun getDetailedSpecs(context: Context): List<HardwareSpecCategory> {
+    fun getDetailedSpecs(context: Context, additionalSpecs: Map<String, String> = emptyMap()): List<HardwareSpecCategory> {
         val categories = mutableListOf<HardwareSpecCategory>()
 
         // 1. Device Identity & OS
@@ -115,7 +124,7 @@ object HardwareSpecsProvider {
                 items = listOf(
                     HardwareSpecItem(context.getString(R.string.spec_soc_hardware), Build.HARDWARE),
                     HardwareSpecItem(context.getString(R.string.spec_board), Build.BOARD),
-                    HardwareSpecItem(context.getString(R.string.spec_cpu_cores), "$cpuCores Cores"),
+                    HardwareSpecItem(context.getString(R.string.spec_cpu_cores), context.getString(R.string.spec_cores_format, cpuCores)),
                     HardwareSpecItem(context.getString(R.string.spec_supported_abis), abis)
                 )
             )
@@ -133,9 +142,9 @@ object HardwareSpecsProvider {
             HardwareSpecCategory(
                 categoryName = context.getString(R.string.category_display),
                 items = listOf(
-                    HardwareSpecItem(context.getString(R.string.spec_resolution), "${metrics.widthPixels} x ${metrics.heightPixels} px"),
-                    HardwareSpecItem(context.getString(R.string.spec_density), "${metrics.densityDpi} dpi (${metrics.density}x)"),
-                    HardwareSpecItem(context.getString(R.string.spec_refresh_rate), "$refreshRate Hz")
+                    HardwareSpecItem(context.getString(R.string.spec_resolution), context.getString(R.string.spec_px_format, metrics.widthPixels, metrics.heightPixels)),
+                    HardwareSpecItem(context.getString(R.string.spec_density), context.getString(R.string.spec_dpi_format, metrics.densityDpi, metrics.density)),
+                    HardwareSpecItem(context.getString(R.string.spec_refresh_rate), context.getString(R.string.spec_hz_format, refreshRate))
                 )
             )
         )
@@ -146,16 +155,16 @@ object HardwareSpecsProvider {
         am?.getMemoryInfo(memoryInfo)
         val statFs = StatFs(Environment.getDataDirectory().path)
 
-        val totalRamGb = String.format("%.2f GB", memoryInfo.totalMem.toDouble() / (1024 * 1024 * 1024))
-        val totalStorageGb = String.format("%.2f GB", (statFs.blockCountLong * statFs.blockSizeLong).toDouble() / (1024 * 1024 * 1024))
-        val availStorageGb = String.format("%.2f GB", (statFs.availableBlocksLong * statFs.blockSizeLong).toDouble() / (1024 * 1024 * 1024))
+        val totalRamGb = String.format(java.util.Locale.getDefault(), context.getString(R.string.spec_gb_format), memoryInfo.totalMem.toDouble() / (1024 * 1024 * 1024))
+        val totalStorageGb = String.format(java.util.Locale.getDefault(), context.getString(R.string.spec_gb_format), (statFs.blockCountLong * statFs.blockSizeLong).toDouble() / (1024 * 1024 * 1024))
+        val availStorageGb = String.format(java.util.Locale.getDefault(), context.getString(R.string.spec_gb_format), (statFs.availableBlocksLong * statFs.blockSizeLong).toDouble() / (1024 * 1024 * 1024))
 
         categories.add(
             HardwareSpecCategory(
                 categoryName = context.getString(R.string.category_memory_storage),
                 items = listOf(
                     HardwareSpecItem(context.getString(R.string.spec_total_ram), totalRamGb),
-                    HardwareSpecItem(context.getString(R.string.spec_low_mem_threshold), "${memoryInfo.threshold / (1024 * 1024)} MB"),
+                    HardwareSpecItem(context.getString(R.string.spec_low_mem_threshold), context.getString(R.string.spec_mb_format, memoryInfo.threshold / (1024 * 1024))),
                     HardwareSpecItem(context.getString(R.string.spec_total_storage), totalStorageGb),
                     HardwareSpecItem(context.getString(R.string.spec_free_storage), availStorageGb)
                 )
@@ -170,7 +179,7 @@ object HardwareSpecsProvider {
             HardwareSpecItem(context.getString(R.string.spec_active_sensors), context.getString(R.string.sensors_registered_format, sensors.size))
         )
         sensors.forEach { sensor ->
-            sensorItems.add(HardwareSpecItem("Type ${sensor.type}", sensor.name))
+            sensorItems.add(HardwareSpecItem(context.getString(R.string.spec_sensor_type, sensor.type), sensor.name))
         }
         categories.add(
             HardwareSpecCategory(
@@ -178,6 +187,22 @@ object HardwareSpecsProvider {
                 items = sensorItems
             )
         )
+
+        // 6. Additional Specs (from Desktop via REST)
+        if (additionalSpecs.isNotEmpty()) {
+            val extraItems = additionalSpecs.map { (key, value) ->
+                val formattedKey = key.split("_").joinToString(" ") { 
+                    it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase(java.util.Locale.getDefault()) else char.toString() } 
+                }
+                HardwareSpecItem(formattedKey, value)
+            }
+            categories.add(
+                HardwareSpecCategory(
+                    categoryName = context.getString(R.string.category_network_extra),
+                    items = extraItems
+                )
+            )
+        }
 
         return categories
     }

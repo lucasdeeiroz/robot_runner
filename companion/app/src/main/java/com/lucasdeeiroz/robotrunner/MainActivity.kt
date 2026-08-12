@@ -117,7 +117,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            val detailedSpecs = remember { HardwareSpecsProvider.getDetailedSpecs(this@MainActivity) }
+            val additionalSpecs by HardwareSpecsProvider.additionalSpecsFlow.collectAsState()
+            val detailedSpecs = remember(additionalSpecs) { HardwareSpecsProvider.getDetailedSpecs(this@MainActivity, additionalSpecs) }
 
             HomePage(
                 isServerRunning = isServerRunning,
