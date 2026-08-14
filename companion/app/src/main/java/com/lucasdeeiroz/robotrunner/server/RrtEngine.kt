@@ -2,24 +2,76 @@ package com.lucasdeeiroz.robotrunner.server
 
 import android.content.Context
 import android.content.Intent
+import android.os.Environment
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.lucasdeeiroz.robotrunner.service.CompanionAccessibilityService
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
-
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.io.File
+import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+data class RrtStep(
+    val keyword: String,
+    val args: List<String> = emptyList(),
+    val actions: List<JsonObject> = emptyList(),
+    var status: String = "PENDING", // PENDING, RUNNING, PASSED, FAILED, SKIPPED
+    var durationMs: Long = 0,
+    var errorMessage: String? = null
+)
+
+data class RrtTestCase(
+    val name: String,
+    val setup: List<JsonObject> = emptyList(),
+    val steps: List<RrtStep> = emptyList(),
+    val teardown: List<JsonObject> = emptyList(),
+    var status: String = "NOT_STARTED", // NOT_STARTED, RUNNING, PASSED, FAILED
+    var durationMs: Long = 0
+)
+
+data class RrtExecutionReport(
+    val reportId: String,
+    val suiteName: String,
+    val targetPackage: String,
+    val startTime: Long,
+    val endTime: Long,
+    val totalScenarios: Int,
+    val passedScenarios: Int,
+    val failedScenarios: Int,
+    val testCases: List<RrtTestCase>,
+    val logs: List<String>
+)
+
+data class RrtSavedSuite(
+    val id: String,
+    val name: String,
+    val targetPackage: String,
+    val testCases: List<RrtTestCase>,
+    val rawJson: JsonObject,
+    val filePath: String,
+    val lastModified: Long,
+    var lastReport: RrtExecutionReport? = null
+)
 
 object RrtEngine {
     private const val TAG = "RrtEngine"
+    private val gson: Gson = GsonBuilder().setPrettyPrinting().create()
 
     val logsFlow = MutableStateFlow<List<String>>(emptyList())
     val isRunningFlow = MutableStateFlow(false)
     val currentSuiteFlow = MutableStateFlow<String?>(null)
     val lastExitCodeFlow = MutableStateFlow<Int?>(null)
+    val savedSuitesFlow = MutableStateFlow<List<RrtSavedSuite>>(emptyList())
+
+    private var executionJob: Job? = null
 
     fun clearLogs() {
         logsFlow.value = emptyList()
@@ -27,11 +79,464 @@ object RrtEngine {
         currentSuiteFlow.value = null
     }
 
+    fun saveSuiteReport(context: Context, suiteName: String, report: RrtExecutionReport) {
+        try {
+            val safeName = suiteName.replace("[^a-zA-Z0-9_\\-]".toRegex(), "_")
+            val internalDir = File(context.filesDir, "rrt_suites")
+            if (!internalDir.exists()) internalDir.mkdirs()
+
+            val file = File(internalDir, "report_${safeName}.json")
+            FileOutputStream(file).use { out ->
+                out.write(gson.toJson(report).toByteArray())
+            }
+            Log.i(TAG, "Saved last execution report for suite '$suiteName' to: ${file.absolutePath}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save execution report for '$suiteName'", e)
+        }
+    }
+
+    fun loadSuiteReport(context: Context, suiteName: String): RrtExecutionReport? {
+        return try {
+            val safeName = suiteName.replace("[^a-zA-Z0-9_\\-]".toRegex(), "_")
+            val internalDir = File(context.filesDir, "rrt_suites")
+            val file = File(internalDir, "report_${safeName}.json")
+            if (file.exists()) {
+                val jsonStr = file.readText()
+                gson.fromJson(jsonStr, RrtExecutionReport::class.java)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not load report for '$suiteName': ${e.message}")
+            null
+        }
+    }
+
+    fun parseSuiteFromJson(
+        payload: JsonObject,
+        filePath: String = "",
+        lastModified: Long = System.currentTimeMillis(),
+        context: Context? = null
+    ): RrtSavedSuite {
+        val suiteName = payload.get("suite_name")?.asString ?: "RRT Suite"
+        val targetPkg = payload.get("target_package")?.asString ?: ""
+        val testsJson = payload.getAsJsonArray("tests")
+
+        val testCases = mutableListOf<RrtTestCase>()
+        if (testsJson != null) {
+            for (i in 0 until testsJson.size()) {
+                val tObj = testsJson.get(i).asJsonObject
+                val tName = tObj.get("name")?.asString ?: "Test #$i"
+
+                val setupActions = mutableListOf<JsonObject>()
+                tObj.getAsJsonArray("setup")?.forEach { setupActions.add(it.asJsonObject) }
+
+                val teardownActions = mutableListOf<JsonObject>()
+                tObj.getAsJsonArray("teardown")?.forEach { teardownActions.add(it.asJsonObject) }
+
+                val steps = mutableListOf<RrtStep>()
+                tObj.getAsJsonArray("steps")?.forEach { sElem ->
+                    val sObj = sElem.asJsonObject
+                    val keyword = sObj.get("keyword")?.asString ?: "Step"
+                    val args = mutableListOf<String>()
+                    sObj.getAsJsonArray("args")?.forEach { args.add(it.asString) }
+                    val actions = mutableListOf<JsonObject>()
+                    sObj.getAsJsonArray("actions")?.forEach { actions.add(it.asJsonObject) }
+                    steps.add(RrtStep(keyword = keyword, args = args, actions = actions))
+                }
+
+                testCases.add(
+                    RrtTestCase(
+                        name = tName,
+                        setup = setupActions,
+                        steps = steps,
+                        teardown = teardownActions
+                    )
+                )
+            }
+        }
+
+        val report = if (context != null) loadSuiteReport(context, suiteName) else null
+        if (report != null) {
+            for (repTest in report.testCases) {
+                val match = testCases.find { it.name == repTest.name }
+                if (match != null) {
+                    match.status = repTest.status
+                    match.durationMs = repTest.durationMs
+                    for (idx in match.steps.indices) {
+                        if (idx < repTest.steps.size) {
+                            val repStep = repTest.steps[idx]
+                            match.steps[idx].status = repStep.status
+                            match.steps[idx].durationMs = repStep.durationMs
+                            match.steps[idx].errorMessage = repStep.errorMessage
+                        }
+                    }
+                }
+            }
+        }
+
+        val id = "suite_${suiteName.replace("[^a-zA-Z0-9_\\-]".toRegex(), "_")}"
+        return RrtSavedSuite(
+            id = id,
+            name = suiteName,
+            targetPackage = targetPkg,
+            testCases = testCases,
+            rawJson = payload,
+            filePath = filePath,
+            lastModified = lastModified,
+            lastReport = report
+        )
+    }
+
+    fun getSampleSuite(): RrtSavedSuite {
+        val sampleJson = JsonObject().apply {
+            addProperty("suite_name", "Sanity Login & Account Verification")
+            addProperty("target_package", "com.positivo.casainteligente")
+            val tests = JsonArray().apply {
+                val test1 = JsonObject().apply {
+                    addProperty("name", "Validando Login e Acesso ao App")
+                    val steps = JsonArray().apply {
+                        add(JsonObject().apply {
+                            addProperty("keyword", "Dado que inicio o aplicativo")
+                            add("args", JsonArray().apply { add("com.positivo.casainteligente") })
+                            add("actions", JsonArray().apply {
+                                add(JsonObject().apply {
+                                    addProperty("action", "launch_app")
+                                    addProperty("package", "com.positivo.casainteligente")
+                                })
+                            })
+                        })
+                        add(JsonObject().apply {
+                            addProperty("keyword", "Quando aguardo o carregamento da tela")
+                            add("actions", JsonArray().apply {
+                                add(JsonObject().apply {
+                                    addProperty("action", "sleep")
+                                    addProperty("seconds", 2.0f)
+                                })
+                            })
+                        })
+                        add(JsonObject().apply {
+                            addProperty("keyword", "Entao verifico a tela principal")
+                            add("actions", JsonArray().apply {
+                                add(JsonObject().apply {
+                                    addProperty("action", "assert_text")
+                                    addProperty("text", "Entrar")
+                                    addProperty("timeout", 5)
+                                })
+                            })
+                        })
+                    }
+                    add("steps", steps)
+                }
+                add(test1)
+            }
+            add("tests", tests)
+        }
+        return parseSuiteFromJson(sampleJson, "", System.currentTimeMillis(), null)
+    }
+
+    fun saveSuitePayload(context: Context, payload: JsonObject): RrtSavedSuite? {
+        return try {
+            val suiteName = payload.get("suite_name")?.asString ?: "RRT_Suite_${System.currentTimeMillis()}"
+            val safeName = suiteName.replace("[^a-zA-Z0-9_\\-]".toRegex(), "_")
+
+            val internalDir = File(context.filesDir, "rrt_suites")
+            if (!internalDir.exists()) internalDir.mkdirs()
+
+            val file = File(internalDir, "suite_${safeName}.json")
+            FileOutputStream(file).use { out ->
+                out.write(gson.toJson(payload).toByteArray())
+            }
+            Log.i(TAG, "Saved RRT suite internally: ${file.absolutePath}")
+
+            try {
+                val dlDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (dlDir.exists() && dlDir.canWrite()) {
+                    val dlFile = File(dlDir, "suite_${safeName}.json")
+                    FileOutputStream(dlFile).use { out ->
+                        out.write(gson.toJson(payload).toByteArray())
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not copy suite to Downloads: ${e.message}")
+            }
+
+            val saved = parseSuiteFromJson(payload, file.absolutePath, file.lastModified(), context)
+            reloadSavedSuites(context)
+            saved
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save RRT suite", e)
+            null
+        }
+    }
+
+    fun listSavedSuites(context: Context): List<RrtSavedSuite> {
+        val list = mutableListOf<RrtSavedSuite>()
+        val seenNames = mutableSetOf<String>()
+
+        // 1. Check internal storage
+        val internalDir = File(context.filesDir, "rrt_suites")
+        if (internalDir.exists() && internalDir.isDirectory) {
+            internalDir.listFiles()?.forEach { file ->
+                if (file.name.startsWith("suite_") && file.name.endsWith(".json")) {
+                    try {
+                        val content = file.readText()
+                        val json = gson.fromJson(content, JsonObject::class.java)
+                        val suite = parseSuiteFromJson(json, file.absolutePath, file.lastModified(), context)
+                        if (seenNames.add(suite.name)) {
+                            list.add(suite)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error parsing saved suite from ${file.name}", e)
+                    }
+                }
+            }
+        }
+
+        // 2. Check Downloads directory
+        try {
+            val dlDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            if (dlDir.exists() && dlDir.isDirectory) {
+                dlDir.listFiles()?.forEach { file ->
+                    if (file.name.startsWith("suite_") && file.name.endsWith(".json")) {
+                        try {
+                            val content = file.readText()
+                            val json = gson.fromJson(content, JsonObject::class.java)
+                            val suite = parseSuiteFromJson(json, file.absolutePath, file.lastModified(), context)
+                            if (seenNames.add(suite.name)) {
+                                list.add(suite)
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error parsing suite from Downloads: ${file.name}", e)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error scanning Downloads directory: ${e.message}")
+        }
+
+        // 3. Fallback to sample suite if empty
+        if (list.isEmpty()) {
+            val sample = getSampleSuite()
+            sample.lastReport = loadSuiteReport(context, sample.name)
+            list.add(sample)
+        }
+
+        return list.sortedByDescending { it.lastModified }
+    }
+
+    fun reloadSavedSuites(context: Context) {
+        savedSuitesFlow.value = listSavedSuites(context)
+    }
+
+    fun deleteSavedSuite(context: Context, suite: RrtSavedSuite): Boolean {
+        var deleted = false
+        val safeName = suite.name.replace("[^a-zA-Z0-9_\\-]".toRegex(), "_")
+
+        if (suite.filePath.isNotEmpty()) {
+            val file = File(suite.filePath)
+            if (file.exists()) {
+                deleted = file.delete()
+            }
+        }
+
+        // Also check filesDir / rrt_suites
+        val internalDir = File(context.filesDir, "rrt_suites")
+        val internalFile = File(internalDir, "suite_${safeName}.json")
+        if (internalFile.exists()) {
+            internalFile.delete()
+            deleted = true
+        }
+
+        // Also delete report file
+        val reportFile = File(internalDir, "report_${safeName}.json")
+        if (reportFile.exists()) {
+            reportFile.delete()
+        }
+
+        // Also check Downloads
+        try {
+            val dlFile = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "suite_${safeName}.json")
+            if (dlFile.exists()) {
+                dlFile.delete()
+                deleted = true
+            }
+        } catch (_: Exception) {}
+
+        reloadSavedSuites(context)
+        return deleted
+    }
+
+    fun stopExecution() {
+        isRunningFlow.value = false
+        executionJob?.cancel()
+        executionJob = null
+    }
+
+    suspend fun executeSavedSuite(
+        context: Context,
+        suite: RrtSavedSuite,
+        onStepUpdated: () -> Unit = {}
+    ): RrtExecutionReport = withContext(Dispatchers.IO) {
+        val startTime = System.currentTimeMillis()
+        val logs = mutableListOf<String>()
+        var passedCount = 0
+        var failedCount = 0
+        var overallExitCode = 0
+
+        isRunningFlow.value = true
+        lastExitCodeFlow.value = null
+        currentSuiteFlow.value = suite.name
+
+        fun addLog(msg: String) {
+            Log.i(TAG, msg)
+            logs.add(msg)
+            logsFlow.value = logsFlow.value + msg
+        }
+
+        addLog("[RRT] Starting execution of suite: ${suite.name}")
+        if (suite.targetPackage.isNotEmpty()) {
+            addLog("[RRT] Target Application: ${suite.targetPackage}")
+        }
+
+        try {
+            for (test in suite.testCases) {
+                if (!isRunningFlow.value) {
+                    test.status = "NOT_STARTED"
+                    break
+                }
+
+                test.status = "RUNNING"
+                val testStart = System.currentTimeMillis()
+                var testPassed = true
+                addLog("----------------------------------------")
+                addLog("[RRT] Running Test Case: ${test.name}")
+                onStepUpdated()
+
+                // Setup actions
+                for (act in test.setup) {
+                    if (!isRunningFlow.value) break
+                    val ok = executeAction(context, act, ::addLog)
+                    if (!ok) {
+                        addLog("[RRT] Setup action failed: ${act.get("action")?.asString}")
+                    }
+                }
+
+                // Steps
+                for (step in test.steps) {
+                    if (!isRunningFlow.value) {
+                        step.status = "SKIPPED"
+                        onStepUpdated()
+                        continue
+                    }
+
+                    step.status = "RUNNING"
+                    val stepStart = System.currentTimeMillis()
+                    addLog("[Step] ${step.keyword}")
+                    onStepUpdated()
+
+                    var stepPassed = true
+                    if (step.actions.isNotEmpty()) {
+                        for (act in step.actions) {
+                            if (!isRunningFlow.value) break
+                            val ok = executeAction(context, act, ::addLog)
+                            if (!ok) {
+                                addLog("[RRT] Action failed in step '${step.keyword}'")
+                                stepPassed = false
+                                break
+                            }
+                        }
+                    } else {
+                        val rawArgs = JsonArray().apply { step.args.forEach { add(it) } }
+                        val ok = executeKeywordFallback(context, step.keyword, rawArgs, ::addLog)
+                        if (!ok) {
+                            addLog("[RRT] Step '${step.keyword}' failed.")
+                            stepPassed = false
+                        }
+                    }
+
+                    step.durationMs = System.currentTimeMillis() - stepStart
+                    if (stepPassed) {
+                        step.status = "PASSED"
+                    } else {
+                        step.status = "FAILED"
+                        testPassed = false
+                        overallExitCode = 1
+                    }
+                    onStepUpdated()
+
+                    if (!stepPassed) break
+                    delay(250)
+                }
+
+                // Teardown actions
+                for (act in test.teardown) {
+                    executeAction(context, act, ::addLog)
+                }
+
+                test.durationMs = System.currentTimeMillis() - testStart
+                if (testPassed) {
+                    test.status = "PASSED"
+                    passedCount++
+                    addLog("[RRT] Test Passed: ${test.name}")
+                } else {
+                    test.status = "FAILED"
+                    failedCount++
+                    addLog("[RRT] Test Failed: ${test.name}")
+                }
+                onStepUpdated()
+            }
+
+            addLog("----------------------------------------")
+            addLog("[RRT] Suite execution finished with exit code: $overallExitCode")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during RRT suite execution", e)
+            addLog("[RRT Error] ${e.message}")
+            overallExitCode = 1
+        } finally {
+            isRunningFlow.value = false
+            lastExitCodeFlow.value = overallExitCode
+        }
+
+        val report = RrtExecutionReport(
+            reportId = "rep_${startTime}",
+            suiteName = suite.name,
+            targetPackage = suite.targetPackage,
+            startTime = startTime,
+            endTime = System.currentTimeMillis(),
+            totalScenarios = suite.testCases.size,
+            passedScenarios = passedCount,
+            failedScenarios = failedCount,
+            testCases = suite.testCases,
+            logs = logs
+        )
+
+        // Save report to disk and update suite
+        saveSuiteReport(context, suite.name, report)
+        suite.lastReport = report
+
+        report
+    }
+
     fun executePayloadSync(context: Context, payload: JsonObject): JsonObject = runBlocking {
+        // Automatically persist incoming payload
+        val savedSuite = try {
+            saveSuitePayload(context, payload)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed auto-saving incoming RRT payload", e)
+            null
+        }
+
         val response = JsonObject()
         val logs = JsonArray()
+        val logsList = mutableListOf<String>()
         var overallSuccess = true
         var exitCode = 0
+        val startTime = System.currentTimeMillis()
+        val testCasesRan = savedSuite?.testCases ?: mutableListOf()
+        var passedCount = 0
+        var failedCount = 0
 
         isRunningFlow.value = true
         lastExitCodeFlow.value = null
@@ -39,6 +544,7 @@ object RrtEngine {
         fun addLog(msg: String) {
             Log.i(TAG, msg)
             logs.add(msg)
+            logsList.add(msg)
             logsFlow.value = logsFlow.value + msg
         }
 
@@ -63,6 +569,11 @@ object RrtEngine {
             for (i in 0 until tests.size()) {
                 val test = tests.get(i).asJsonObject
                 val testName = test.get("name")?.asString ?: "Test #$i"
+                val matchTestCase = testCasesRan.getOrNull(i)
+                matchTestCase?.status = "RUNNING"
+                val testStart = System.currentTimeMillis()
+                var testPassed = true
+
                 addLog("----------------------------------------")
                 addLog("[RRT] Running Test Case: $testName")
 
@@ -84,8 +595,12 @@ object RrtEngine {
                     for (j in 0 until steps.size()) {
                         val step = steps.get(j).asJsonObject
                         val keyword = step.get("keyword")?.asString ?: "Step"
+                        val matchStep = matchTestCase?.steps?.getOrNull(j)
+                        matchStep?.status = "RUNNING"
+                        val stepStart = System.currentTimeMillis()
                         addLog("[Step] $keyword")
 
+                        var stepPassed = true
                         val actions = step.getAsJsonArray("actions")
                         if (actions != null && actions.size() > 0) {
                             for (k in 0 until actions.size()) {
@@ -94,21 +609,26 @@ object RrtEngine {
                                 if (!ok) {
                                     addLog("[RRT] Action failed in step '$keyword'")
                                     overallSuccess = false
+                                    testPassed = false
+                                    stepPassed = false
                                     exitCode = 1
                                     break
                                 }
                             }
                         } else {
-                            // Fallback if no decomposed actions
                             val rawArgs = step.getAsJsonArray("args")
                             val ok = executeKeywordFallback(context, keyword, rawArgs, ::addLog)
                             if (!ok) {
                                 addLog("[RRT] Step '$keyword' failed.")
                                 overallSuccess = false
+                                testPassed = false
+                                stepPassed = false
                                 exitCode = 1
-                                break
                             }
                         }
+
+                        matchStep?.durationMs = System.currentTimeMillis() - stepStart
+                        matchStep?.status = if (stepPassed) "PASSED" else "FAILED"
 
                         if (!overallSuccess) break
                         delay(250)
@@ -124,9 +644,14 @@ object RrtEngine {
                     }
                 }
 
-                if (overallSuccess) {
+                matchTestCase?.durationMs = System.currentTimeMillis() - testStart
+                if (testPassed) {
+                    matchTestCase?.status = "PASSED"
+                    passedCount++
                     addLog("[RRT] Test Passed: $testName")
                 } else {
+                    matchTestCase?.status = "FAILED"
+                    failedCount++
                     addLog("[RRT] Test Failed: $testName")
                 }
             }
@@ -143,10 +668,103 @@ object RrtEngine {
             lastExitCodeFlow.value = exitCode
         }
 
+        val suiteName = payload.get("suite_name")?.asString ?: "RRT Suite"
+        val targetPkg = payload.get("target_package")?.asString ?: ""
+        val report = RrtExecutionReport(
+            reportId = "rep_${startTime}",
+            suiteName = suiteName,
+            targetPackage = targetPkg,
+            startTime = startTime,
+            endTime = System.currentTimeMillis(),
+            totalScenarios = testCasesRan.size,
+            passedScenarios = passedCount,
+            failedScenarios = failedCount,
+            testCases = testCasesRan,
+            logs = logsList
+        )
+        saveSuiteReport(context, suiteName, report)
+        savedSuite?.lastReport = report
+        reloadSavedSuites(context)
+
         response.addProperty("status", if (overallSuccess) "ok" else "error")
         response.addProperty("exitCode", exitCode)
         response.add("logs", logs)
         response
+    }
+
+    fun exportReportHtml(context: Context, report: RrtExecutionReport): File? {
+        return try {
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            if (!downloadsDir.exists()) downloadsDir.mkdirs()
+
+            val safeName = report.suiteName.replace("[^a-zA-Z0-9_\\-]".toRegex(), "_")
+            val fileName = "report_rrt_${safeName}_${System.currentTimeMillis()}.html"
+            val file = File(downloadsDir, fileName)
+
+            val df = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+            val startStr = df.format(Date(report.startTime))
+            val endStr = df.format(Date(report.endTime))
+            val passRate = if (report.totalScenarios > 0) (report.passedScenarios * 100) / report.totalScenarios else 0
+
+            val html = buildString {
+                append("<!DOCTYPE html>\n<html><head><meta charset='UTF-8'><title>RRT Audit Report - ${report.suiteName}</title>")
+                append("<style>")
+                append("body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 24px; }")
+                append(".container { max-width: 900px; margin: 0 auto; }")
+                append(".header { background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; margin-bottom: 20px; }")
+                append(".badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 12px; }")
+                append(".pass { background: #22c55e22; color: #4ade80; border: 1px solid #22c55e44; }")
+                append(".fail { background: #ef444422; color: #f87171; border: 1px solid #ef444444; }")
+                append(".card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 16px; margin-bottom: 12px; }")
+                append(".step-row { font-family: monospace; font-size: 12px; padding: 4px 0; }")
+                append(".log-box { background: #090d16; border: 1px solid #1e293b; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 11px; max-height: 300px; overflow-y: auto; color: #94a3b8; }")
+                append("</style></head><body><div class='container'>")
+                append("<div class='header'>")
+                append("<h2>Robot Runner - RRT Execution Report</h2>")
+                append("<p><strong>Suite:</strong> ${report.suiteName} | <strong>Target:</strong> ${report.targetPackage}</p>")
+                append("<p><strong>Period:</strong> $startStr &mdash; $endStr</p>")
+                append("<p><span class='badge ${if (passRate == 100) "pass" else "fail"}'>$passRate% PASS RATE (${report.passedScenarios}/${report.totalScenarios})</span></p>")
+                append("</div>")
+
+                append("<h3>Test Scenarios</h3>")
+                for (test in report.testCases) {
+                    val statusClass = if (test.status == "PASSED") "pass" else "fail"
+                    append("<div class='card'>")
+                    append("<div style='display:flex; justify-content:space-between; align-items:center;'>")
+                    append("<h4>${test.name}</h4>")
+                    append("<span class='badge $statusClass'>${test.status} (${test.durationMs}ms)</span>")
+                    append("</div>")
+
+                    for (step in test.steps) {
+                        val stepClass = if (step.status == "PASSED") "pass" else "fail"
+                        append("<div class='step-row'>")
+                        append("<span class='badge $stepClass' style='padding: 2px 6px; font-size: 10px;'>${step.status.take(4)}</span> ")
+                        append("<span style='color: #c084fc; font-weight: bold;'>${step.keyword}</span> ")
+                        append("<span style='color: #cbd5e1;'>${step.args.joinToString(" ")}</span>")
+                        append("</div>")
+                    }
+                    append("</div>")
+                }
+
+                append("<h3>Execution Console Stream</h3>")
+                append("<div class='log-box'>")
+                for (line in report.logs) {
+                    append("<div>${line.replace("<", "&lt;").replace(">", "&gt;")}</div>")
+                }
+                append("</div>")
+
+                append("</div></body></html>")
+            }
+
+            FileOutputStream(file).use { out ->
+                out.write(html.toByteArray())
+            }
+            Log.i(TAG, "Exported HTML report: ${file.absolutePath}")
+            file
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed exporting HTML report", e)
+            null
+        }
     }
 
     private suspend fun executeAction(context: Context, actionObj: JsonObject, log: (String) -> Unit): Boolean {

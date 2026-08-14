@@ -10,7 +10,7 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
 - [ ] **Integração com PowerMonitor API**
   - *Objetivo:* Integrar o ecossistema do Robot Runner com a API do PowerMonitor para análise avançada de consumo de bateria, CPU e recursos durante a execução de automações.
 
-- [ ] **Criação do protocolo de testes RRT (testes de UI in-device)**
+- [x] **Criação do protocolo de testes RRT (testes de UI in-device)**
   - *Objetivo:* Desenvolver o "Robot Runner Test" (RRT) protocol. Estabelecer o padrão de execução de testes de interface diretamente no dispositivo (via Companion App), sem dependência excessiva do host.
 
 - [x] **Alinhamento Estrutural e de Funcionalidades (Desktop vs Companion)**
@@ -67,13 +67,13 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
   - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
   - [x] Otimizar os componentes de leitura de tráfego de rede e consumo.
 
-## Fase: Revisão da Aba BDD Runner (Run)
-  - [ ] Internacionalizar todos os textos.
-  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
-  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
-  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
-  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
-  - [ ] Otimizar a execução de suítes de automação e validação de relatórios exportados.
+## Fase: Revisão da Aba Tests / BDD Runner (Run)
+  - [x] Internacionalizar todos os textos.
+  - [x] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop (`ui/components/tabs/run/TestsSubTab.kt`).
+  - [x] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [x] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
+  - [x] Otimizar a execução de suítes de automação RRT persistidas em dados locais e validação de relatórios exportados.
 
 ## Fase: Revisão da Aba UI Inspector (Run)
   - [ ] Internacionalizar todos os textos.

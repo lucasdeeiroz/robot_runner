@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lucasdeeiroz.robotrunner.R
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.AppsSubTab
-import com.lucasdeeiroz.robotrunner.bdd.BddTestRunnerTabContent
+import com.lucasdeeiroz.robotrunner.ui.components.tabs.run.TestsSubTab
 import com.lucasdeeiroz.robotrunner.explorer.ExplorerTabContent
 import com.lucasdeeiroz.robotrunner.inspector.InspectorTabContent
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.LogcatSubTab
@@ -386,7 +386,7 @@ fun HomePage(
                             )
                         }
                         1 -> when (subTabRun) {
-                            0 -> BddTestRunnerTabContent()
+                            0 -> TestsSubTab()
                             1 -> InspectorTabContent()
                             2 -> ExplorerTabContent()
                             3 -> PlaceholderTabContent(stringResource(id = R.string.tab_scenarios_ai))

@@ -427,4 +427,17 @@
     <string name="run_console_auto_scroll">Auto-rolagem</string>
     <string name="run_console_suite_prefix">Suíte: %1$s</string>
     <string name="run_console_lines_count">%1$d linhas</string>
+
+    <!-- TestsSubTab Strings -->
+    <string name="label_selected_suite">Suíte Selecionada: %1$s</string>
+    <string name="label_no_suites_found">Nenhuma suíte RRT salva. Envie um teste pelo Desktop ou execute a suíte de exemplo.</string>
+    <string name="label_target_app">Alvo: %1$s</string>
+    <string name="label_scenarios_count">%1$d Cenários, %2$d Passos</string>
+    <string name="btn_delete_suite">Excluir</string>
+    <string name="msg_suite_deleted">Suíte excluída: %1$s</string>
+    <string name="header_scenario_stream">Fluxo de Cenários Gherkin</string>
+    <string name="label_suite_summary">RESUMO DA SUÍTE</string>
+    <string name="label_passed_scenarios">Passaram: %1$d/%2$d Cenários</string>
+    <string name="label_stored_suites">Suítes RRT Armazenadas</string>
+    <string name="label_sample_suite">Suíte de Exemplo</string>
 </resources>

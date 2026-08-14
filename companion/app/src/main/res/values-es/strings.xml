@@ -427,4 +427,17 @@
     <string name="run_console_auto_scroll">Desplazamiento automático</string>
     <string name="run_console_suite_prefix">Suite: %1$s</string>
     <string name="run_console_lines_count">%1$d líneas</string>
+
+    <!-- TestsSubTab Strings -->
+    <string name="label_selected_suite">Suite Seleccionada: %1$s</string>
+    <string name="label_no_suites_found">No hay suites RRT guardadas. Envíe una prueba desde Desktop o ejecute la suite de ejemplo.</string>
+    <string name="label_target_app">Objetivo: %1$s</string>
+    <string name="label_scenarios_count">%1$d Escenarios, %2$d Pasos</string>
+    <string name="btn_delete_suite">Eliminar</string>
+    <string name="msg_suite_deleted">Suite eliminada: %1$s</string>
+    <string name="header_scenario_stream">Flujo de Escenarios Gherkin</string>
+    <string name="label_suite_summary">RESUMEN DE LA SUITE</string>
+    <string name="label_passed_scenarios">Aprobados: %1$d/%2$d Escenarios</string>
+    <string name="label_stored_suites">Suites RRT Almacenadas</string>
+    <string name="label_sample_suite">Suite de Ejemplo</string>
 </resources>

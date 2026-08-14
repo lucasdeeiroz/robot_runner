@@ -439,4 +439,17 @@
     <string name="run_console_auto_scroll">Auto-scroll</string>
     <string name="run_console_suite_prefix">Suite: %1$s</string>
     <string name="run_console_lines_count">%1$d lines</string>
+
+    <!-- TestsSubTab Strings -->
+    <string name="label_selected_suite">Selected Suite: %1$s</string>
+    <string name="label_no_suites_found">No RRT suites stored. Send a test from Desktop or run the sample suite.</string>
+    <string name="label_target_app">Target: %1$s</string>
+    <string name="label_scenarios_count">%1$d Scenarios, %2$d Steps</string>
+    <string name="btn_delete_suite">Delete</string>
+    <string name="msg_suite_deleted">Suite deleted: %1$s</string>
+    <string name="header_scenario_stream">Gherkin Scenario Stream</string>
+    <string name="label_suite_summary">SUITE SUMMARY</string>
+    <string name="label_passed_scenarios">Passed: %1$d/%2$d Scenarios</string>
+    <string name="label_stored_suites">Stored RRT Suites</string>
+    <string name="label_sample_suite">Sample Suite</string>
 </resources>
