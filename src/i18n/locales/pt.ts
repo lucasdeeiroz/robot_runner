@@ -1721,6 +1721,10 @@ export const pt = {
             no_selection: "Nenhuma seleção válida",
             run_all: "Executar Todos",
             run_selected: "Executar Selecionado",
+            run_with_companion: "Executar com Companion",
+            run_ai: "Executar Teste com IA",
+            run_ai_prompt: "Executar Teste por IA",
+            run_ai_desc: "O Agente de IA executará ações baseadas nos passos BDD gerados.",
             tips: {
                 appium_maven: "Observação: Para Appium/Java, o projeto todo será executado via Maven."
             },
@@ -1742,10 +1746,7 @@ export const pt = {
             },
             options: {
                 dont_overwrite: "Salvar Logs"
-            },
-            run_ai: "Executar Teste com IA",
-            run_ai_prompt: "Executar Teste por IA",
-            run_ai_desc: "O Agente de IA executará ações baseadas nos passos BDD gerados."
+            }
         },
         tests_page: {
             monitoring: "Monitoramento de Testes",

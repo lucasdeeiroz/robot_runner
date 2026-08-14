@@ -13,6 +13,7 @@ import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import kotlinx.coroutines.launch
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -547,6 +548,34 @@ class CompanionHttpServer(
                 }
             }
 
+            "/rrt/execute" -> {
+                if (method == Method.POST) {
+                    try {
+                        val jsonStr = safeGetPostBody(session)
+                        if (jsonStr.isNullOrEmpty()) {
+                            JsonObject().apply {
+                                addProperty("status", "error")
+                                addProperty("message", "Missing or empty RRT payload body")
+                            }
+                        } else {
+                            val payload = gson.fromJson(jsonStr, JsonObject::class.java)
+                            RrtEngine.executePayloadSync(context, payload)
+                        }
+                    } catch (e: Exception) {
+                        Log.e("CompanionHttpServer", "Error executing RRT payload", e)
+                        JsonObject().apply {
+                            addProperty("status", "error")
+                            addProperty("message", e.message ?: "Failed to execute RRT payload")
+                        }
+                    }
+                } else {
+                    JsonObject().apply {
+                        addProperty("status", "error")
+                        addProperty("message", "Method not allowed")
+                    }
+                }
+            }
+
             "/device/info" -> buildDeviceInfoPayload()
 
             "/hardware/interactive-tests" -> {
@@ -735,7 +764,6 @@ class CompanionHttpServer(
                 } catch (e: Exception) {
                     JsonObject().apply {
                         addProperty("status", "error")
-                        addProperty("message", e.message ?: "Failed to launch display test")
                     }
                 }
             }

@@ -16,6 +16,7 @@ macro_rules! generate_robot_runner_handler {
             crate::runner::run_cypress_test,
             crate::runner::run_selenium_test,
             crate::runner::stop_test,
+            crate::runner::compile_and_send_rrt,
             crate::inspector::get_screenshot,
             crate::inspector::get_compressed_screenshot,
             crate::inspector::get_xml_dump,

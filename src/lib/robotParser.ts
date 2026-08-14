@@ -57,7 +57,7 @@ export interface SuiteNode {
     };
 }
 
-export type KeywordSubType = 'keyword' | 'setup' | 'teardown' | 'for' | 'iteration' | 'if' | 'else-if' | 'else' | 'break' | 'continue' | 'while' | 'try' | 'except' | 'finally';
+export type KeywordSubType = 'keyword' | 'step' | 'setup' | 'teardown' | 'for' | 'iteration' | 'if' | 'else-if' | 'else' | 'break' | 'continue' | 'while' | 'try' | 'except' | 'finally';
 
 export interface KeywordNode {
     type: 'keyword';
@@ -101,6 +101,9 @@ export type LinearNode =
     | SuiteEndNode 
     | { type: 'test-start', name: string, id: string, doc?: string, originalLine?: string }
     | { type: 'test-end', name: string, status: 'PASS' | 'FAIL' | 'SKIP', id: string, doc?: string, ret?: string }
+    | { type: 'keyword-start', name: string, subType?: KeywordSubType, id: string, doc?: string, args?: string[] }
+    | { type: 'keyword-end', status: 'PASS' | 'FAIL' | 'SKIP', id: string, ret?: string }
+    | { type: 'rrt-action', content: string, isError?: boolean, isSuccess?: boolean, id: string }
     | { type: 'maestro-suite-start' | 'maestro-suite-end' | 'maestro-test-start' | 'maestro-test-end' | 'maven-suite-start' | 'maven-suite-end' | 'maven-test-start' | 'maven-test-end', name: string, id: string, status?: string, content?: string }
     | AiThoughtNode
     | AiActionNode

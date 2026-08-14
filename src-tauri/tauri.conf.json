@@ -29,7 +29,8 @@
     "resources": [
       "../scripts/web_capture.cjs",
       "../scripts/web_interaction.cjs",
-      "../scripts/web_record.cjs"
+      "../scripts/web_record.cjs",
+      "../scripts/rrt_compiler.py"
     ],
     "targets": [
       "nsis",

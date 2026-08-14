@@ -1723,6 +1723,10 @@ export const es = {
             no_selection: "Sin selección válida",
             run_all: "Ejecutar Todas",
             run_selected: "Ejecutar Seleccionada",
+            run_with_companion: "Ejecutar con Companion",
+            run_ai: "Ejecutar Prueba con IA",
+            run_ai_prompt: "Ejecutar Prueba por IA",
+            run_ai_desc: "El Agente de IA ejecutará acciones basadas en los pasos BDD generados.",
             tips: {
                 appium_maven: "Seleccione la raíz del proyecto Maven (donde se encuentra pom.xml)."
             },
@@ -1744,10 +1748,7 @@ export const es = {
             },
             options: {
                 dont_overwrite: "Guardar Logs"
-            },
-            run_ai: "Ejecutar Prueba con IA",
-            run_ai_prompt: "Ejecutar Prueba por IA",
-            run_ai_desc: "El Agente de IA ejecutará acciones basadas en los pasos BDD generados."
+            }
         },
         tests_page: {
             monitoring: "Monitoreo de Pruebas",

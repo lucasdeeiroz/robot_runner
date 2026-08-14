@@ -414,4 +414,17 @@
     <string name="msg_recording_audio">Grabando 3 segundos...</string>
     <string name="msg_playing_audio">Reproduciendo...</string>
     <string name="msg_failed_mic">Fallo al iniciar el micrófono</string>
+
+    <!-- Run Console Strings -->
+    <string name="run_console_status_idle">Inactivo</string>
+    <string name="run_console_status_running">Ejecutando...</string>
+    <string name="run_console_status_passed">Aprobado</string>
+    <string name="run_console_status_failed">Fallido</string>
+    <string name="run_console_no_logs_title">Sin Registros de Ejecución</string>
+    <string name="run_console_no_logs_desc">Ejecute una suite de prueba desde Robot Runner Desktop o BDD Runner para monitorear la salida en vivo y los pasos en tiempo real.</string>
+    <string name="run_console_search_placeholder">Filtrar registros de consola...</string>
+    <string name="run_console_clear_logs">Limpiar registros</string>
+    <string name="run_console_auto_scroll">Desplazamiento automático</string>
+    <string name="run_console_suite_prefix">Suite: %1$s</string>
+    <string name="run_console_lines_count">%1$d líneas</string>
 </resources>

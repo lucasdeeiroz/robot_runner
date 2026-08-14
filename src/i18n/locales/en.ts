@@ -1719,6 +1719,10 @@ export const en = {
             no_selection: "No valid selection",
             run_all: "Run All Tests",
             run_selected: "Run Selected Test",
+            run_with_companion: "Run with Companion",
+            run_ai: "Run Test with AI",
+            run_ai_prompt: "Run Test by AI",
+            run_ai_desc: "The AI Agent will execute actions based on the generated BDD steps.",
             tips: {
                 appium_maven: "Note: For Appium/Java, the whole project will be executed via Maven."
             },
@@ -1740,10 +1744,7 @@ export const en = {
             },
             options: {
                 dont_overwrite: "Save Logs"
-            },
-            run_ai: "Run Test with AI",
-            run_ai_prompt: "Run Test by AI",
-            run_ai_desc: "The AI Agent will execute actions based on the generated BDD steps."
+            }
         },
         tests_page: {
             monitoring: "Test Monitoring",

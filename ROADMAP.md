@@ -4,7 +4,7 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
 
 ## Fase Atual: Funcionalidades Essenciais e Integração
 
-- [ ] **Teste de Câmera/Barcode**
+- [x] **Teste de Câmera/Barcode**
   - *Objetivo:* Implementar e validar testes automatizados para fluxos que utilizam a câmera e leitores de código de barras no dispositivo físico/emulador.
 
 - [ ] **Integração com PowerMonitor API**
@@ -33,7 +33,7 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
     - [x] Mover as views existentes (UI Inspector, BDD Runner, etc.) para as novas sessões estruturais.
     - [x] Criar abas em branco/placeholder para funcionalidades do Desktop ausentes no mobile (Scenarios, Console, Webview, History).
 
-- [ ] **Paridade Completa: Console de Execução (Run Console)**
+- [x] **Paridade Completa: Console de Execução (Run Console)**
   - *Objetivo:* Implementar interface dedicada no Mobile (Android) para o "Run Console", espelhando a funcionalidade do Desktop. Deve prover monitoramento de saída bruta interativo com scroll virtualizado da execução dos testes localmente.
 
 - [x] **Alterar pacote do app mobile**
@@ -140,12 +140,12 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
   - [x] Conferir validações SELinux em dispositivos POS Android para recuperar status de rede/memória.
 
 ## Fase: Revisão da Aba Diagnostics (Toolbox)
-  - [ ] Internacionalizar todos os textos.
-  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
-  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
-  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
-  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
-  - [ ] Validar extração do JSON Golden File e geração offline do Relatório de Auditoria PDF.
+  - [x] Internacionalizar todos os textos.
+  - [x] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [x] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [x] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
+  - [x] Validar extração do JSON Golden File e geração offline do Relatório de Auditoria PDF.
 
 ---
 
@@ -158,12 +158,12 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
   - [ ] Criar interface (atualmente placeholder) e integração AI no Companion App, substituindo o placeholder pela tela interativa.
 
 ## Fase: Implementação da Aba Run Console (Toolbox)
-  - [ ] Internacionalizar todos os textos.
-  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
-  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
-  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
-  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
-  - [ ] Espelhar a aba Console de Execução (log bruto em tempo real) para testes BDD em interface mobile.
+  - [x] Internacionalizar todos os textos.
+  - [x] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [x] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [x] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
+  - [x] Espelhar a aba Console de Execução (log bruto em tempo real) para testes BDD em interface mobile.
 
 ## Fase: Implementação da Aba Webview (Toolbox)
   - [ ] Internacionalizar todos os textos.

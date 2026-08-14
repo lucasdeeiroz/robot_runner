@@ -20,6 +20,32 @@ pub struct TestState(pub Arc<Mutex<HashMap<String, ProcessInfo>>>);
 
 use crate::cmd_utils::{new_std_command, new_tokio_command, get_adb_program};
 use crate::errors::{AppError, AppResult};
+use tauri::Manager;
+
+fn resolve_script_path(name: &str, app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let resource_candidate = resource_dir.join("scripts").join(name);
+        if resource_candidate.exists() {
+            return Ok(resource_candidate);
+        }
+        let fallback_resource_candidate = resource_dir.join(name);
+        if fallback_resource_candidate.exists() {
+            return Ok(fallback_resource_candidate);
+        }
+    }
+    
+    let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    
+    let direct = current_dir.join(format!("scripts/{}", name));
+    if direct.exists() {
+        return Ok(direct);
+    }
+    let parent = current_dir.join(format!("../scripts/{}", name));
+    if parent.exists() {
+        return Ok(parent);
+    }
+    Err(format!("Could not find scripts/{}", name))
+}
 
 /// Sends a graceful stop signal to a process.
 fn graceful_stop(child: &mut Child, output_dir: &str) -> bool {
@@ -790,4 +816,167 @@ pub async fn run_selenium_test(
     }
     cmd.env("ADB", &adb_program);
     spawn_and_monitor(app, state, run_id, cmd, working_dir, abs_output_dir).await
+}
+
+#[tauri::command]
+pub async fn compile_and_send_rrt(
+    app: AppHandle,
+    _state: State<'_, TestState>,
+    run_id: String,
+    test_path: Option<String>,
+    output_dir: String,
+    _logs_path: Option<String>,
+    device: Option<String>,
+    _device_model: Option<String>,
+    _android_version: Option<String>,
+    working_dir: Option<String>,
+    _selected_tests: Option<Vec<String>>,
+    _arguments_file: Option<String>,
+    _timestamp_outputs: Option<bool>,
+) -> AppResult<String> {
+    let output_dir = crate::cmd_utils::expand_env_vars(&output_dir);
+    let test_path = test_path.map(|p| crate::cmd_utils::expand_env_vars(&p));
+    let working_dir = working_dir.map(|p| crate::cmd_utils::expand_env_vars(&p));
+
+    let abs_output_dir = std::fs::canonicalize(&output_dir)
+        .map(|p| {
+            let s = p.to_string_lossy().to_string();
+            if s.starts_with(r"\\?\") {
+                s[4..].to_string()
+            } else {
+                s
+            }
+        })
+        .unwrap_or_else(|_| output_dir.clone());
+
+    std::fs::create_dir_all(&abs_output_dir).map_err(|e| AppError::IoError(format!("Failed to create output directory: {}", e)))?;
+
+    let _ = app.emit("test-output", TestOutput {
+        run_id: run_id.clone(),
+        message: "[System] Compiling RRT...".to_string(),
+    });
+
+    let python_bin = if let Some(ref wd) = working_dir {
+        crate::env_setup::get_venv_python_path(std::path::Path::new(wd))
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| "python".to_string())
+    } else {
+        "python".to_string()
+    };
+
+    let script_path = resolve_script_path("rrt_compiler.py", &app)
+        .map_err(|e| AppError::CommandFailed(e))?;
+
+    let mut compiler_cmd = Command::new(&python_bin);
+    compiler_cmd.arg(script_path);
+    if let Some(tp) = &test_path {
+        compiler_cmd.arg(tp);
+    }
+
+    if let Some(ref wd) = working_dir {
+        compiler_cmd.current_dir(wd);
+    }
+    compiler_cmd.stdout(Stdio::piped());
+    compiler_cmd.stderr(Stdio::piped());
+
+    let output = compiler_cmd.output().await.map_err(|e| AppError::IoError(format!("Failed to run rrt_compiler: {}", e)))?;
+    let payload = String::from_utf8_lossy(&output.stdout).to_string();
+
+    if !output.status.success() {
+        let err = String::from_utf8_lossy(&output.stderr).to_string();
+        let _ = app.emit("test-output", TestOutput {
+            run_id: run_id.clone(),
+            message: format!("RRT Compilation failed: {}", err),
+        });
+        let _ = app.emit("test-finished", TestFinished {
+            run_id: run_id.clone(),
+            exit_code: 1,
+        });
+        return Err(AppError::CommandFailed(format!("RRT Compilation failed: {}", err)));
+    }
+
+    let _ = app.emit("test-output", TestOutput {
+        run_id: run_id.clone(),
+        message: "[System] Compiled Robot file to RRT protocol payload.".to_string(),
+    });
+
+    // Send to Companion
+    let udid = device.unwrap_or_else(|| "emulator-5554".to_string());
+    
+    // Setup port forwarding
+    let adb_program = get_adb_program(&app);
+    let mut port_fwd = std::process::Command::new(&adb_program);
+    port_fwd.args(&["-s", &udid, "forward", "tcp:9876", "tcp:9876"]);
+    let _ = port_fwd.output(); // Ignore errors, it might already be forwarded
+
+    let client = reqwest::Client::new();
+    let res = client.post("http://127.0.0.1:9876/rrt/execute")
+        .header("Content-Type", "application/json")
+        .body(payload)
+        .send()
+        .await;
+
+    match res {
+        Ok(response) => {
+            if response.status().is_success() {
+                let text = response.text().await.unwrap_or_default();
+                let mut exit_code = 0;
+                
+                if let Ok(json_res) = serde_json::from_str::<serde_json::Value>(&text) {
+                    if let Some(logs_arr) = json_res.get("logs").and_then(|l| l.as_array()) {
+                        for log_val in logs_arr {
+                            if let Some(log_msg) = log_val.as_str() {
+                                let _ = app.emit("test-output", TestOutput {
+                                    run_id: run_id.clone(),
+                                    message: log_msg.to_string(),
+                                });
+                            }
+                        }
+                    }
+                    if let Some(code) = json_res.get("exitCode").and_then(|c| c.as_i64()) {
+                        exit_code = code as i32;
+                    }
+                    if let Some(status_str) = json_res.get("status").and_then(|s| s.as_str()) {
+                        if status_str == "error" && exit_code == 0 {
+                            exit_code = 1;
+                        }
+                    }
+                } else {
+                    let _ = app.emit("test-output", TestOutput {
+                        run_id: run_id.clone(),
+                        message: format!("[Companion Response] {}", text),
+                    });
+                }
+
+                let _ = app.emit("test-finished", TestFinished {
+                    run_id: run_id.clone(),
+                    exit_code,
+                });
+                Ok("RRT executed".to_string())
+            } else {
+                let status = response.status();
+                let text = response.text().await.unwrap_or_default();
+                let _ = app.emit("test-output", TestOutput {
+                    run_id: run_id.clone(),
+                    message: format!("[System] Failed to execute RRT on Companion. Status: {}, Body: {}", status, text),
+                });
+                let _ = app.emit("test-finished", TestFinished {
+                    run_id: run_id.clone(),
+                    exit_code: 1,
+                });
+                Err(AppError::CommandFailed(format!("HTTP error from Companion: {}", status)))
+            }
+        },
+        Err(e) => {
+            let _ = app.emit("test-output", TestOutput {
+                run_id: run_id.clone(),
+                message: format!("Failed to send RRT to Companion: {}", e),
+            });
+            let _ = app.emit("test-finished", TestFinished {
+                run_id: run_id.clone(),
+                exit_code: 1,
+            });
+            Err(AppError::CommandFailed(format!("Failed to send RRT to Companion: {}", e)))
+        }
+    }
 }

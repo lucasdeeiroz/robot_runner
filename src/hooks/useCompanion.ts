@@ -56,14 +56,75 @@ export interface CompanionDeviceInfo {
     };
 }
 
+interface CompanionDeviceCache {
+    status: CompanionStatus;
+    isInstalled: boolean | null;
+    deviceInfo: CompanionDeviceInfo | null;
+    recentEvents: CompanionEventItem[];
+    lastConnectedAt?: number;
+}
+
+const companionCacheMap = new Map<string, CompanionDeviceCache>();
+const companionListeners = new Set<(device: string, cache: CompanionDeviceCache) => void>();
+
+function updateCompanionCache(device: string, updates: Partial<CompanionDeviceCache>) {
+    const current = companionCacheMap.get(device) || {
+        status: 'disconnected',
+        isInstalled: null,
+        deviceInfo: null,
+        recentEvents: []
+    };
+    const updated = { ...current, ...updates };
+    companionCacheMap.set(device, updated);
+    companionListeners.forEach(listener => listener(device, updated));
+}
+
 export function useCompanion(selectedDevice: string | null) {
-    const [status, setStatus] = useState<CompanionStatus>('disconnected');
-    const [isInstalled, setIsInstalled] = useState<boolean | null>(null);
-    const [deviceInfo, setDeviceInfo] = useState<CompanionDeviceInfo | null>(null);
-    const [recentEvents, setRecentEvents] = useState<CompanionEventItem[]>([]);
+    const initialCache = selectedDevice ? companionCacheMap.get(selectedDevice) : null;
+    const [status, setStatusState] = useState<CompanionStatus>(initialCache?.status ?? 'disconnected');
+    const [isInstalled, setIsInstalledState] = useState<boolean | null>(initialCache?.isInstalled ?? null);
+    const [deviceInfo, setDeviceInfoState] = useState<CompanionDeviceInfo | null>(initialCache?.deviceInfo ?? null);
+    const [recentEvents, setRecentEventsState] = useState<CompanionEventItem[]>(initialCache?.recentEvents ?? []);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const { settings } = useSettings();
     const { user } = useAuth();
+
+    const setStatus = useCallback((s: CompanionStatus) => {
+        setStatusState(s);
+        if (selectedDevice) updateCompanionCache(selectedDevice, { status: s });
+    }, [selectedDevice]);
+
+    const setIsInstalled = useCallback((inst: boolean | null) => {
+        setIsInstalledState(inst);
+        if (selectedDevice) updateCompanionCache(selectedDevice, { isInstalled: inst });
+    }, [selectedDevice]);
+
+    const setDeviceInfo = useCallback((info: CompanionDeviceInfo | null) => {
+        setDeviceInfoState(info);
+        if (selectedDevice) updateCompanionCache(selectedDevice, { deviceInfo: info, ...(info ? { lastConnectedAt: Date.now() } : {}) });
+    }, [selectedDevice]);
+
+    const setRecentEvents = useCallback((events: CompanionEventItem[]) => {
+        setRecentEventsState(events);
+        if (selectedDevice) updateCompanionCache(selectedDevice, { recentEvents: events });
+    }, [selectedDevice]);
+
+    // Sync state when other instances of useCompanion update cache for this device
+    useEffect(() => {
+        if (!selectedDevice) return;
+        const listener = (device: string, cache: CompanionDeviceCache) => {
+            if (device === selectedDevice) {
+                setStatusState(cache.status);
+                setIsInstalledState(cache.isInstalled);
+                setDeviceInfoState(cache.deviceInfo);
+                setRecentEventsState(cache.recentEvents);
+            }
+        };
+        companionListeners.add(listener);
+        return () => {
+            companionListeners.delete(listener);
+        };
+    }, [selectedDevice]);
 
     const checkInstallation = useCallback(async () => {
         if (!selectedDevice) {
@@ -227,7 +288,10 @@ export function useCompanion(selectedDevice: string | null) {
 
     const connectCompanion = useCallback(async () => {
         if (!selectedDevice) return;
-        setStatus('connecting');
+        const isAlreadyConnected = companionCacheMap.get(selectedDevice)?.status === 'connected';
+        if (!isAlreadyConnected) {
+            setStatus('connecting');
+        }
         console.log("[useCompanion] Connecting to Companion on device:", selectedDevice);
 
         // Prepare Logo Base64

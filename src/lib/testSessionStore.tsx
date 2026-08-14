@@ -36,6 +36,7 @@ export interface TestSession {
     isAiAgent?: boolean;
     aiPrompt?: string;
     profileName?: string;
+    isRrt?: boolean;
 }
 
 interface TestOutputPayload {
@@ -50,7 +51,7 @@ interface TestFinishedPayload {
 
 interface TestSessionContextType {
     sessions: TestSession[];
-    addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string, profileName?: string) => void;
+    addSession: (runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string, profileName?: string, isRrt?: boolean) => void;
     addToolboxSession: (deviceUdid: string, deviceName: string, deviceModel?: string, androidVersion?: string) => void; // New action
     rerunSession: (runId: string, rerunFailedFrom?: string) => Promise<void>;
     stopSession: (runId: string) => Promise<void>;
@@ -245,7 +246,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
 
 
 
-    const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string, profileName?: string) => {
+    const addSession = useCallback((runId: string, deviceUdid: string, deviceName: string, testPath: string, framework: 'robot' | 'maestro' | 'appium' | 'cypress' | 'selenium', timestampOutputs: boolean, outputDir?: string, argumentsFile?: string | null, deviceModel?: string, androidVersion?: string, selectedTests?: string[], isAiAgent?: boolean, aiPrompt?: string, profileName?: string, isRrt?: boolean) => {
         setSessions(prev => {
             // Check for recycling
             if (settings.recycleDeviceViews) {
@@ -280,7 +281,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                         startTime: Date.now(),
                         isAiAgent,
                         aiPrompt,
-                        profileName
+                        profileName,
+                        isRrt
                     };
 
                     setTimeout(() => setActiveSessionId(existing.runId), 0); // Focus it
@@ -311,7 +313,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                     startTime: Date.now(),
                     isAiAgent,
                     aiPrompt,
-                    profileName
+                    profileName,
+                    isRrt
                 }
             ];
         });
@@ -452,7 +455,8 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
             session.selectedTests,
             session.isAiAgent,
             session.aiPrompt,
-            sessionProfileName
+            sessionProfileName,
+            session.isRrt
         );
         try {
             // Notificar Android Companion sobre o início da atividade de teste
@@ -467,9 +471,10 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
                 })
             }).catch(e => console.warn("Failed to notify companion:", e));
 
-            // Check Appium (Skip for Maestro, Cypress, Selenium, or if Robot is selected and noAppiumForRobot is enabled)
+            // Check Appium (Skip for Maestro, Cypress, Selenium, RRT, or if Robot is selected and noAppiumForRobot is enabled)
             const fw = session.framework;
-            const skipAppium = fw === 'maestro' || fw === 'cypress' || fw === 'selenium' || (fw === 'robot' && settings.noAppiumForRobot);
+            const isRrt = session.isRrt || false;
+            const skipAppium = fw === 'maestro' || fw === 'cypress' || fw === 'selenium' || isRrt || (fw === 'robot' && settings.noAppiumForRobot);
             if (!skipAppium) {
                 const status = await invoke<{ running: boolean }>('get_appium_status', {
                     host: settings.appiumHost,
@@ -489,19 +494,35 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
             }
 
             if (fw === 'robot') {
-                await invoke("run_robot_test", {
-                    runId: newRunId,
-                    testPath: session.testPath === session.argumentsFile ? null : session.testPath,
-                    outputDir: outputDir,
-                    logs_path: sessionProfileName,
-                    device: session.deviceUdid === 'local' ? null : session.deviceUdid,
-                    argumentsFile: session.argumentsFile,
-                    deviceModel: session.deviceModel,
-                    androidVersion: session.androidVersion,
-                    workingDir: settings.paths.automationRoot,
-                    rerunFailedFrom: rerunFailedFrom,
-                    selectedTests: session.selectedTests
-                });
+                if (isRrt) {
+                    await invoke("compile_and_send_rrt", {
+                        runId: newRunId,
+                        testPath: session.testPath === session.argumentsFile ? null : session.testPath,
+                        outputDir: outputDir,
+                        logs_path: sessionProfileName,
+                        device: session.deviceUdid === 'local' ? null : session.deviceUdid,
+                        argumentsFile: session.argumentsFile,
+                        timestampOutputs: session.timestampOutputs,
+                        deviceModel: session.deviceModel,
+                        androidVersion: session.androidVersion,
+                        workingDir: settings.paths.automationRoot,
+                        selectedTests: session.selectedTests
+                    });
+                } else {
+                    await invoke("run_robot_test", {
+                        runId: newRunId,
+                        testPath: session.testPath === session.argumentsFile ? null : session.testPath,
+                        outputDir: outputDir,
+                        logs_path: sessionProfileName,
+                        device: session.deviceUdid === 'local' ? null : session.deviceUdid,
+                        argumentsFile: session.argumentsFile,
+                        deviceModel: session.deviceModel,
+                        androidVersion: session.androidVersion,
+                        workingDir: settings.paths.automationRoot,
+                        rerunFailedFrom: rerunFailedFrom,
+                        selectedTests: session.selectedTests
+                    });
+                }
             } else if (fw === 'maestro') {
                 await invoke("run_maestro_test", {
                     runId: newRunId,

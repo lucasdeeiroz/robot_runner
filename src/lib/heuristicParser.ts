@@ -1,4 +1,4 @@
-import { LinearNode, LogNode, SuiteNode, TestNode, TextNode } from "./robotParser";
+import { LinearNode, LogNode, SuiteNode, TestNode, TextNode, KeywordNode } from "./robotParser";
 
 export interface HeuristicParserResult {
     tree: LogNode[];
@@ -30,7 +30,12 @@ const IS_ROBOT_RUNNER_TEST_START = (l: string) => l.startsWith("[RobotRunner-Tes
 const IS_RR_SUITE_START = (l: string) => l.startsWith("[RR-SUITE-START]");
 const IS_RR_SUITE_END = (l: string) => l.startsWith("[RR-SUITE-END]");
 const IS_RR_TEST_END = (l: string) => l.startsWith("[RR-TEST-END]");
-const IS_REDUNDANT_SYSTEM = (l: string) => l.trim().startsWith('[System]') || /^\s*(Output|Log|Report):/.test(l) || IS_STATUS(l) || l.startsWith("[RR-");
+const IS_RRT_SUITE_START = (l: string) => l.startsWith("[RRT] Starting execution of suite:");
+const IS_RRT_TEST_START = (l: string) => l.startsWith("[RRT] Running Test Case:");
+const IS_RRT_TEST_PASSED = (l: string) => l.startsWith("[RRT] Test Passed:");
+const IS_RRT_TEST_FAILED = (l: string) => l.startsWith("[RRT] Test Failed:");
+const IS_RRT_SUITE_END = (l: string) => l.startsWith("[RRT] Suite execution finished");
+const IS_REDUNDANT_SYSTEM = (l: string) => l.trim().startsWith('[System]') || /^\s*(Output|Log|Report):/.test(l) || IS_STATUS(l) || l.startsWith("[RR-") || l.startsWith("[RRT]");
 
 const extractOutputXmlPath = (l: string): string | undefined => {
     const clean = cleanAnsi(l).trim();
@@ -213,6 +218,32 @@ export function parseHeuristicLogs(
             const isFailed = !(line.includes("Failures: 0") && line.includes("Errors: 0"));
             const status = isFailed ? "FAIL" : "PASS";
             linearNodes.push({ type: 'test-end', name: 'Maven Test', status, id: `mvn-t-end-${nodeIdx}` });
+        } else if (IS_RRT_SUITE_START(cleanLine)) {
+            const name = cleanLine.replace("[RRT] Starting execution of suite:", "").trim();
+            linearNodes.push({ type: 'suite-start', name, originalLine: cleanLine, id: `rrt-s-start-${nodeIdx}` });
+        } else if (IS_RRT_TEST_START(cleanLine)) {
+            const name = cleanLine.replace("[RRT] Running Test Case:", "").trim();
+            linearNodes.push({ type: 'test-start', name, originalLine: cleanLine, id: `rrt-t-start-${nodeIdx}` });
+        } else if (cleanLine.startsWith("[Step]")) {
+            const stepName = cleanLine.replace("[Step]", "").trim();
+            linearNodes.push({ type: 'keyword-start', name: stepName, subType: 'step', id: `rrt-kw-${nodeIdx}` });
+        } else if (cleanLine.startsWith("->") || cleanLine.startsWith("  ->") || line.startsWith("  ->") || line.startsWith("->")) {
+            const actionContent = line.trim();
+            const actionText = actionContent.replace(/^->\s*/, '');
+            const isError = actionText.includes('failed') || actionText.includes('Error') || actionText.includes('Verification failed');
+            const isSuccess = actionText.includes('verified') || actionText.includes('Passed');
+            linearNodes.push({ type: 'rrt-action', content: actionContent, isError, isSuccess, id: `rrt-act-${nodeIdx}` });
+        } else if (IS_RRT_TEST_PASSED(cleanLine)) {
+            const name = cleanLine.replace("[RRT] Test Passed:", "").trim();
+            linearNodes.push({ type: 'keyword-end', status: 'PASS', id: `rrt-kw-end-${nodeIdx}` });
+            linearNodes.push({ type: 'test-end', name, status: 'PASS', id: `rrt-t-end-${nodeIdx}` });
+        } else if (IS_RRT_TEST_FAILED(cleanLine)) {
+            const name = cleanLine.replace("[RRT] Test Failed:", "").trim();
+            linearNodes.push({ type: 'keyword-end', status: 'FAIL', id: `rrt-kw-end-${nodeIdx}` });
+            linearNodes.push({ type: 'test-end', name, status: 'FAIL', id: `rrt-t-end-${nodeIdx}` });
+        } else if (IS_RRT_SUITE_END(cleanLine)) {
+            const status = cleanLine.includes("exit code: 0") ? "PASS" : "FAIL";
+            linearNodes.push({ type: 'suite-end', name: 'RRT Suite', status, summary: cleanLine, id: `rrt-s-end-${nodeIdx}` });
         } else if (line.startsWith('[AI Agent] Thought:')) {
             linearNodes.push({ type: 'ai-thought', content: line.replace('[AI Agent] Thought:', '').trim(), id: `ai-thought-${nodeIdx}` } as any);
         } else if (line.startsWith('[AI Agent] Action:')) {
@@ -228,10 +259,21 @@ export function parseHeuristicLogs(
     const root: LogNode[] = [];
     const suiteStack: SuiteNode[] = [];
     let currentTest: TestNode | null = null;
+    let currentKeyword: KeywordNode | null = null;
 
     const activeSuite = () => suiteStack.length > 0 ? suiteStack[suiteStack.length - 1] : null;
 
+    const closeCurrentKeyword = (finalStatus: 'PASS' | 'FAIL' | 'SKIP' = 'PASS') => {
+        if (currentKeyword) {
+            if (currentKeyword.status === 'RUNNING') {
+                currentKeyword.status = finalStatus;
+            }
+            currentKeyword = null;
+        }
+    };
+
     const closeCurrentTest = () => {
+        closeCurrentKeyword();
         if (currentTest) {
             const testLogs = currentTest.logs;
             for (let j = testLogs.length - 1; j >= 0; j--) {
@@ -282,14 +324,22 @@ export function parseHeuristicLogs(
             for (let i = suiteStack.length - 1; i >= 0; i--) {
                 const s = suiteStack[i];
                 const cleanStack = normalize(s.name);
-                if (cleanStack === cleanTarget || cleanStack.endsWith('.' + cleanTarget) || cleanStack === cleanTarget.split('.').pop()) {
+                if (cleanStack === cleanTarget || cleanStack.endsWith('.' + cleanTarget) || cleanStack === cleanTarget.split('.').pop() || cleanTarget === 'RRT Suite' || cleanTarget === 'Maestro Suite') {
                     matchIndex = i;
                     break;
                 }
             }
+            if (matchIndex === -1 && suiteStack.length > 0) {
+                matchIndex = suiteStack.length - 1;
+            }
             if (matchIndex !== -1) {
                 const suite = suiteStack[matchIndex];
-                suite.status = node.status;
+                let finalStatus = node.status;
+                if (suite.stats) {
+                    if (suite.stats.failed > 0) finalStatus = 'FAIL';
+                    else if (suite.stats.passed > 0 && node.status === 'PASS') finalStatus = 'PASS';
+                }
+                suite.status = finalStatus;
                 suite.summary = node.summary;
                 if ((node as any).doc) suite.doc = (node as any).doc;
                 suiteStack.splice(matchIndex);
@@ -302,18 +352,56 @@ export function parseHeuristicLogs(
                 doc: node.doc,
                 status: 'RUNNING',
                 logs: [],
+                children: [],
+                hasChildren: true,
                 id: nodeId
             };
             if (activeSuite()) activeSuite()!.children.push(currentTest);
             else root.push(currentTest);
-        } else if (node.type === 'test-end') {
-            // Find current test by name if stack is messed up
-            if (!currentTest || (node.name !== 'Maven Test' && currentTest.name !== node.name)) {
-                // Heuristic fix: if we get a test-end but currentTest name doesn't match, 
-                // we might have missed a test-start or it's a generic one
-            }
-            
+        } else if (node.type === 'keyword-start') {
+            closeCurrentKeyword('PASS');
+            const newKw: KeywordNode = {
+                type: 'keyword',
+                id: nodeId,
+                name: node.name,
+                subType: node.subType || 'step',
+                status: 'RUNNING',
+                children: [],
+                hasChildren: true
+            };
             if (currentTest) {
+                if (!currentTest.children) currentTest.children = [];
+                currentTest.children.push(newKw);
+                currentTest.hasChildren = true;
+            } else if (activeSuite()) {
+                activeSuite()!.children.push(newKw);
+            } else {
+                root.push(newKw);
+            }
+            currentKeyword = newKw;
+        } else if (node.type === 'keyword-end') {
+            closeCurrentKeyword(node.status);
+        } else if (node.type === 'rrt-action') {
+            const actionNode: TextNode = { type: 'text', content: node.content, id: nodeId };
+            if (currentKeyword) {
+                currentKeyword.children.push(actionNode);
+                if (node.isError) {
+                    currentKeyword.status = 'FAIL';
+                    if (currentTest) currentTest.status = 'FAIL';
+                }
+            } else if (currentTest) {
+                if (!currentTest.children) currentTest.children = [];
+                currentTest.children.push(actionNode);
+                currentTest.hasChildren = true;
+                if (node.isError) currentTest.status = 'FAIL';
+            } else {
+                const currentSuite = activeSuite();
+                if (currentSuite) currentSuite.children.push(actionNode);
+                else root.push(actionNode);
+            }
+        } else if (node.type === 'test-end') {
+            if (currentTest) {
+                closeCurrentKeyword(node.status);
                 currentTest.status = node.status;
                 if (node.doc) currentTest.doc = node.doc;
                 if (node.ret) currentTest.ret = node.ret;
@@ -329,12 +417,17 @@ export function parseHeuristicLogs(
                 currentTest = null;
             }
         } else if (node.type === 'text') {
-            if (currentTest) {
+            if (currentKeyword) {
+                if (!IS_REDUNDANT_SYSTEM(node.content)) {
+                    currentKeyword.children.push({ type: 'text', content: node.content, id: nodeId });
+                }
+            } else if (currentTest) {
                 if (!IS_REDUNDANT_SYSTEM(node.content)) currentTest.logs.push(node.content);
                 // System finish detection
                 if (node.content.includes('[System] Finished:') || node.content.includes('[System] Stopping...')) {
                     const isSuccess = node.content.toLowerCase().includes('exit code: 0');
                     const finalStatus = isSuccess ? 'PASS' : 'FAIL';
+                    closeCurrentKeyword(finalStatus);
                     if (currentTest.status === 'RUNNING') {
                         currentTest.status = finalStatus;
                         const suite = activeSuite();
@@ -360,7 +453,9 @@ export function parseHeuristicLogs(
             }
         } else if (node.type === 'ai-thought' || node.type === 'ai-action' || node.type === 'adb-executed') {
             const aiNode = { ...node, id: nodeId } as any;
-            if (currentTest) {
+            if (currentKeyword) {
+                currentKeyword.children.push(aiNode);
+            } else if (currentTest) {
                 if (!(currentTest as any).children) (currentTest as any).children = [];
                 (currentTest as any).children.push(aiNode);
             } else {
@@ -373,6 +468,35 @@ export function parseHeuristicLogs(
             }
         }
     });
+
+    // If suite finished log is present, ensure any remaining RUNNING nodes are properly finalized
+    const hasFinishedLog = logs.some(l => l.includes('[RRT] Suite execution finished') || l.includes('[System] Finished:') || l.includes('[System] Stopping...'));
+    if (hasFinishedLog) {
+        closeCurrentTest();
+        const resolveRunningNodes = (nodes: LogNode[]) => {
+            for (const n of nodes) {
+                if (n.type === 'suite' && n.status === 'RUNNING') {
+                    if (n.stats && n.stats.failed > 0) {
+                        n.status = 'FAIL';
+                    } else if (n.stats && n.stats.passed > 0) {
+                        n.status = 'PASS';
+                    } else {
+                        n.status = 'PASS';
+                    }
+                }
+                if (n.type === 'test' && n.status === 'RUNNING') {
+                    n.status = 'PASS';
+                }
+                if (n.type === 'keyword' && n.status === 'RUNNING') {
+                    n.status = 'PASS';
+                }
+                if ((n as any).children && Array.isArray((n as any).children)) {
+                    resolveRunningNodes((n as any).children);
+                }
+            }
+        };
+        resolveRunningNodes(root);
+    }
 
     return {
         tree: root,

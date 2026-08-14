@@ -52,6 +52,7 @@ import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.PerformanceSubTab
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.CommandsSubTab
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.StopwatchSubTab
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.CheckupSubTab
+import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.RunConsoleSubTab
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.draw.clip
@@ -400,9 +401,9 @@ fun HomePage(
                                 detailedSpecs = detailedSpecs,
                                 onLaunchDisplayTest = onLaunchDisplayTest
                             )
-                            7 -> PlaceholderTabContent(stringResource(id = R.string.tab_run_console))
-                            8 -> PlaceholderTabContent(stringResource(id = R.string.tab_history))
-                            // 9 -> PlaceholderTabContent(stringResource(id = R.string.tab_webview))
+                            6 -> RunConsoleSubTab()
+                            7 -> PlaceholderTabContent(stringResource(id = R.string.tab_history))
+                            // 8 -> PlaceholderTabContent(stringResource(id = R.string.tab_webview))
                         }
                     }
                 }

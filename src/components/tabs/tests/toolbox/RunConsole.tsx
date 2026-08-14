@@ -107,6 +107,11 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath,
     const debugVirtuosoRef = useRef<VirtuosoHandle>(null);
     const [tree, setTree] = useState<LogNode[]>(() => session?.repopulatedTree ? [session.repopulatedTree] : []);
 
+    // Persistent Parsing Context
+    const parsedNodesRef = useRef<LinearNode[]>([]);
+    const processedCountRef = useRef<number>(0);
+    const [reparseLoading, setReparseLoading] = useState(false);
+
     const handleChildrenLoaded = useCallback((id: string, children: LogNode[]) => {
         // Find node in tree and attach children so flattenLogNodes can see them
         const updateNode = (nodes: LogNode[]): boolean => {
@@ -201,25 +206,27 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath,
         }
     };
 
-    // Persistent Parsing Context
-    const parsedNodesRef = useRef<LinearNode[]>([]);
-    const processedCountRef = useRef<number>(0);
-
-    // Track if post-test re-parse is in progress
-    const [reparseLoading, setReparseLoading] = useState(false);
+    // Reset parsing context when switching sessions / runId
+    useEffect(() => {
+        parsedNodesRef.current = [];
+        processedCountRef.current = 0;
+        setTree(session?.repopulatedTree ? [session.repopulatedTree] : []);
+        setSummary(null);
+        setSummaryError(null);
+    }, [runId]);
 
     // Invalidate XML parsing cache for this session's output path when the test run starts
     useEffect(() => {
-        if (isRunning && session?.outputDir) {
+        if (isRunning && session?.outputDir && !session?.isRrt) {
             const outputPath = session.outputDir;
             const outputXmlPath = session.outputXmlPath || `${outputPath.replace(/[\\/]+$/, "")}/output.xml`;
             invalidateCache(outputXmlPath);
         }
-    }, [isRunning, session?.outputDir, session?.outputXmlPath]);
+    }, [isRunning, session?.outputDir, session?.outputXmlPath, session?.isRrt]);
 
     useEffect(() => {
-        // Skip if running, or no output path, or tree is already officially repopulated
-        if (isRunning || !session?.outputDir || !!session?.repopulatedTree) return;
+        // Skip if running, or no output path, or tree is already officially repopulated, or if it's an RRT session (RRT does not generate output.xml)
+        if (isRunning || !session?.outputDir || !!session?.repopulatedTree || session?.isRrt) return;
 
         let cancelled = false;
 
@@ -247,7 +254,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath,
 
         parseOutputXml();
         return () => { cancelled = true; };
-    }, [isRunning, session?.outputDir, session?.repopulatedTree]);
+    }, [isRunning, session?.outputDir, session?.repopulatedTree, session?.isRrt]);
 
     const handleSummarize = async (customPrompt?: string) => {
         if (tree.length === 0 || isSummarizing) return;
@@ -477,8 +484,8 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath,
 
     // Heuristic Parsing Loop
     useEffect(() => {
-        // Skip log parsing if we already have a repopped tree and the test is finished
-        if (!isRunning && tree.length > 0 && (session?.repopulatedTree || session?.outputDir)) {
+        // Skip log parsing if we already have a repopped tree and the test is finished (for frameworks that produce output.xml)
+        if (!isRunning && tree.length > 0 && (session?.repopulatedTree || (!session?.isRrt && session?.outputDir))) {
             processedCountRef.current = logs.length; // Mark all as processed
             return;
         }
@@ -508,12 +515,12 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath,
             setTree(result.tree);
         }
 
-        // Auto-detect output XML from logs
-        if (result.outputXmlPath || result.outputDir) {
+        // Auto-detect output XML from logs (not applicable for RRT)
+        if (!session?.isRrt && (result.outputXmlPath || result.outputDir)) {
             setSessionTree(runId, undefined, undefined, result.outputDir, result.outputXmlPath);
         }
 
-    }, [logs, isRunning, runId, session?.repopulatedTree]);
+    }, [logs, isRunning, runId, session?.repopulatedTree, session?.isRrt]);
 
     // Definitively update tree when session.repopulatedTree arrives
     useEffect(() => {
@@ -722,6 +729,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath,
                                     </div>
                                 );
                             }
+
                             return (
                                 <div className="whitespace-pre-wrap break-words hover:bg-surface-variant/10 px-6 py-0.5 rounded transition-colors border-l-2 border-transparent hover:border-primary/30 flex">
                                     <span className="text-on-surface-variant/40 mr-3 select-none w-8 inline-block text-right tabular-nums shrink-0">{i + 1}</span>
@@ -730,7 +738,7 @@ export function RunConsole({ runId, logs, isSessionRunning: isRunning, testPath,
                                         line.includes('| PASS |') && "text-success font-semibold",
                                         line.includes('| FAIL |') && "text-error font-semibold",
                                         line.includes('| SKIP |') && "text-warning font-semibold",
-                                        (line.includes('[System]') || line.includes('[RR-')) && "text-on-surface-variant/60 italic"
+                                        (line.includes('[System]') || line.includes('[RR-') || line.startsWith('[RRT]')) && "text-on-surface-variant/60 italic"
                                     )}>
                                         {line}
                                     </span>

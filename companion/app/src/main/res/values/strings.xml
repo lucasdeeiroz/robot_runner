@@ -426,4 +426,17 @@
     <string name="msg_recording_audio">Recording 3 seconds...</string>
     <string name="msg_playing_audio">Playing back...</string>
     <string name="msg_failed_mic">Failed to start microphone</string>
+
+    <!-- Run Console Strings -->
+    <string name="run_console_status_idle">Idle</string>
+    <string name="run_console_status_running">Running...</string>
+    <string name="run_console_status_passed">Passed</string>
+    <string name="run_console_status_failed">Failed</string>
+    <string name="run_console_no_logs_title">No Test Execution Logs</string>
+    <string name="run_console_no_logs_desc">Execute a test suite from Robot Runner Desktop or BDD Runner to monitor live output and step logs in real time.</string>
+    <string name="run_console_search_placeholder">Filter console logs...</string>
+    <string name="run_console_clear_logs">Clear logs</string>
+    <string name="run_console_auto_scroll">Auto-scroll</string>
+    <string name="run_console_suite_prefix">Suite: %1$s</string>
+    <string name="run_console_lines_count">%1$d lines</string>
 </resources>
