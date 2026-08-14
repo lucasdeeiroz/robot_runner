@@ -105,6 +105,56 @@ class CompanionHttpServer(
             return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", errJson.toString())
         }
 
+        if (uri == "/rrt/execute") {
+            if (method == Method.POST) {
+                try {
+                    val jsonStr = safeGetPostBody(session)
+                    if (jsonStr.isNullOrEmpty()) {
+                        val err = JsonObject().apply {
+                            addProperty("status", "error")
+                            addProperty("message", "Missing or empty RRT payload body")
+                        }
+                        return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", err.toString())
+                    }
+                    val payload = gson.fromJson(jsonStr, JsonObject::class.java)
+
+                    val pos = java.io.PipedOutputStream()
+                    val pis = java.io.PipedInputStream(pos, 8192)
+
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                        val writer = java.io.OutputStreamWriter(pos, Charsets.UTF_8).buffered()
+                        try {
+                            RrtEngine.executePayloadStreaming(context, payload) { eventJson ->
+                                try {
+                                    writer.write(eventJson.toString() + "\n")
+                                    writer.flush()
+                                } catch (e: Exception) {
+                                    Log.w("CompanionHttpServer", "Client stream write error", e)
+                                }
+                            }
+                        } finally {
+                            try { writer.close() } catch (_: Exception) {}
+                        }
+                    }
+
+                    return newChunkedResponse(Response.Status.OK, "application/x-ndjson", pis)
+                } catch (e: Exception) {
+                    Log.e("CompanionHttpServer", "Error starting RRT stream execution", e)
+                    val err = JsonObject().apply {
+                        addProperty("status", "error")
+                        addProperty("message", e.message ?: "Failed to execute RRT payload")
+                    }
+                    return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", err.toString())
+                }
+            } else {
+                val err = JsonObject().apply {
+                    addProperty("status", "error")
+                    addProperty("message", "Method not allowed")
+                }
+                return newFixedLengthResponse(Response.Status.METHOD_NOT_ALLOWED, "application/json", err.toString())
+            }
+        }
+
         val responseJson = when (uri) {
             "/ping" -> JsonObject().apply {
                 addProperty("status", "ok")
@@ -545,34 +595,6 @@ class CompanionHttpServer(
                 JsonObject().apply {
                     addProperty("status", if (pdfFile != null) "ok" else "error")
                     addProperty("filePath", pdfFile?.absolutePath ?: "")
-                }
-            }
-
-            "/rrt/execute" -> {
-                if (method == Method.POST) {
-                    try {
-                        val jsonStr = safeGetPostBody(session)
-                        if (jsonStr.isNullOrEmpty()) {
-                            JsonObject().apply {
-                                addProperty("status", "error")
-                                addProperty("message", "Missing or empty RRT payload body")
-                            }
-                        } else {
-                            val payload = gson.fromJson(jsonStr, JsonObject::class.java)
-                            RrtEngine.executePayloadSync(context, payload)
-                        }
-                    } catch (e: Exception) {
-                        Log.e("CompanionHttpServer", "Error executing RRT payload", e)
-                        JsonObject().apply {
-                            addProperty("status", "error")
-                            addProperty("message", e.message ?: "Failed to execute RRT payload")
-                        }
-                    }
-                } else {
-                    JsonObject().apply {
-                        addProperty("status", "error")
-                        addProperty("message", "Method not allowed")
-                    }
                 }
             }
 

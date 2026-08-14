@@ -36,6 +36,7 @@ class CompanionServerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         startForegroundServiceNotification()
         startServer()
     }
@@ -77,8 +78,31 @@ class CompanionServerService : Service() {
     }
 
     override fun onDestroy() {
+        if (instance === this) {
+            instance = null
+        }
         stopServer()
         super.onDestroy()
+    }
+
+    fun updateForegroundNotification(notification: Notification) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                try {
+                    startForeground(1001, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+                } catch (_: Exception) {
+                    startForeground(1001, notification)
+                }
+            } else {
+                startForeground(1001, notification)
+            }
+        } catch (e: Exception) {
+            Log.w("CompanionService", "Failed to update foreground notification: ${e.message}")
+        }
+    }
+
+    fun restoreDefaultNotification() {
+        startForegroundServiceNotification()
     }
 
     private fun startForegroundServiceNotification() {
@@ -120,5 +144,7 @@ class CompanionServerService : Service() {
 
     companion object {
         const val SERVER_PORT = 9876
+        var instance: CompanionServerService? = null
+            private set
     }
 }

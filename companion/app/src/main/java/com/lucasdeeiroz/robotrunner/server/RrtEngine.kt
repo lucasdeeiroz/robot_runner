@@ -388,6 +388,8 @@ object RrtEngine {
         isRunningFlow.value = true
         lastExitCodeFlow.value = null
         currentSuiteFlow.value = suite.name
+        val totalSteps = suite.testCases.sumOf { it.steps.size }
+        var currentStepNumber = 0
 
         fun addLog(msg: String) {
             Log.i(TAG, msg)
@@ -395,6 +397,7 @@ object RrtEngine {
             logsFlow.value = logsFlow.value + msg
         }
 
+        RrtNotificationManager.showProgress(context, suite.name, 0, totalSteps, "Iniciando...")
         addLog("[RRT] Starting execution of suite: ${suite.name}")
         if (suite.targetPackage.isNotEmpty()) {
             addLog("[RRT] Target Application: ${suite.targetPackage}")
@@ -433,6 +436,8 @@ object RrtEngine {
 
                     step.status = "RUNNING"
                     val stepStart = System.currentTimeMillis()
+                    currentStepNumber++
+                    RrtNotificationManager.showProgress(context, suite.name, currentStepNumber, totalSteps, step.keyword)
                     addLog("[Step] ${step.keyword}")
                     onStepUpdated()
 
@@ -497,6 +502,7 @@ object RrtEngine {
         } finally {
             isRunningFlow.value = false
             lastExitCodeFlow.value = overallExitCode
+            RrtNotificationManager.showCompletion(context, suite.name, overallExitCode == 0, passedCount, suite.testCases.size)
         }
 
         val report = RrtExecutionReport(
@@ -519,8 +525,11 @@ object RrtEngine {
         report
     }
 
-    fun executePayloadSync(context: Context, payload: JsonObject): JsonObject = runBlocking {
-        // Automatically persist incoming payload
+    suspend fun executePayloadStreaming(
+        context: Context,
+        payload: JsonObject,
+        onEvent: (JsonObject) -> Unit
+    ) = withContext(Dispatchers.IO) {
         val savedSuite = try {
             saveSuitePayload(context, payload)
         } catch (e: Exception) {
@@ -528,7 +537,6 @@ object RrtEngine {
             null
         }
 
-        val response = JsonObject()
         val logs = JsonArray()
         val logsList = mutableListOf<String>()
         var overallSuccess = true
@@ -546,10 +554,28 @@ object RrtEngine {
             logs.add(msg)
             logsList.add(msg)
             logsFlow.value = logsFlow.value + msg
+
+            val event = JsonObject().apply {
+                addProperty("type", "log")
+                addProperty("message", msg)
+            }
+            onEvent(event)
         }
 
         val suiteName = payload.get("suite_name")?.asString ?: "RRT Suite"
         val targetPkg = payload.get("target_package")?.asString ?: ""
+
+        val tests = payload.getAsJsonArray("tests")
+        var totalSteps = 0
+        if (tests != null) {
+            for (i in 0 until tests.size()) {
+                val t = tests.get(i).asJsonObject
+                totalSteps += t.getAsJsonArray("steps")?.size() ?: 0
+            }
+        }
+        var currentStepNumber = 0
+
+        RrtNotificationManager.showProgress(context, suiteName, 0, totalSteps, "Iniciando...")
 
         try {
             currentSuiteFlow.value = suiteName
@@ -558,13 +584,16 @@ object RrtEngine {
                 addLog("[RRT] Target Application: $targetPkg")
             }
 
-            val tests = payload.getAsJsonArray("tests")
             if (tests == null || tests.size() == 0) {
                 addLog("[RRT] Warning: No tests found in payload.")
-                response.addProperty("status", "ok")
-                response.addProperty("exitCode", 0)
-                response.add("logs", logs)
-                return@runBlocking response
+                val finishEvt = JsonObject().apply {
+                    addProperty("type", "finish")
+                    addProperty("status", "ok")
+                    addProperty("exitCode", 0)
+                    add("logs", logs)
+                }
+                onEvent(finishEvt)
+                return@withContext
             }
 
             for (i in 0 until tests.size()) {
@@ -599,7 +628,17 @@ object RrtEngine {
                         val matchStep = matchTestCase?.steps?.getOrNull(j)
                         matchStep?.status = "RUNNING"
                         val stepStart = System.currentTimeMillis()
+
+                        currentStepNumber++
+                        RrtNotificationManager.showProgress(context, suiteName, currentStepNumber, totalSteps, keyword)
                         addLog("[Step] $keyword")
+
+                        val stepEvt = JsonObject().apply {
+                            addProperty("type", "step")
+                            addProperty("step", keyword)
+                            addProperty("status", "RUNNING")
+                        }
+                        onEvent(stepEvt)
 
                         var stepPassed = true
                         val actions = step.getAsJsonArray("actions")
@@ -630,6 +669,13 @@ object RrtEngine {
 
                         matchStep?.durationMs = System.currentTimeMillis() - stepStart
                         matchStep?.status = if (stepPassed) "PASSED" else "FAILED"
+
+                        val stepResultEvt = JsonObject().apply {
+                            addProperty("type", "step")
+                            addProperty("step", keyword)
+                            addProperty("status", matchStep?.status ?: "PASSED")
+                        }
+                        onEvent(stepResultEvt)
 
                         if (!overallSuccess) break
                         delay(250)
@@ -675,6 +721,15 @@ object RrtEngine {
         } finally {
             isRunningFlow.value = false
             lastExitCodeFlow.value = exitCode
+            RrtNotificationManager.showCompletion(context, suiteName, overallSuccess, passedCount, tests?.size() ?: 0)
+
+            val finishEvt = JsonObject().apply {
+                addProperty("type", "finish")
+                addProperty("status", if (overallSuccess) "ok" else "error")
+                addProperty("exitCode", exitCode)
+                add("logs", logs)
+            }
+            onEvent(finishEvt)
         }
 
         val report = RrtExecutionReport(
@@ -689,14 +744,20 @@ object RrtEngine {
             testCases = testCasesRan,
             logs = logsList
         )
+
+        // Save report to disk and update suite
         saveSuiteReport(context, suiteName, report)
         savedSuite?.lastReport = report
-        reloadSavedSuites(context)
+    }
 
-        response.addProperty("status", if (overallSuccess) "ok" else "error")
-        response.addProperty("exitCode", exitCode)
-        response.add("logs", logs)
-        response
+    fun executePayloadSync(context: Context, payload: JsonObject): JsonObject = runBlocking {
+        var finalRes = JsonObject()
+        executePayloadStreaming(context, payload) { evt ->
+            if (evt.get("type")?.asString == "finish") {
+                finalRes = evt
+            }
+        }
+        finalRes
     }
 
     fun exportReportHtml(context: Context, report: RrtExecutionReport): File? {

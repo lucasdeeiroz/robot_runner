@@ -920,45 +920,91 @@ pub async fn compile_and_send_rrt(
         .send()
         .await;
 
-    // Guaranteed ADB privileged termination of target application on test teardown
-    if let Some(ref target_pkg) = target_package {
-        if !target_pkg.is_empty() {
-            let mut force_stop_cmd = std::process::Command::new(&adb_program);
-            force_stop_cmd.args(&["-s", &udid, "shell", "am", "force-stop", target_pkg]);
-            let _ = force_stop_cmd.output();
-        }
-    }
-
     match res {
-        Ok(response) => {
+        Ok(mut response) => {
             if response.status().is_success() {
-                let text = response.text().await.unwrap_or_default();
+                let mut buffer = String::new();
                 let mut exit_code = 0;
-                
-                if let Ok(json_res) = serde_json::from_str::<serde_json::Value>(&text) {
-                    if let Some(logs_arr) = json_res.get("logs").and_then(|l| l.as_array()) {
-                        for log_val in logs_arr {
-                            if let Some(log_msg) = log_val.as_str() {
-                                let _ = app.emit("test-output", TestOutput {
-                                    run_id: run_id.clone(),
-                                    message: log_msg.to_string(),
-                                });
+
+                while let Ok(Some(chunk)) = response.chunk().await {
+                    let chunk_str = String::from_utf8_lossy(&chunk);
+                    buffer.push_str(&chunk_str);
+
+                    while let Some(pos) = buffer.find('\n') {
+                        let line = buffer[..pos].trim().to_string();
+                        buffer = buffer[pos + 1..].to_string();
+
+                        if line.is_empty() {
+                            continue;
+                        }
+
+                        if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&line) {
+                            let event_type = json_val.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                            match event_type {
+                                "log" => {
+                                    if let Some(msg) = json_val.get("message").and_then(|m| m.as_str()) {
+                                        let _ = app.emit("test-output", TestOutput {
+                                            run_id: run_id.clone(),
+                                            message: msg.to_string(),
+                                        });
+                                    }
+                                }
+                                "finish" => {
+                                    if let Some(code) = json_val.get("exitCode").and_then(|c| c.as_i64()) {
+                                        exit_code = code as i32;
+                                    }
+                                    if let Some(status_str) = json_val.get("status").and_then(|s| s.as_str()) {
+                                        if status_str == "error" && exit_code == 0 {
+                                            exit_code = 1;
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    if let Some(msg) = json_val.get("message").and_then(|m| m.as_str()) {
+                                        let _ = app.emit("test-output", TestOutput {
+                                            run_id: run_id.clone(),
+                                            message: msg.to_string(),
+                                        });
+                                    }
+                                }
                             }
+                        } else {
+                            let _ = app.emit("test-output", TestOutput {
+                                run_id: run_id.clone(),
+                                message: line,
+                            });
                         }
                     }
-                    if let Some(code) = json_res.get("exitCode").and_then(|c| c.as_i64()) {
-                        exit_code = code as i32;
-                    }
-                    if let Some(status_str) = json_res.get("status").and_then(|s| s.as_str()) {
-                        if status_str == "error" && exit_code == 0 {
-                            exit_code = 1;
+                }
+
+                // Final flush if any leftovers
+                if !buffer.trim().is_empty() {
+                    let line = buffer.trim();
+                    if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(line) {
+                        if let Some(msg) = json_val.get("message").and_then(|m| m.as_str()) {
+                            let _ = app.emit("test-output", TestOutput {
+                                run_id: run_id.clone(),
+                                message: msg.to_string(),
+                            });
                         }
+                        if let Some(code) = json_val.get("exitCode").and_then(|c| c.as_i64()) {
+                            exit_code = code as i32;
+                        }
+                    } else {
+                        let _ = app.emit("test-output", TestOutput {
+                            run_id: run_id.clone(),
+                            message: line.to_string(),
+                        });
                     }
-                } else {
-                    let _ = app.emit("test-output", TestOutput {
-                        run_id: run_id.clone(),
-                        message: format!("[Companion Response] {}", text),
-                    });
+                }
+
+                // Guaranteed ADB privileged termination of target application on test teardown
+                if let Some(ref target_pkg) = target_package {
+                    if !target_pkg.is_empty() {
+                        let mut force_stop_cmd = std::process::Command::new(&adb_program);
+                        force_stop_cmd.args(&["-s", &udid, "shell", "am", "force-stop", target_pkg]);
+                        let _ = force_stop_cmd.output();
+                    }
                 }
 
                 let _ = app.emit("test-finished", TestFinished {
@@ -969,6 +1015,16 @@ pub async fn compile_and_send_rrt(
             } else {
                 let status = response.status();
                 let text = response.text().await.unwrap_or_default();
+
+                // Guaranteed ADB privileged termination on failure
+                if let Some(ref target_pkg) = target_package {
+                    if !target_pkg.is_empty() {
+                        let mut force_stop_cmd = std::process::Command::new(&adb_program);
+                        force_stop_cmd.args(&["-s", &udid, "shell", "am", "force-stop", target_pkg]);
+                        let _ = force_stop_cmd.output();
+                    }
+                }
+
                 let _ = app.emit("test-output", TestOutput {
                     run_id: run_id.clone(),
                     message: format!("[System] Failed to execute RRT on Companion. Status: {}, Body: {}", status, text),
@@ -977,19 +1033,28 @@ pub async fn compile_and_send_rrt(
                     run_id: run_id.clone(),
                     exit_code: 1,
                 });
-                Err(AppError::CommandFailed(format!("HTTP error from Companion: {}", status)))
+                Ok("RRT failed".to_string())
             }
-        },
+        }
         Err(e) => {
+            // Guaranteed ADB privileged termination on connection error
+            if let Some(ref target_pkg) = target_package {
+                if !target_pkg.is_empty() {
+                    let mut force_stop_cmd = std::process::Command::new(&adb_program);
+                    force_stop_cmd.args(&["-s", &udid, "shell", "am", "force-stop", target_pkg]);
+                    let _ = force_stop_cmd.output();
+                }
+            }
+
             let _ = app.emit("test-output", TestOutput {
                 run_id: run_id.clone(),
-                message: format!("Failed to send RRT to Companion: {}", e),
+                message: format!("[System] Error connecting to Companion server: {}", e),
             });
             let _ = app.emit("test-finished", TestFinished {
                 run_id: run_id.clone(),
                 exit_code: 1,
             });
-            Err(AppError::CommandFailed(format!("Failed to send RRT to Companion: {}", e)))
+            Ok("RRT connection error".to_string())
         }
     }
 }
