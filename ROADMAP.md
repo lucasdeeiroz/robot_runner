@@ -163,7 +163,7 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
   - [x] Equiparar funcionalidades com a respectiva aba no RR Desktop.
   - [x] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
   - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
-  - [x] Espelhar a aba Console de Execução (log bruto em tempo real) para testes BDD em interface mobile.
+  - [x] Consolidado e integrado nativamente dentro da aba Tests (`ui/components/tabs/run/TestsSubTab.kt`).
 
 ## Fase: Implementação da Aba Webview (Toolbox)
   - [ ] Internacionalizar todos os textos.

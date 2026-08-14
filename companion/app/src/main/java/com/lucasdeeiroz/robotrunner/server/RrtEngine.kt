@@ -548,10 +548,11 @@ object RrtEngine {
             logsFlow.value = logsFlow.value + msg
         }
 
+        val suiteName = payload.get("suite_name")?.asString ?: "RRT Suite"
+        val targetPkg = payload.get("target_package")?.asString ?: ""
+
         try {
-            val suiteName = payload.get("suite_name")?.asString ?: "RRT Suite"
             currentSuiteFlow.value = suiteName
-            val targetPkg = payload.get("target_package")?.asString ?: ""
             addLog("[RRT] Starting execution of suite: $suiteName")
             if (targetPkg.isNotEmpty()) {
                 addLog("[RRT] Target Application: $targetPkg")
@@ -582,7 +583,7 @@ object RrtEngine {
                 if (setupActions != null) {
                     for (k in 0 until setupActions.size()) {
                         val act = setupActions.get(k).asJsonObject
-                        val ok = executeAction(context, act, ::addLog)
+                        val ok = executeAction(context, act, ::addLog, isDesktopExecution = true)
                         if (!ok) {
                             addLog("[RRT] Setup action failed: ${act.get("action")?.asString}")
                         }
@@ -605,7 +606,7 @@ object RrtEngine {
                         if (actions != null && actions.size() > 0) {
                             for (k in 0 until actions.size()) {
                                 val act = actions.get(k).asJsonObject
-                                val ok = executeAction(context, act, ::addLog)
+                                val ok = executeAction(context, act, ::addLog, isDesktopExecution = true)
                                 if (!ok) {
                                     addLog("[RRT] Action failed in step '$keyword'")
                                     overallSuccess = false
@@ -617,7 +618,7 @@ object RrtEngine {
                             }
                         } else {
                             val rawArgs = step.getAsJsonArray("args")
-                            val ok = executeKeywordFallback(context, keyword, rawArgs, ::addLog)
+                            val ok = executeKeywordFallback(context, keyword, rawArgs, ::addLog, isDesktopExecution = true)
                             if (!ok) {
                                 addLog("[RRT] Step '$keyword' failed.")
                                 overallSuccess = false
@@ -640,7 +641,7 @@ object RrtEngine {
                 if (teardownActions != null) {
                     for (k in 0 until teardownActions.size()) {
                         val act = teardownActions.get(k).asJsonObject
-                        executeAction(context, act, ::addLog)
+                        executeAction(context, act, ::addLog, isDesktopExecution = true)
                     }
                 }
 
@@ -658,6 +659,14 @@ object RrtEngine {
 
             addLog("----------------------------------------")
             addLog("[RRT] Suite execution finished with exit code: $exitCode")
+
+            // Bring Companion to front to display updated results without opening Settings
+            try {
+                val companionIntent = Intent(context, com.lucasdeeiroz.robotrunner.MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                }
+                context.startActivity(companionIntent)
+            } catch (_: Exception) {}
         } catch (e: Exception) {
             Log.e(TAG, "Fatal error executing RRT payload", e)
             addLog("[RRT Error] ${e.message}")
@@ -668,8 +677,6 @@ object RrtEngine {
             lastExitCodeFlow.value = exitCode
         }
 
-        val suiteName = payload.get("suite_name")?.asString ?: "RRT Suite"
-        val targetPkg = payload.get("target_package")?.asString ?: ""
         val report = RrtExecutionReport(
             reportId = "rep_${startTime}",
             suiteName = suiteName,
@@ -767,7 +774,12 @@ object RrtEngine {
         }
     }
 
-    private suspend fun executeAction(context: Context, actionObj: JsonObject, log: (String) -> Unit): Boolean {
+    private suspend fun executeAction(
+        context: Context,
+        actionObj: JsonObject,
+        log: (String) -> Unit,
+        isDesktopExecution: Boolean = false
+    ): Boolean {
         val actionType = actionObj.get("action")?.asString?.lowercase() ?: return true
         val service = CompanionAccessibilityService.instance
 
@@ -799,11 +811,14 @@ object RrtEngine {
 
             "close_app" -> {
                 val pkg = actionObj.get("package")?.asString ?: ""
-                log("  -> Closing Application: $pkg")
-                if (service != null) {
-                    service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
+                if (isDesktopExecution) {
+                    log("  -> Close App: $pkg (managed via Desktop ADB)")
+                    if (service != null) {
+                        service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
+                    }
+                } else {
+                    terminateApplicationSafely(context, service, pkg, log)
                 }
-                delay(500)
                 return true
             }
 
@@ -879,7 +894,13 @@ object RrtEngine {
         }
     }
 
-    private suspend fun executeKeywordFallback(context: Context, keyword: String, args: JsonArray?, log: (String) -> Unit): Boolean {
+    private suspend fun executeKeywordFallback(
+        context: Context,
+        keyword: String,
+        args: JsonArray?,
+        log: (String) -> Unit,
+        isDesktopExecution: Boolean = false
+    ): Boolean {
         val service = CompanionAccessibilityService.instance
         val low = keyword.lowercase()
 
@@ -897,8 +918,75 @@ object RrtEngine {
                 if (service == null) return false
                 return retryUntilTrue(10) { isTextPresentInHierarchy(service, text) }
             }
+        } else if (low.contains("fechar") || low.contains("terminate") || low.contains("close")) {
+            val pkg = if (args != null && args.size() > 0) args.get(0).asString else ""
+            if (isDesktopExecution) {
+                log("  -> [Desktop Teardown] Close App: $pkg (managed via Desktop ADB)")
+                if (service != null) {
+                    service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
+                }
+            } else {
+                terminateApplicationSafely(context, service, pkg, log)
+            }
+            return true
         }
         return true
+    }
+
+    private suspend fun terminateApplicationSafely(
+        context: Context,
+        service: CompanionAccessibilityService?,
+        pkg: String,
+        log: (String) -> Unit
+    ) {
+        log("  -> Terminating Application: $pkg")
+        try {
+            if (pkg.isNotEmpty()) {
+                // Tier 1: Automated Force Stop via Settings + Accessibility Service
+                if (service != null) {
+                    val stopped = service.forceStopPackageViaSettings(context, pkg, log)
+                    if (stopped) {
+                        log("  -> Target app successfully terminated: $pkg")
+                        return
+                    }
+                }
+
+                // Tier 2: Bring Companion back to Foreground (pushes target app to background)
+                try {
+                    val companionIntent = Intent(context, com.lucasdeeiroz.robotrunner.MainActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    }
+                    context.startActivity(companionIntent)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed bringing companion to front: ${e.message}")
+                }
+                delay(300)
+
+                // Tier 3: Kill background processes of target app
+                try {
+                    val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+                    am?.killBackgroundProcesses(pkg)
+                    log("  -> Background processes killed: $pkg")
+                } catch (e: Exception) {
+                    Log.w(TAG, "killBackgroundProcesses failed: ${e.message}")
+                }
+
+                // Tier 4: Direct ActivityManager forceStopPackage reflection (if privileged)
+                try {
+                    val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+                    val forceStopMethod = am?.javaClass?.getMethod("forceStopPackage", String::class.java)
+                    forceStopMethod?.invoke(am, pkg)
+                } catch (_: Exception) {}
+
+                // Tier 5: Shell force-stop (if privileged shell available)
+                try {
+                    Runtime.getRuntime().exec(arrayOf("am", "force-stop", pkg))
+                } catch (_: Exception) {}
+            }
+        } catch (e: Exception) {
+            log("  -> Error terminating app: ${e.message}")
+        }
+        delay(300)
     }
 
     private fun parseLocator(raw: String): Triple<String?, String?, String?> {

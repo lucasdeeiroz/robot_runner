@@ -7,8 +7,13 @@ import android.os.Build
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import kotlinx.coroutines.delay
 import java.util.concurrent.ConcurrentLinkedQueue
 
 class CompanionAccessibilityService : AccessibilityService() {
@@ -399,6 +404,175 @@ class CompanionAccessibilityService : AccessibilityService() {
         } catch (e: Exception) {
             Log.w("CompanionAccessibility", "Error traversing AccessibilityNodeInfo", e)
         }
+    }
+
+    suspend fun forceStopPackageViaSettings(context: Context, targetPackage: String, log: (String) -> Unit): Boolean {
+        if (targetPackage.isBlank()) return false
+        log("  -> [Force Stop via Settings] Opening App Settings for: $targetPackage")
+
+        try {
+            // 1. Launch Settings App Details Screen
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", targetPackage, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+            context.startActivity(intent)
+
+            // 2. Poll for the Force Stop button in Settings window (max 3 seconds)
+            val startTime = System.currentTimeMillis()
+            var buttonClicked = false
+            val forceStopKeywords = listOf(
+                "force_stop", "force_stop_button", "right_button", "button2",
+                "forçar parada", "forçar interrupção", "force stop", "detener",
+                "forzar detención", "interromper", "forzar detencion", "arreter", "stoppen erzwingen"
+            )
+
+            while (System.currentTimeMillis() - startTime < 3500 && !buttonClicked) {
+                delay(100)
+                val roots = buildList {
+                    rootInActiveWindow?.let { add(it) }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        try {
+                            windows?.forEach { w ->
+                                w.root?.let { r -> if (!contains(r)) add(r) }
+                            }
+                        } catch (_: Exception) {}
+                    }
+                }
+
+                for (root in roots) {
+                    val forceStopBtn = findForceStopButton(root, forceStopKeywords)
+                    if (forceStopBtn != null) {
+                        if (forceStopBtn.isEnabled) {
+                            val clicked = forceStopBtn.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                            if (clicked) {
+                                buttonClicked = true
+                                log("  -> [Force Stop via Settings] Clicked 'Force Stop' button")
+                                break
+                            }
+                        } else {
+                            // Button is disabled, which means the app is already stopped!
+                            log("  -> [Force Stop via Settings] App is already stopped (button disabled)")
+                            buttonClicked = false
+                            break
+                        }
+                    }
+                }
+            }
+
+            // 3. Confirm the dialog ("OK" / "Confirmar" / button1) via Node inspection + Hardware Gesture Tap fallback
+            if (buttonClicked) {
+                delay(350)
+                val dialogStartTime = System.currentTimeMillis()
+                var dialogConfirmed = false
+
+                while (System.currentTimeMillis() - dialogStartTime < 2000 && !dialogConfirmed) {
+                    delay(80)
+                    val dialogRoots = buildList {
+                        rootInActiveWindow?.let { add(it) }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            try {
+                                windows?.forEach { w ->
+                                    w.root?.let { r -> if (!contains(r)) add(r) }
+                                }
+                            } catch (_: Exception) {}
+                        }
+                    }
+
+                    for (dialogRoot in dialogRoots) {
+                        val confirmBtn = findConfirmDialogButton(dialogRoot)
+                        if (confirmBtn != null) {
+                            val rect = android.graphics.Rect()
+                            confirmBtn.getBoundsInScreen(rect)
+                            if (rect.width() > 0 && rect.height() > 0) {
+                                performTap(rect.centerX().toFloat(), rect.centerY().toFloat())
+                                log("  -> [Force Stop via Settings] Tapped OK button bounds at (${rect.centerX()}, ${rect.centerY()})")
+                            }
+                            confirmBtn.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                            dialogConfirmed = true
+                            log("  -> [Force Stop via Settings] Confirmed Force Stop dialog (clicked OK)")
+                            delay(300)
+                            break
+                        }
+                    }
+                }
+
+                // If accessibility tree was blocked/obscured, fallback to hardware gesture tap on bottom-right OK
+                if (!dialogConfirmed) {
+                    val metrics = context.resources.displayMetrics
+                    val w = metrics.widthPixels.toFloat()
+                    val h = metrics.heightPixels.toFloat()
+                    log("  -> [Force Stop via Settings] Dispatching hardware tap to bottom-right OK button (${(w * 0.73f).toInt()}, ${(h * 0.944f).toInt()})")
+                    performTap(w * 0.73f, h * 0.944f)
+                    delay(150)
+                    performTap(w * 0.73f, h * 0.944f)
+                    delay(300)
+                }
+            }
+
+            // 4. Return immediately to Companion MainActivity
+            val companionIntent = Intent(context, com.lucasdeeiroz.robotrunner.MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            context.startActivity(companionIntent)
+            delay(200)
+            return true
+        } catch (e: Exception) {
+            log("  -> [Force Stop via Settings] Failed: ${e.message}")
+            return false
+        }
+    }
+
+    private fun findForceStopButton(node: AccessibilityNodeInfo, keywords: List<String>): AccessibilityNodeInfo? {
+        val text = node.text?.toString()?.lowercase() ?: ""
+        val desc = node.contentDescription?.toString()?.lowercase() ?: ""
+        val resId = node.viewIdResourceName?.lowercase() ?: ""
+
+        val isMatch = keywords.any { kw ->
+            text.contains(kw) || desc.contains(kw) || resId.contains(kw)
+        }
+
+        if (isMatch) {
+            var cur: AccessibilityNodeInfo? = node
+            while (cur != null) {
+                if (cur.isClickable || cur.isEnabled) return cur
+                cur = cur.parent
+            }
+            return node
+        }
+
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val match = findForceStopButton(child, keywords)
+            if (match != null) return match
+        }
+        return null
+    }
+
+    private fun findConfirmDialogButton(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val text = node.text?.toString()?.trim()?.lowercase() ?: ""
+        val desc = node.contentDescription?.toString()?.trim()?.lowercase() ?: ""
+        val resId = node.viewIdResourceName?.lowercase() ?: ""
+        val className = node.className?.toString() ?: ""
+
+        // Exclude titles and messages to prevent false positive clicks
+        val isTitleOrMessage = resId.contains("title") || resId.contains("message") || resId.contains("summary")
+
+        if (!isTitleOrMessage) {
+            val isButton1 = resId.endsWith(":id/button1") || resId == "android:id/button1"
+            val isOkExact = text == "ok" || desc == "ok" || text == "confirmar" || desc == "confirmar" || text == "sim" || desc == "sim"
+
+            if (isButton1 || (isOkExact && (node.isClickable || className.contains("Button")))) {
+                return node
+            }
+        }
+
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val match = findConfirmDialogButton(child)
+            if (match != null) return match
+        }
+        return null
     }
 }
 

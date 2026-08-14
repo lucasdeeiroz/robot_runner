@@ -52,7 +52,6 @@ import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.PerformanceSubTab
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.CommandsSubTab
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.StopwatchSubTab
 import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.CheckupSubTab
-import com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox.RunConsoleSubTab
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.draw.clip
@@ -182,10 +181,8 @@ fun HomePage(
                                     PillTabItem(stringResource(id = R.string.tab_shell), Icons.Rounded.Terminal),
                                     PillTabItem(stringResource(id = R.string.tab_apps), Icons.Rounded.Apps),
                                     PillTabItem(stringResource(id = R.string.tab_checkup), Icons.Rounded.Memory),
-                                    
-                                    // PillTabItem(stringResource(id = R.string.tab_webview), Icons.Rounded.Language),
-                                    PillTabItem(stringResource(id = R.string.tab_run_console), Icons.Rounded.Code),
                                     PillTabItem(stringResource(id = R.string.tab_history), Icons.Rounded.History)
+                                    // PillTabItem(stringResource(id = R.string.tab_webview), Icons.Rounded.Language),
                                 ),
                                 selectedIndex = subTabToolbox,
                                 onTabSelected = { subTabToolbox = it }
@@ -401,9 +398,8 @@ fun HomePage(
                                 detailedSpecs = detailedSpecs,
                                 onLaunchDisplayTest = onLaunchDisplayTest
                             )
-                            6 -> RunConsoleSubTab()
-                            7 -> PlaceholderTabContent(stringResource(id = R.string.tab_history))
-                            // 8 -> PlaceholderTabContent(stringResource(id = R.string.tab_webview))
+                            6 -> PlaceholderTabContent(stringResource(id = R.string.tab_history))
+                            // 7 -> PlaceholderTabContent(stringResource(id = R.string.tab_webview))
                         }
                     }
                 }

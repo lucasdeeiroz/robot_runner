@@ -150,6 +150,7 @@ pub async fn grant_companion_permissions(app: AppHandle, device: String) -> AppR
         "android.permission.DUMP",
         "android.permission.WAKE_LOCK",
         "android.permission.BLUETOOTH_SCAN",
+        "android.permission.FORCE_STOP_PACKAGES",
     ];
     
     eprintln!("[Companion Rust] Granting necessary permissions via ADB on {}", device);

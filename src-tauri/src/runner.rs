@@ -909,12 +909,25 @@ pub async fn compile_and_send_rrt(
     port_fwd.args(&["-s", &udid, "forward", "tcp:9876", "tcp:9876"]);
     let _ = port_fwd.output(); // Ignore errors, it might already be forwarded
 
+    let target_package = serde_json::from_str::<serde_json::Value>(&payload)
+        .ok()
+        .and_then(|v| v.get("target_package").and_then(|p| p.as_str().map(|s| s.to_string())));
+
     let client = reqwest::Client::new();
     let res = client.post("http://127.0.0.1:9876/rrt/execute")
         .header("Content-Type", "application/json")
         .body(payload)
         .send()
         .await;
+
+    // Guaranteed ADB privileged termination of target application on test teardown
+    if let Some(ref target_pkg) = target_package {
+        if !target_pkg.is_empty() {
+            let mut force_stop_cmd = std::process::Command::new(&adb_program);
+            force_stop_cmd.args(&["-s", &udid, "shell", "am", "force-stop", target_pkg]);
+            let _ = force_stop_cmd.output();
+        }
+    }
 
     match res {
         Ok(response) => {

@@ -87,8 +87,14 @@ def expand_statement(stmt, local_vars, global_vars, keywords_dict, package_name,
         actions.append({"action": "launch_app", "package": pkg})
         return actions
 
-    if low_name in ["fechar app", "terminate application", "close all applications", "close application"]:
-        actions.append({"action": "close_app", "package": package_name})
+    if low_name in ["fechar app", "terminate application", "close all applications", "close application", "terminar aplicativo", "terminar aplicacao", "quit application"]:
+        pkg = package_name
+        for a in resolved_args:
+            if "app_id=" in a:
+                pkg = a.replace("app_id=", "").strip()
+            elif "com." in a and not a.startswith("http"):
+                pkg = a.strip()
+        actions.append({"action": "close_app", "package": pkg})
         return actions
 
     if low_name in ["click element", "click text", "click button"]:
