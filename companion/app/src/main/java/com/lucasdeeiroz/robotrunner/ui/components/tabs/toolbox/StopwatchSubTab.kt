@@ -671,6 +671,8 @@ fun ScannerStopwatchContent() {
         hasCameraPermission = granted
     }
 
+    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+
     LaunchedEffect(Unit) {
         while (true) {
             isScanning = ScannerStopwatchEngine.isScanning
@@ -793,7 +795,6 @@ fun ScannerStopwatchContent() {
                         AndroidView(
                             factory = { ctx ->
                                 val previewView = PreviewView(ctx)
-                                val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
                                 cameraProviderFuture.addListener({
                                     val cameraProvider = cameraProviderFuture.get()
                                     val preview = Preview.Builder().build().also {
