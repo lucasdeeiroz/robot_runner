@@ -417,11 +417,17 @@ object RrtEngine {
                 addLog("[RRT] Running Test Case: ${test.name}")
                 onStepUpdated()
 
+                val runtimeVars = mutableMapOf<String, Any>()
+                suite.rawJson.getAsJsonObject("variables")?.entrySet()?.forEach { (k, v) ->
+                    val cleanK = cleanAssignName(k)
+                    runtimeVars[cleanK] = v.asString
+                }
+
                 // Setup actions
                 for (act in test.setup) {
                     if (!isRunningFlow.value) break
-                    val ok = executeAction(context, act, ::addLog)
-                    if (!ok) {
+                    val status = executeAction(context, act, ::addLog, isDesktopExecution = false, runtimeVars = runtimeVars)
+                    if (status == ActionStatus.FAILED) {
                         addLog("[RRT] Setup action failed: ${act.get("action")?.asString}")
                     }
                 }
@@ -445,8 +451,8 @@ object RrtEngine {
                     if (step.actions.isNotEmpty()) {
                         for (act in step.actions) {
                             if (!isRunningFlow.value) break
-                            val ok = executeAction(context, act, ::addLog)
-                            if (!ok) {
+                            val status = executeAction(context, act, ::addLog, isDesktopExecution = false, runtimeVars = runtimeVars)
+                            if (status == ActionStatus.FAILED) {
                                 addLog("[RRT] Action failed in step '${step.keyword}'")
                                 stepPassed = false
                                 break
@@ -477,7 +483,7 @@ object RrtEngine {
 
                 // Teardown actions
                 for (act in test.teardown) {
-                    executeAction(context, act, ::addLog)
+                    executeAction(context, act, ::addLog, isDesktopExecution = false, runtimeVars = runtimeVars)
                 }
 
                 test.durationMs = System.currentTimeMillis() - testStart
@@ -607,13 +613,19 @@ object RrtEngine {
                 addLog("----------------------------------------")
                 addLog("[RRT] Running Test Case: $testName")
 
+                val runtimeVars = mutableMapOf<String, Any>()
+                payload.getAsJsonObject("variables")?.entrySet()?.forEach { (k, v) ->
+                    val cleanK = cleanAssignName(k)
+                    runtimeVars[cleanK] = v.asString
+                }
+
                 // 1. Setup actions
                 val setupActions = test.getAsJsonArray("setup")
                 if (setupActions != null) {
                     for (k in 0 until setupActions.size()) {
                         val act = setupActions.get(k).asJsonObject
-                        val ok = executeAction(context, act, ::addLog, isDesktopExecution = true)
-                        if (!ok) {
+                        val status = executeAction(context, act, ::addLog, isDesktopExecution = true, runtimeVars = runtimeVars)
+                        if (status == ActionStatus.FAILED) {
                             addLog("[RRT] Setup action failed: ${act.get("action")?.asString}")
                         }
                     }
@@ -645,8 +657,8 @@ object RrtEngine {
                         if (actions != null && actions.size() > 0) {
                             for (k in 0 until actions.size()) {
                                 val act = actions.get(k).asJsonObject
-                                val ok = executeAction(context, act, ::addLog, isDesktopExecution = true)
-                                if (!ok) {
+                                val status = executeAction(context, act, ::addLog, isDesktopExecution = true, runtimeVars = runtimeVars)
+                                if (status == ActionStatus.FAILED) {
                                     addLog("[RRT] Action failed in step '$keyword'")
                                     overallSuccess = false
                                     testPassed = false
@@ -670,14 +682,7 @@ object RrtEngine {
                         matchStep?.durationMs = System.currentTimeMillis() - stepStart
                         matchStep?.status = if (stepPassed) "PASSED" else "FAILED"
 
-                        val stepResultEvt = JsonObject().apply {
-                            addProperty("type", "step")
-                            addProperty("step", keyword)
-                            addProperty("status", matchStep?.status ?: "PASSED")
-                        }
-                        onEvent(stepResultEvt)
-
-                        if (!overallSuccess) break
+                        if (!stepPassed) break
                         delay(250)
                     }
                 }
@@ -687,7 +692,7 @@ object RrtEngine {
                 if (teardownActions != null) {
                     for (k in 0 until teardownActions.size()) {
                         val act = teardownActions.get(k).asJsonObject
-                        executeAction(context, act, ::addLog, isDesktopExecution = true)
+                        executeAction(context, act, ::addLog, isDesktopExecution = true, runtimeVars = runtimeVars)
                     }
                 }
 
@@ -835,81 +840,266 @@ object RrtEngine {
         }
     }
 
+    enum class ActionStatus {
+        SUCCESS,
+        FAILED,
+        BREAK,
+        CONTINUE
+    }
+
+    private fun cleanAssignName(raw: String): String {
+        return raw.replace("\${", "").replace("}", "").replace("=", "").replace("@{", "").replace("&{", "").trim()
+    }
+
+    private fun resolveRuntimeVariables(text: String, runtimeVars: Map<String, Any>): String {
+        var result = text
+        for (iter in 0..2) {
+            val prev = result
+            // 1. Resolve ${var}[property] e.g. ${posicoes}[height]
+            val propRegex = Regex("""\$\{([a-zA-Z0-9_]+)\}\[([a-zA-Z0-9_]+)\]""")
+            result = propRegex.replace(result) { match ->
+                val varName = match.groupValues[1]
+                val prop = match.groupValues[2]
+                val varVal = runtimeVars[varName]
+                when (varVal) {
+                    is Map<*, *> -> varVal[prop]?.toString() ?: "0"
+                    is JsonObject -> varVal.get(prop)?.asString ?: "0"
+                    else -> "0"
+                }
+            }
+            // 2. Resolve ${var} e.g. ${linha_x}
+            val varRegex = Regex("""\$\{([a-zA-Z0-9_]+)\}""")
+            result = varRegex.replace(result) { match ->
+                val varName = match.groupValues[1]
+                val varVal = runtimeVars[varName]
+                if (varVal != null) varVal.toString() else match.value
+            }
+            if (result == prev) break
+        }
+        return result
+    }
+
+    private fun evalMathExpression(expr: String): Double {
+        val clean = expr.replace("//", "/").replace(" ", "")
+        return try {
+            object : Any() {
+                var pos = -1
+                var ch = 0
+
+                fun nextChar() {
+                    ch = if (++pos < clean.length) clean[pos].code else -1
+                }
+
+                fun eat(charToEat: Int): Boolean {
+                    while (ch == ' '.code) nextChar()
+                    if (ch == charToEat) {
+                        nextChar()
+                        return true
+                    }
+                    return false
+                }
+
+                fun parse(): Double {
+                    nextChar()
+                    val x = parseExpression()
+                    return x
+                }
+
+                fun parseExpression(): Double {
+                    var x = parseTerm()
+                    while (true) {
+                        when {
+                            eat('+'.code) -> x += parseTerm()
+                            eat('-'.code) -> x -= parseTerm()
+                            else -> return x
+                        }
+                    }
+                }
+
+                fun parseTerm(): Double {
+                    var x = parseFactor()
+                    while (true) {
+                        when {
+                            eat('*'.code) -> x *= parseFactor()
+                            eat('/'.code) -> {
+                                val divisor = parseFactor()
+                                x = if (divisor != 0.0) x / divisor else 0.0
+                            }
+                            eat('%'.code) -> {
+                                val divisor = parseFactor()
+                                x = if (divisor != 0.0) x % divisor else 0.0
+                            }
+                            else -> return x
+                        }
+                    }
+                }
+
+                fun parseFactor(): Double {
+                    if (eat('+'.code)) return +parseFactor()
+                    if (eat('-'.code)) return -parseFactor()
+
+                    var x: Double
+                    val startPos = pos
+                    if (eat('('.code)) {
+                        x = parseExpression()
+                        eat(')'.code)
+                    } else if ((ch >= '0'.code && ch <= '9'.code) || ch == '.'.code) {
+                        while ((ch >= '0'.code && ch <= '9'.code) || ch == '.'.code) nextChar()
+                        x = clean.substring(startPos, pos).toDoubleOrNull() ?: 0.0
+                    } else {
+                        x = 0.0
+                    }
+                    return x
+                }
+            }.parse()
+        } catch (e: Exception) {
+            0.0
+        }
+    }
+
+    private fun evalCondition(condStr: String): Boolean {
+        val trimmed = condStr.trim()
+        if (trimmed.equals("true", ignoreCase = true) || trimmed == "1") return true
+        if (trimmed.equals("false", ignoreCase = true) || trimmed == "0") return false
+
+        // Check operators: ==, !=, <=, >=, <, >
+        if (trimmed.contains("==")) {
+            val parts = trimmed.split("==", limit = 2)
+            val left = parts[0].trim().removeSurrounding("\"", "'")
+            val right = parts[1].trim().removeSurrounding("\"", "'")
+            if (left.equals("true", ignoreCase = true) || left.equals("false", ignoreCase = true)) {
+                return left.equals(right, ignoreCase = true)
+            }
+            val numL = left.toDoubleOrNull()
+            val numR = right.toDoubleOrNull()
+            return if (numL != null && numR != null) numL == numR else left == right
+        }
+        if (trimmed.contains("!=")) {
+            val parts = trimmed.split("!=", limit = 2)
+            val left = parts[0].trim().removeSurrounding("\"", "'")
+            val right = parts[1].trim().removeSurrounding("\"", "'")
+            if (left.equals("true", ignoreCase = true) || left.equals("false", ignoreCase = true)) {
+                return !left.equals(right, ignoreCase = true)
+            }
+            val numL = left.toDoubleOrNull()
+            val numR = right.toDoubleOrNull()
+            return if (numL != null && numR != null) numL != numR else left != right
+        }
+        if (trimmed.contains("<=")) {
+            val parts = trimmed.split("<=", limit = 2)
+            val numL = parts[0].trim().toDoubleOrNull() ?: 0.0
+            val numR = parts[1].trim().toDoubleOrNull() ?: 0.0
+            return numL <= numR
+        }
+        if (trimmed.contains(">=")) {
+            val parts = trimmed.split(">=", limit = 2)
+            val numL = parts[0].trim().toDoubleOrNull() ?: 0.0
+            val numR = parts[1].trim().toDoubleOrNull() ?: 0.0
+            return numL >= numR
+        }
+        if (trimmed.contains("<")) {
+            val parts = trimmed.split("<", limit = 2)
+            val numL = parts[0].trim().toDoubleOrNull() ?: 0.0
+            val numR = parts[1].trim().toDoubleOrNull() ?: 0.0
+            return numL < numR
+        }
+        if (trimmed.contains(">")) {
+            val parts = trimmed.split(">", limit = 2)
+            val numL = parts[0].trim().toDoubleOrNull() ?: 0.0
+            val numR = parts[1].trim().toDoubleOrNull() ?: 0.0
+            return numL > numR
+        }
+        return false
+    }
+
     private suspend fun executeAction(
         context: Context,
         actionObj: JsonObject,
         log: (String) -> Unit,
-        isDesktopExecution: Boolean = false
-    ): Boolean {
-        val actionType = actionObj.get("action")?.asString?.lowercase() ?: return true
+        isDesktopExecution: Boolean = false,
+        runtimeVars: MutableMap<String, Any> = mutableMapOf()
+    ): ActionStatus {
+        val actionType = actionObj.get("action")?.asString?.lowercase() ?: return ActionStatus.SUCCESS
         val service = CompanionAccessibilityService.instance
 
         when (actionType) {
             "launch_app" -> {
-                val pkg = actionObj.get("package")?.asString ?: ""
+                val rawPkg = actionObj.get("package")?.asString ?: ""
+                val pkg = resolveRuntimeVariables(rawPkg, runtimeVars)
                 if (pkg.isNotEmpty()) {
                     log("  -> Launching Application: $pkg")
                     try {
                         val launchIntent = context.packageManager.getLaunchIntentForPackage(pkg)
                         if (launchIntent != null) {
-                            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
                             context.startActivity(launchIntent)
                             delay(2000)
-                            return true
+                            return ActionStatus.SUCCESS
                         } else {
                             log("  -> Warning: No launch intent found for $pkg, attempting monkey launch")
                             Runtime.getRuntime().exec("monkey -p $pkg -c android.intent.category.LAUNCHER 1")
                             delay(2000)
-                            return true
+                            return ActionStatus.SUCCESS
                         }
                     } catch (e: Exception) {
                         log("  -> Failed to launch app: ${e.message}")
-                        return false
+                        return ActionStatus.FAILED
                     }
                 }
-                return true
+                return ActionStatus.SUCCESS
             }
 
             "close_app" -> {
-                val pkg = actionObj.get("package")?.asString ?: ""
-                if (isDesktopExecution) {
-                    log("  -> Close App: $pkg (managed via Desktop ADB)")
-                    if (service != null) {
-                        service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
-                    }
-                } else {
-                    terminateApplicationSafely(context, service, pkg, log)
-                }
-                return true
+                val rawPkg = actionObj.get("package")?.asString ?: ""
+                val pkg = resolveRuntimeVariables(rawPkg, runtimeVars)
+                terminateApplicationSafely(context, service, pkg, log)
+                return ActionStatus.SUCCESS
             }
 
             "click" -> {
                 val rawTarget = actionObj.get("target")?.asString ?: ""
-                log("  -> Click: $rawTarget")
+                val target = resolveRuntimeVariables(rawTarget, runtimeVars)
+                log("  -> Click: $target")
                 if (service == null) {
                     log("  -> Error: Companion Accessibility Service is not active")
-                    return false
+                    return ActionStatus.FAILED
                 }
-                return retryUntilTrue(timeoutSeconds = 5) {
-                    performClickOnTarget(service, rawTarget)
+                val ok = retryUntilTrue(timeoutSeconds = 5) {
+                    performClickOnTarget(service, target)
                 }
+                return if (ok) ActionStatus.SUCCESS else ActionStatus.FAILED
             }
 
             "wait_visible" -> {
                 val rawTarget = actionObj.get("target")?.asString ?: ""
+                val target = resolveRuntimeVariables(rawTarget, runtimeVars)
                 val timeout = actionObj.get("timeout")?.asInt ?: 15
-                log("  -> Waiting for visibility of: $rawTarget (timeout: ${timeout}s)")
-                if (service == null) return false
-                return retryUntilTrue(timeoutSeconds = timeout) {
-                    isTargetVisible(service, rawTarget)
+                log("  -> Waiting for visibility of: $target (timeout: ${timeout}s)")
+                if (service == null) return ActionStatus.FAILED
+                val ok = retryUntilTrue(timeoutSeconds = timeout) {
+                    isTargetVisible(service, target)
                 }
+                return if (ok) ActionStatus.SUCCESS else ActionStatus.FAILED
+            }
+
+            "wait_not_visible" -> {
+                val rawTarget = actionObj.get("target")?.asString ?: ""
+                val target = resolveRuntimeVariables(rawTarget, runtimeVars)
+                val timeout = actionObj.get("timeout")?.asInt ?: 15
+                log("  -> Waiting for invisibility of: $target (timeout: ${timeout}s)")
+                if (service == null) return ActionStatus.FAILED
+                val ok = retryUntilTrue(timeoutSeconds = timeout) {
+                    !isTargetVisible(service, target)
+                }
+                return if (ok) ActionStatus.SUCCESS else ActionStatus.FAILED
             }
 
             "assert_text" -> {
-                val text = actionObj.get("text")?.asString ?: ""
+                val rawText = actionObj.get("text")?.asString ?: ""
+                val text = resolveRuntimeVariables(rawText, runtimeVars)
                 val timeout = actionObj.get("timeout")?.asInt ?: 15
                 log("  -> Asserting text present on screen: '$text' (timeout: ${timeout}s)")
-                if (service == null) return false
+                if (service == null) return ActionStatus.FAILED
                 val found = retryUntilTrue(timeoutSeconds = timeout) {
                     isTextPresentInHierarchy(service, text)
                 }
@@ -918,24 +1108,28 @@ object RrtEngine {
                 } else {
                     log("  -> Verification failed: Text '$text' was not found on screen.")
                 }
-                return found
+                return if (found) ActionStatus.SUCCESS else ActionStatus.FAILED
             }
 
             "input_text" -> {
                 val rawTarget = actionObj.get("target")?.asString ?: ""
-                val text = actionObj.get("text")?.asString ?: ""
-                log("  -> Input text: '$text' into '$rawTarget'")
-                if (service == null) return false
-                return retryUntilTrue(timeoutSeconds = 5) {
-                    performInputOnTarget(service, rawTarget, text)
+                val target = resolveRuntimeVariables(rawTarget, runtimeVars)
+                val rawText = actionObj.get("text")?.asString ?: ""
+                val text = resolveRuntimeVariables(rawText, runtimeVars)
+                log("  -> Input text: '$text' into '$target'")
+                if (service == null) return ActionStatus.FAILED
+                val ok = retryUntilTrue(timeoutSeconds = 5) {
+                    performInputOnTarget(service, target, text)
                 }
+                return if (ok) ActionStatus.SUCCESS else ActionStatus.FAILED
             }
 
             "sleep" -> {
-                val seconds = actionObj.get("seconds")?.asFloat ?: 1.0f
-                log("  -> Sleep ${seconds}s")
-                delay((seconds * 1000).toLong())
-                return true
+                val rawSec = actionObj.get("seconds")?.asString ?: "1.0"
+                val resolvedSec = resolveRuntimeVariables(rawSec, runtimeVars).toFloatOrNull() ?: 1.0f
+                log("  -> Sleep ${resolvedSec}s")
+                delay((resolvedSec * 1000).toLong())
+                return ActionStatus.SUCCESS
             }
 
             "press_key" -> {
@@ -945,12 +1139,333 @@ object RrtEngine {
                     service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
                 }
                 delay(300)
-                return true
+                return ActionStatus.SUCCESS
+            }
+
+            "scroll_to_element", "scroll_until_visible" -> {
+                val rawTarget = actionObj.get("target")?.asString ?: ""
+                val target = resolveRuntimeVariables(rawTarget, runtimeVars)
+                val rawContainer = actionObj.get("container")?.asString
+                val container = if (!rawContainer.isNullOrEmpty()) resolveRuntimeVariables(rawContainer, runtimeVars) else null
+                val maxScrolls = actionObj.get("max_scrolls")?.asInt ?: 10
+                val containerCriteria = if (!container.isNullOrEmpty()) com.lucasdeeiroz.robotrunner.model.LocatorCriteria.parse(container) else null
+
+                log("  -> Scrolling to element: $target (max attempts: $maxScrolls)")
+                if (service == null) {
+                    log("  -> Error: Companion Accessibility Service is not active")
+                    return ActionStatus.FAILED
+                }
+
+                var found = isTargetVisible(service, target)
+                if (found) {
+                    log("  -> Target element is already visible: $target")
+                    return ActionStatus.SUCCESS
+                }
+
+                for (attempt in 1..maxScrolls) {
+                    log("  -> Scroll attempt $attempt/$maxScrolls...")
+                    service.performScrollOnContainer(containerCriteria, forward = true)
+                    delay(700)
+                    if (isTargetVisible(service, target)) {
+                        log("  -> Target element found after $attempt scroll(s): $target")
+                        found = true
+                        break
+                    }
+                }
+                return if (found) ActionStatus.SUCCESS else ActionStatus.FAILED
+            }
+
+            "scroll", "scroll_down", "scroll_forward" -> {
+                val rawContainer = actionObj.get("container")?.asString ?: actionObj.get("target")?.asString
+                val container = if (!rawContainer.isNullOrEmpty()) resolveRuntimeVariables(rawContainer, runtimeVars) else null
+                val containerCriteria = if (!container.isNullOrEmpty()) com.lucasdeeiroz.robotrunner.model.LocatorCriteria.parse(container) else null
+                log("  -> Scroll down / forward")
+                if (service == null) return ActionStatus.FAILED
+                val scrolled = service.performScrollOnContainer(containerCriteria, forward = true)
+                delay(400)
+                return if (scrolled) ActionStatus.SUCCESS else ActionStatus.FAILED
+            }
+
+            "scroll_up", "scroll_backward" -> {
+                val rawContainer = actionObj.get("container")?.asString ?: actionObj.get("target")?.asString
+                val container = if (!rawContainer.isNullOrEmpty()) resolveRuntimeVariables(rawContainer, runtimeVars) else null
+                val containerCriteria = if (!container.isNullOrEmpty()) com.lucasdeeiroz.robotrunner.model.LocatorCriteria.parse(container) else null
+                log("  -> Scroll up / backward")
+                if (service == null) return ActionStatus.FAILED
+                val scrolled = service.performScrollOnContainer(containerCriteria, forward = false)
+                delay(400)
+                return if (scrolled) ActionStatus.SUCCESS else ActionStatus.FAILED
+            }
+
+            "swipe" -> {
+                val dm = context.resources.displayMetrics
+                val w = dm.widthPixels.toFloat()
+                val h = dm.heightPixels.toFloat()
+
+                val rawSx = actionObj.get("start_x")?.asString ?: ""
+                val rawSy = actionObj.get("start_y")?.asString ?: ""
+                val rawEx = actionObj.get("end_x")?.asString ?: actionObj.get("offset_x")?.asString ?: ""
+                val rawEy = actionObj.get("end_y")?.asString ?: actionObj.get("offset_y")?.asString ?: ""
+                val rawDur = actionObj.get("duration")?.asString ?: "350"
+
+                var sx = resolveRuntimeVariables(rawSx, runtimeVars).toFloatOrNull() ?: (w / 2f)
+                var sy = resolveRuntimeVariables(rawSy, runtimeVars).toFloatOrNull() ?: (h * 0.75f)
+                var ex = resolveRuntimeVariables(rawEx, runtimeVars).toFloatOrNull() ?: sx
+                var ey = resolveRuntimeVariables(rawEy, runtimeVars).toFloatOrNull() ?: (h * 0.25f)
+                val dur = resolveRuntimeVariables(rawDur, runtimeVars).replace("ms", "").toLongOrNull() ?: 350L
+
+                // Clamp to safe screen bounds (avoid status bar / gesture navigation bar dead zones)
+                sy = sy.coerceIn(120f, h - 180f)
+                ey = ey.coerceIn(120f, h - 180f)
+                sx = sx.coerceIn(50f, w - 50f)
+                ex = ex.coerceIn(50f, w - 50f)
+
+                log("  -> Swipe gesture: ($sx, $sy) -> ($ex, $ey) duration=${dur}ms")
+                if (service == null) {
+                    log("  -> Error: Companion Accessibility Service is not active")
+                    return ActionStatus.FAILED
+                }
+                val swiped = service.performSwipe(sx, sy, ex, ey, dur)
+                if (!swiped) {
+                    log("  -> Swipe gesture could not be completed via AccessibilityService")
+                }
+                return if (swiped) ActionStatus.SUCCESS else ActionStatus.FAILED
+            }
+
+            "get_element_rect" -> {
+                val rawTarget = actionObj.get("target")?.asString ?: ""
+                val target = resolveRuntimeVariables(rawTarget, runtimeVars)
+                val assignVar = cleanAssignName(actionObj.get("assign")?.asString ?: "rect")
+                log("  -> Get Element Rect of: $target -> \$$assignVar")
+                if (service == null) return ActionStatus.FAILED
+                val criteria = com.lucasdeeiroz.robotrunner.model.LocatorCriteria.parse(target)
+                val node = service.findFirstMatchingNode(criteria)
+                if (node != null) {
+                    val r = android.graphics.Rect()
+                    node.getBoundsInScreen(r)
+                    val rectMap = mapOf(
+                        "x" to r.left,
+                        "y" to r.top,
+                        "width" to r.width(),
+                        "height" to r.height(),
+                        "left" to r.left,
+                        "top" to r.top,
+                        "right" to r.right,
+                        "bottom" to r.bottom
+                    )
+                    runtimeVars[assignVar] = rectMap
+                    log("  -> Rect: $rectMap")
+                    return ActionStatus.SUCCESS
+                } else {
+                    log("  -> Element not found for Get Element Rect: $target")
+                    val dm = context.resources.displayMetrics
+                    runtimeVars[assignVar] = mapOf("x" to 0, "y" to 0, "width" to dm.widthPixels, "height" to dm.heightPixels)
+                    return ActionStatus.SUCCESS
+                }
+            }
+
+            "get_element_location" -> {
+                val rawTarget = actionObj.get("target")?.asString ?: ""
+                val target = resolveRuntimeVariables(rawTarget, runtimeVars)
+                val assignVar = cleanAssignName(actionObj.get("assign")?.asString ?: "location")
+                val criteria = com.lucasdeeiroz.robotrunner.model.LocatorCriteria.parse(target)
+                val node = service?.findFirstMatchingNode(criteria)
+                val r = android.graphics.Rect()
+                if (node != null) node.getBoundsInScreen(r)
+                runtimeVars[assignVar] = mapOf("x" to r.left, "y" to r.top)
+                return ActionStatus.SUCCESS
+            }
+
+            "get_element_size" -> {
+                val rawTarget = actionObj.get("target")?.asString ?: ""
+                val target = resolveRuntimeVariables(rawTarget, runtimeVars)
+                val assignVar = cleanAssignName(actionObj.get("assign")?.asString ?: "size")
+                val criteria = com.lucasdeeiroz.robotrunner.model.LocatorCriteria.parse(target)
+                val node = service?.findFirstMatchingNode(criteria)
+                val r = android.graphics.Rect()
+                if (node != null) node.getBoundsInScreen(r)
+                runtimeVars[assignVar] = mapOf("width" to r.width(), "height" to r.height())
+                return ActionStatus.SUCCESS
+            }
+
+            "get_text" -> {
+                val rawTarget = actionObj.get("target")?.asString ?: ""
+                val target = resolveRuntimeVariables(rawTarget, runtimeVars)
+                val assignVar = cleanAssignName(actionObj.get("assign")?.asString ?: "text")
+                val criteria = com.lucasdeeiroz.robotrunner.model.LocatorCriteria.parse(target)
+                val node = service?.findFirstMatchingNode(criteria)
+                val txt = node?.text?.toString() ?: node?.contentDescription?.toString() ?: ""
+                runtimeVars[assignVar] = txt
+                log("  -> Get Text: '$txt' -> \$$assignVar")
+                return ActionStatus.SUCCESS
+            }
+
+            "get_element_attribute" -> {
+                val rawTarget = actionObj.get("target")?.asString ?: ""
+                val target = resolveRuntimeVariables(rawTarget, runtimeVars)
+                val attr = actionObj.get("attribute")?.asString ?: "content-desc"
+                val assignVar = cleanAssignName(actionObj.get("assign")?.asString ?: "attr")
+                val criteria = com.lucasdeeiroz.robotrunner.model.LocatorCriteria.parse(target)
+                val node = service?.findFirstMatchingNode(criteria)
+                val valStr = when (attr.lowercase()) {
+                    "text" -> node?.text?.toString() ?: ""
+                    "content-desc", "contentdescription", "description" -> node?.contentDescription?.toString() ?: ""
+                    "resource-id", "resourceid", "id" -> node?.viewIdResourceName ?: ""
+                    "class", "classname" -> node?.className?.toString() ?: ""
+                    "package" -> node?.packageName?.toString() ?: ""
+                    "clickable" -> node?.isClickable?.toString() ?: "false"
+                    "scrollable" -> node?.isScrollable?.toString() ?: "false"
+                    "enabled" -> node?.isEnabled?.toString() ?: "true"
+                    "selected" -> node?.isSelected?.toString() ?: "false"
+                    "focused" -> node?.isFocused?.toString() ?: "false"
+                    else -> ""
+                }
+                runtimeVars[assignVar] = valStr
+                return ActionStatus.SUCCESS
+            }
+
+            "evaluate" -> {
+                val rawExpr = actionObj.get("expression")?.asString ?: ""
+                val assignVar = cleanAssignName(actionObj.get("assign")?.asString ?: "result")
+                val resolvedExpr = resolveRuntimeVariables(rawExpr, runtimeVars)
+                val res = evalMathExpression(resolvedExpr)
+                runtimeVars[assignVar] = res
+                log("  -> Evaluate: $resolvedExpr = $res -> \$$assignVar")
+                return ActionStatus.SUCCESS
+            }
+
+            "convert_to_integer", "convert_to_int" -> {
+                val rawVal = actionObj.get("value")?.asString ?: ""
+                val assignVar = cleanAssignName(actionObj.get("assign")?.asString ?: rawVal)
+                val resolved = resolveRuntimeVariables(rawVal, runtimeVars)
+                val intVal = resolved.toDoubleOrNull()?.toInt() ?: resolved.toIntOrNull() ?: 0
+                runtimeVars[assignVar] = intVal
+                log("  -> Convert To Integer: $resolved -> $intVal (\$$assignVar)")
+                return ActionStatus.SUCCESS
+            }
+
+            "convert_to_number", "convert_to_float" -> {
+                val rawVal = actionObj.get("value")?.asString ?: ""
+                val assignVar = cleanAssignName(actionObj.get("assign")?.asString ?: rawVal)
+                val resolved = resolveRuntimeVariables(rawVal, runtimeVars)
+                val numVal = resolved.toDoubleOrNull() ?: 0.0
+                runtimeVars[assignVar] = numVal
+                return ActionStatus.SUCCESS
+            }
+
+            "convert_to_string", "convert_to_text" -> {
+                val rawVal = actionObj.get("value")?.asString ?: ""
+                val assignVar = cleanAssignName(actionObj.get("assign")?.asString ?: rawVal)
+                val resolved = resolveRuntimeVariables(rawVal, runtimeVars)
+                runtimeVars[assignVar] = resolved
+                return ActionStatus.SUCCESS
+            }
+
+            "set_variable" -> {
+                val rawVal = actionObj.get("value")?.asString ?: ""
+                val assignVar = cleanAssignName(actionObj.get("assign")?.asString ?: "var")
+                val resolved = resolveRuntimeVariables(rawVal, runtimeVars)
+                runtimeVars[assignVar] = resolved
+                return ActionStatus.SUCCESS
+            }
+
+            "fail" -> {
+                val rawMsg = actionObj.get("message")?.asString ?: "Test failed explicitly"
+                val msg = resolveRuntimeVariables(rawMsg, runtimeVars)
+                log("  -> Fail: $msg")
+                return ActionStatus.FAILED
+            }
+
+            "break" -> {
+                log("  -> Loop BREAK")
+                return ActionStatus.BREAK
+            }
+
+            "continue" -> {
+                log("  -> Loop CONTINUE")
+                return ActionStatus.CONTINUE
+            }
+
+            "run_keyword_and_return_status" -> {
+                val assignVar = cleanAssignName(actionObj.get("assign")?.asString ?: "status")
+                val nestedAction = actionObj.getAsJsonObject("nested_action")
+                log("  -> Run Keyword And Return Status...")
+                val ok = if (nestedAction != null) {
+                    val status = executeAction(context, nestedAction, log, isDesktopExecution, runtimeVars)
+                    status == ActionStatus.SUCCESS
+                } else false
+                runtimeVars[assignVar] = ok
+                log("  -> Status result: $ok -> \$$assignVar")
+                return ActionStatus.SUCCESS
+            }
+
+            "for_loop" -> {
+                val varName = cleanAssignName(actionObj.get("var")?.asString ?: "i")
+                val rawStart = actionObj.get("start")?.asString ?: "0"
+                val rawEnd = actionObj.get("end")?.asString ?: "1"
+                val rawStep = actionObj.get("step")?.asString ?: "1"
+
+                val startVal = resolveRuntimeVariables(rawStart, runtimeVars).toDoubleOrNull()?.toInt() ?: 0
+                val endVal = resolveRuntimeVariables(rawEnd, runtimeVars).toDoubleOrNull()?.toInt() ?: 1
+                val stepVal = resolveRuntimeVariables(rawStep, runtimeVars).toDoubleOrNull()?.toInt() ?: 1
+                val body = actionObj.getAsJsonArray("body") ?: JsonArray()
+
+                log("  -> FOR \$$varName IN RANGE $startVal to $endVal (step $stepVal)")
+                var loopBreak = false
+                var i = startVal
+                while (if (stepVal > 0) i < endVal else i > endVal) {
+                    runtimeVars[varName] = i
+                    log("  -> [Loop Iteration \$$varName = $i]")
+                    for (k in 0 until body.size()) {
+                        val act = body.get(k).asJsonObject
+                        val status = executeAction(context, act, log, isDesktopExecution, runtimeVars)
+                        if (status == ActionStatus.BREAK) {
+                            loopBreak = true
+                            break
+                        } else if (status == ActionStatus.CONTINUE) {
+                            break
+                        } else if (status == ActionStatus.FAILED) {
+                            return ActionStatus.FAILED
+                        }
+                    }
+                    if (loopBreak) break
+                    i += stepVal
+                }
+                return ActionStatus.SUCCESS
+            }
+
+            "if" -> {
+                val branches = actionObj.getAsJsonArray("branches") ?: JsonArray()
+                for (k in 0 until branches.size()) {
+                    val branch = branches.get(k).asJsonObject
+                    val branchType = branch.get("type")?.asString?.uppercase() ?: "IF"
+                    val rawCondition = branch.get("condition")?.asString
+                    val condition = if (!rawCondition.isNullOrEmpty()) resolveRuntimeVariables(rawCondition, runtimeVars) else ""
+                    val shouldExecute = if (branchType == "ELSE" || condition.isEmpty()) {
+                        true
+                    } else {
+                        evalCondition(condition)
+                    }
+
+                    if (shouldExecute) {
+                        log("  -> Executing branch: $branchType ${if (condition.isNotEmpty()) "($condition)" else ""}")
+                        val body = branch.getAsJsonArray("body") ?: JsonArray()
+                        for (m in 0 until body.size()) {
+                            val act = body.get(m).asJsonObject
+                            val status = executeAction(context, act, log, isDesktopExecution, runtimeVars)
+                            if (status != ActionStatus.SUCCESS) {
+                                return status
+                            }
+                        }
+                        break
+                    }
+                }
+                return ActionStatus.SUCCESS
             }
 
             else -> {
                 log("  -> Skipping unhandled action: $actionType")
-                return true
+                return ActionStatus.SUCCESS
             }
         }
     }
@@ -972,23 +1487,20 @@ object RrtEngine {
                 if (service == null) return false
                 return retryUntilTrue(5) { performClickOnTarget(service, target) }
             }
-        } else if (low.contains("valida") || low.contains("assert") || low.contains("contém")) {
+        } else if (low.contains("valida") || low.contains("assert") || low.contains("contém") || low.contains("visible")) {
             if (args != null && args.size() > 0) {
                 val text = args.get(0).asString
                 log("  -> [Fallback Assert] $text")
                 if (service == null) return false
-                return retryUntilTrue(10) { isTextPresentInHierarchy(service, text) }
+                return retryUntilTrue(10) { isTargetVisible(service, text) || isTextPresentInHierarchy(service, text) }
             }
+        } else if (low.contains("scroll") || low.contains("swipe") || low.contains("rolar")) {
+            log("  -> [Fallback Scroll/Swipe]")
+            if (service == null) return false
+            return service.performScrollOnContainer(null, forward = true)
         } else if (low.contains("fechar") || low.contains("terminate") || low.contains("close")) {
             val pkg = if (args != null && args.size() > 0) args.get(0).asString else ""
-            if (isDesktopExecution) {
-                log("  -> [Desktop Teardown] Close App: $pkg (managed via Desktop ADB)")
-                if (service != null) {
-                    service.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
-                }
-            } else {
-                terminateApplicationSafely(context, service, pkg, log)
-            }
+            terminateApplicationSafely(context, service, pkg, log)
             return true
         }
         return true
@@ -1050,67 +1562,27 @@ object RrtEngine {
         delay(300)
     }
 
-    private fun parseLocator(raw: String): Triple<String?, String?, String?> {
-        var resourceId: String? = null
-        var textMatch: String? = null
-        var descMatch: String? = null
-
-        val unescaped = raw.replace("\\n", "\n").trim()
-
-        if (unescaped.startsWith("accessibility_id=")) {
-            descMatch = unescaped.removePrefix("accessibility_id=").trim()
-            textMatch = descMatch
-        } else if (unescaped.startsWith("id=")) {
-            resourceId = unescaped.removePrefix("id=").trim()
-        } else if (unescaped.startsWith("android=new UiSelector()")) {
-            val descRegex = Regex("""description\("([^"]+)"\)""")
-            val textRegex = Regex("""text\("([^"]+)"\)""")
-            val idRegex = Regex("""resourceId\("([^"]+)"\)""")
-
-            descRegex.find(unescaped)?.let { descMatch = it.groupValues[1] }
-            textRegex.find(unescaped)?.let { textMatch = it.groupValues[1] }
-            idRegex.find(unescaped)?.let { resourceId = it.groupValues[1] }
-        } else if (unescaped.startsWith("xpath=")) {
-            val contentDescRegex = Regex("""@content-desc=["']([^"']+)["']""")
-            val textRegex = Regex("""@text=["']([^"']+)["']""")
-            contentDescRegex.find(unescaped)?.let { descMatch = it.groupValues[1] }
-            textRegex.find(unescaped)?.let { textMatch = it.groupValues[1] }
-            if (descMatch == null && textMatch == null) {
-                textMatch = unescaped.substringAfterLast("/").substringAfterLast("@")
-            }
-        } else {
-            textMatch = unescaped
-            descMatch = unescaped
-        }
-
-        return Triple(resourceId, textMatch, descMatch)
-    }
-
     private fun performClickOnTarget(service: CompanionAccessibilityService, rawTarget: String): Boolean {
-        val (resId, text, desc) = parseLocator(rawTarget)
-        return service.performNodeActionByMatch(
-            resourceId = resId,
-            textMatch = text,
-            contentDescMatch = desc,
+        val criteria = com.lucasdeeiroz.robotrunner.model.LocatorCriteria.parse(rawTarget)
+        return service.performNodeActionByCriteria(
+            criteria = criteria,
             action = "click"
         )
     }
 
     private fun performInputOnTarget(service: CompanionAccessibilityService, rawTarget: String, textValue: String): Boolean {
-        val (resId, text, desc) = parseLocator(rawTarget)
-        return service.performNodeActionByMatch(
-            resourceId = resId,
-            textMatch = text,
-            contentDescMatch = desc,
+        val criteria = com.lucasdeeiroz.robotrunner.model.LocatorCriteria.parse(rawTarget)
+        return service.performNodeActionByCriteria(
+            criteria = criteria,
             action = "input",
             textValue = textValue
         )
     }
 
     private fun isTargetVisible(service: CompanionAccessibilityService, rawTarget: String): Boolean {
-        val (resId, text, desc) = parseLocator(rawTarget)
+        val criteria = com.lucasdeeiroz.robotrunner.model.LocatorCriteria.parse(rawTarget)
         val root = service.rootInActiveWindow ?: return false
-        return findNodeByCriteria(root, resId, text, desc) != null
+        return findNodeByCriteria(root, criteria) != null
     }
 
     private fun isTextPresentInHierarchy(service: CompanionAccessibilityService, text: String): Boolean {
@@ -1131,14 +1603,12 @@ object RrtEngine {
         return false
     }
 
-    private fun findNodeByCriteria(node: AccessibilityNodeInfo, resId: String?, text: String?, desc: String?): AccessibilityNodeInfo? {
-        if (!resId.isNullOrEmpty() && node.viewIdResourceName?.equals(resId, ignoreCase = true) == true) return node
-        if (!text.isNullOrEmpty() && node.text?.toString()?.contains(text, ignoreCase = true) == true) return node
-        if (!desc.isNullOrEmpty() && node.contentDescription?.toString()?.contains(desc, ignoreCase = true) == true) return node
+    private fun findNodeByCriteria(node: AccessibilityNodeInfo, criteria: com.lucasdeeiroz.robotrunner.model.LocatorCriteria): AccessibilityNodeInfo? {
+        if (criteria.matches(node)) return node
 
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
-            val match = findNodeByCriteria(child, resId, text, desc)
+            val match = findNodeByCriteria(child, criteria)
             if (match != null) return match
         }
         return null

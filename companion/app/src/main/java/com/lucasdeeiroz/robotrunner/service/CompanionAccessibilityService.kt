@@ -14,6 +14,14 @@ import android.provider.Settings
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.Dispatchers
+import kotlin.coroutines.resume
+import android.os.Handler
+import android.os.Looper
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.ConcurrentLinkedQueue
 
 class CompanionAccessibilityService : AccessibilityService() {
@@ -37,7 +45,13 @@ class CompanionAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
-        Log.i("CompanionAccessibility", "Companion Accessibility Service connected!")
+        val info = serviceInfo ?: android.accessibilityservice.AccessibilityServiceInfo()
+        info.flags = info.flags or
+                android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
+                android.accessibilityservice.AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
+                android.accessibilityservice.AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
+        serviceInfo = info
+        Log.i("CompanionAccessibility", "Companion Accessibility Service connected with gesture support!")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -135,10 +149,46 @@ class CompanionAccessibilityService : AccessibilityService() {
         return false
     }
 
-    fun performNodeActionByMatch(
-        resourceId: String? = null,
-        textMatch: String? = null,
-        contentDescMatch: String? = null,
+    fun findFirstMatchingNode(criteria: com.lucasdeeiroz.robotrunner.model.LocatorCriteria): AccessibilityNodeInfo? {
+        var root = rootInActiveWindow
+        if (root == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            try {
+                val activeWindows = windows
+                if (activeWindows != null) {
+                    for (w in activeWindows) {
+                        if (w.root != null && w.isFocused) {
+                            root = w.root
+                            break
+                        }
+                    }
+                    if (root == null) {
+                        for (w in activeWindows) {
+                            if (w.root != null) {
+                                root = w.root
+                                break
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("CompanionAccessibility", "Error checking windows for findFirstMatchingNode", e)
+            }
+        }
+        if (root == null) return null
+
+        val matchingNodes = mutableListOf<AccessibilityNodeInfo>()
+        collectMatchingNodes(root, criteria, matchingNodes)
+        return if (matchingNodes.isNotEmpty()) {
+            if (criteria.instance in matchingNodes.indices) {
+                matchingNodes[criteria.instance]
+            } else {
+                matchingNodes[0]
+            }
+        } else null
+    }
+
+    fun performNodeActionByCriteria(
+        criteria: com.lucasdeeiroz.robotrunner.model.LocatorCriteria,
         action: String = "click",
         textValue: String? = null
     ): Boolean {
@@ -169,22 +219,39 @@ class CompanionAccessibilityService : AccessibilityService() {
         }
         if (root == null) return false
 
-        val targetNode = findMatchingNode(root, resourceId, textMatch, contentDescMatch)
-        if (targetNode != null) {
+        val matchingNodes = mutableListOf<AccessibilityNodeInfo>()
+        collectMatchingNodes(root, criteria, matchingNodes)
+
+        if (matchingNodes.isNotEmpty()) {
+            val targetNode = if (criteria.instance in matchingNodes.indices) {
+                matchingNodes[criteria.instance]
+            } else {
+                matchingNodes[0]
+            }
+
             return when (action.lowercase()) {
                 "click", "tap" -> {
+                    val rect = android.graphics.Rect()
+                    targetNode.getBoundsInScreen(rect)
+                    val cx = rect.centerX().toFloat()
+                    val cy = rect.centerY().toFloat()
+
+                    var accessibilityClicked = false
                     var curr: AccessibilityNodeInfo? = targetNode
-                    var clicked = false
                     while (curr != null) {
                         if (curr.isClickable) {
-                            clicked = curr.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                            if (clicked) break
+                            accessibilityClicked = curr.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                            if (accessibilityClicked) break
                         }
                         curr = curr.parent
                     }
-                    if (!clicked) {
-                        targetNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                    } else true
+
+                    if (rect.width() > 0 && rect.height() > 0 && cx > 0 && cy > 0) {
+                        performTap(cx, cy)
+                        true
+                    } else {
+                        accessibilityClicked || targetNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    }
                 }
                 "input", "set_text" -> {
                     if (textValue != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -202,26 +269,143 @@ class CompanionAccessibilityService : AccessibilityService() {
         return false
     }
 
-    private fun findMatchingNode(
-        node: AccessibilityNodeInfo,
-        resourceId: String?,
-        textMatch: String?,
-        contentDescMatch: String?
-    ): AccessibilityNodeInfo? {
-        if (!resourceId.isNullOrEmpty() && node.viewIdResourceName?.equals(resourceId, ignoreCase = true) == true) {
-            return node
-        }
-        if (!textMatch.isNullOrEmpty() && node.text?.toString()?.contains(textMatch, ignoreCase = true) == true) {
-            return node
-        }
-        if (!contentDescMatch.isNullOrEmpty() && node.contentDescription?.toString()?.contains(contentDescMatch, ignoreCase = true) == true) {
-            return node
-        }
+    fun performNodeActionByMatch(
+        resourceId: String? = null,
+        textMatch: String? = null,
+        contentDescMatch: String? = null,
+        action: String = "click",
+        textValue: String? = null
+    ): Boolean {
+        val criteria = com.lucasdeeiroz.robotrunner.model.LocatorCriteria(
+            resourceId = resourceId,
+            textMatch = textMatch,
+            contentDescMatch = contentDescMatch,
+            isOrMatch = true
+        )
+        return performNodeActionByCriteria(criteria, action, textValue)
+    }
 
+    private fun collectMatchingNodes(
+        node: AccessibilityNodeInfo,
+        criteria: com.lucasdeeiroz.robotrunner.model.LocatorCriteria,
+        outList: MutableList<AccessibilityNodeInfo>
+    ) {
+        if (criteria.matches(node)) {
+            outList.add(node)
+        }
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
-            val match = findMatchingNode(child, resourceId, textMatch, contentDescMatch)
-            if (match != null) return match
+            collectMatchingNodes(child, criteria, outList)
+        }
+    }
+
+    suspend fun performSwipe(startX: Float, startY: Float, endX: Float, endY: Float, durationMs: Long = 350): Boolean {
+        val dur = durationMs.coerceIn(50L, 1000L)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            val gestureSuccess = try {
+                withContext(Dispatchers.Main) {
+                    withTimeoutOrNull(dur + 1500L) {
+                        suspendCancellableCoroutine<Boolean> { cont ->
+                            val path = Path().apply {
+                                moveTo(startX, startY)
+                                lineTo(endX, endY)
+                            }
+                            val stroke = GestureDescription.StrokeDescription(path, 0, dur)
+                            val gesture = GestureDescription.Builder().addStroke(stroke).build()
+
+                            val dispatched = dispatchGesture(gesture, object : GestureResultCallback() {
+                                override fun onCompleted(gestureDescription: GestureDescription?) {
+                                    Log.i("CompanionAccessibility", "Swipe completed via AccessibilityService: ($startX, $startY) -> ($endX, $endY)")
+                                    if (cont.isActive) cont.resume(true)
+                                }
+                                override fun onCancelled(gestureDescription: GestureDescription?) {
+                                    Log.w("CompanionAccessibility", "Swipe cancelled via AccessibilityService")
+                                    if (cont.isActive) cont.resume(false)
+                                }
+                            }, null)
+
+                            if (!dispatched) {
+                                Log.w("CompanionAccessibility", "dispatchGesture returned false")
+                                if (cont.isActive) cont.resume(false)
+                            }
+                        }
+                    } ?: false
+                }
+            } catch (e: Exception) {
+                Log.e("CompanionAccessibility", "Accessibility swipe error", e)
+                false
+            }
+
+            if (gestureSuccess) {
+                delay(300)
+                return true
+            }
+        }
+
+        return false
+    }
+
+    suspend fun performScrollOnContainer(
+        containerCriteria: com.lucasdeeiroz.robotrunner.model.LocatorCriteria? = null,
+        forward: Boolean = true
+    ): Boolean {
+        var root = rootInActiveWindow
+        if (root == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            try {
+                val activeWindows = windows
+                if (activeWindows != null) {
+                    for (w in activeWindows) {
+                        if (w.root != null && w.isFocused) {
+                            root = w.root
+                            break
+                        }
+                    }
+                    if (root == null) {
+                        for (w in activeWindows) {
+                            if (w.root != null) {
+                                root = w.root
+                                break
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("CompanionAccessibility", "Error checking windows for scroll container", e)
+            }
+        }
+        if (root != null) {
+            val scrollableNode = if (containerCriteria != null) {
+                val nodes = mutableListOf<AccessibilityNodeInfo>()
+                collectMatchingNodes(root, containerCriteria, nodes)
+                nodes.firstOrNull() ?: findFirstScrollableNode(root)
+            } else {
+                findFirstScrollableNode(root)
+            }
+
+            if (scrollableNode != null) {
+                val action = if (forward) AccessibilityNodeInfo.ACTION_SCROLL_FORWARD else AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
+                val scrolled = scrollableNode.performAction(action)
+                if (scrolled) return true
+            }
+        }
+
+        // Fallback: Gesture swipe based on screen dimensions
+        val displayMetrics = resources.displayMetrics
+        val width = displayMetrics.widthPixels.toFloat()
+        val height = displayMetrics.heightPixels.toFloat()
+        val startX = width / 2f
+        val startY = if (forward) height * 0.75f else height * 0.25f
+        val endY = if (forward) height * 0.25f else height * 0.75f
+        return performSwipe(startX, startY, startX, endY, 350)
+    }
+
+    private fun findFirstScrollableNode(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        if (node.isScrollable) return node
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findFirstScrollableNode(child)
+            if (found != null) return found
         }
         return null
     }

@@ -721,7 +721,6 @@ pub async fn run_cypress_test(
     if let Ok(json) = serde_json::to_string_pretty(&metadata) {
         let _ = std::fs::write(metadata_path, json);
     }
-
     let adb_program = get_adb_program(&app);
     let mut cmd;
     #[cfg(target_os = "windows")]
@@ -830,8 +829,8 @@ pub async fn compile_and_send_rrt(
     _device_model: Option<String>,
     _android_version: Option<String>,
     working_dir: Option<String>,
-    _selected_tests: Option<Vec<String>>,
-    _arguments_file: Option<String>,
+    selected_tests: Option<Vec<String>>,
+    arguments_file: Option<String>,
     _timestamp_outputs: Option<bool>,
 ) -> AppResult<String> {
     let output_dir = crate::cmd_utils::expand_env_vars(&output_dir);
@@ -868,9 +867,24 @@ pub async fn compile_and_send_rrt(
         .map_err(|e| AppError::CommandFailed(e))?;
 
     let mut compiler_cmd = Command::new(&python_bin);
-    compiler_cmd.arg(script_path);
-    if let Some(tp) = &test_path {
-        compiler_cmd.arg(tp);
+    compiler_cmd.arg(&script_path);
+
+    if let Some(ref af) = arguments_file {
+        if !af.is_empty() {
+            compiler_cmd.arg("--args-file").arg(af);
+        }
+    }
+    if let Some(ref tp) = test_path {
+        if !tp.is_empty() {
+            compiler_cmd.arg("--path").arg(tp);
+        }
+    }
+    if let Some(ref selected) = selected_tests {
+        for s in selected {
+            if !s.is_empty() {
+                compiler_cmd.arg("--selected").arg(s);
+            }
+        }
     }
 
     if let Some(ref wd) = working_dir {
