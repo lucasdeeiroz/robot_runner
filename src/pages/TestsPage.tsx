@@ -3,6 +3,7 @@ import { useTestSessions } from "@/lib/testSessionStore";
 import { useSettings } from "@/lib/settings";
 import { ToolboxView } from "@/components/tabs/tests/toolbox/ToolboxView";
 import { HistorySubTab } from "@/components/tabs/tests/HistorySubTab";
+import { ReportsSubTab } from "@/components/tabs/tests/ReportsSubTab";
 import { AndroidVersionPill } from "@/components/atoms/AndroidVersionPill";
 import { XCircle, LayoutGrid, Minimize2, Maximize2, FileText, Settings, Globe } from 'lucide-react';
 import { PageHeader } from "@/components/organisms/PageHeader";
@@ -198,11 +199,18 @@ export function TestsPage({ onNavigate }: TestsPageProps) {
             {/* Modified Tabs Row with Grid Toggle */}
             <TabBar
                 tabs={[
-                    ...(isExplorer ? [] : [{
-                        id: 'history',
-                        label: t('tests_page.history'),
-                        selected: isGridView ? false : undefined
-                    }]),
+                    ...(isExplorer ? [] : [
+                        {
+                            id: 'history',
+                            label: t('tests_page.history', 'History'),
+                            selected: isGridView ? false : undefined
+                        },
+                        {
+                            id: 'reports',
+                            label: t('tests_page.reports', 'Reports'),
+                            selected: isGridView ? false : undefined
+                        }
+                    ]),
                     ...sessions.map(s => {
                         const isSuccess = s.exitCode === "0";
                         const isFailed = s.status === 'finished' && !isSuccess;
@@ -239,9 +247,9 @@ export function TestsPage({ onNavigate }: TestsPageProps) {
                 activeId={subTab}
                 onChange={(id) => {
                     if (isGridView) {
-                        if (id === 'history') {
+                        if (id === 'history' || id === 'reports') {
                             setIsGridView(false);
-                            handleTabChange('history');
+                            handleTabChange(id);
                         } else {
                             toggleGridSession(id);
                         }
@@ -403,6 +411,10 @@ export function TestsPage({ onNavigate }: TestsPageProps) {
                         {subTab === 'history' && !isExplorer ? (
                             <div className="flex-1 flex flex-col">
                                 <HistorySubTab onNavigate={onNavigate} />
+                            </div>
+                        ) : subTab === 'reports' && !isExplorer ? (
+                            <div className="flex-1 flex flex-col">
+                                <ReportsSubTab />
                             </div>
                         ) : activeSession ? (
                             <div className="flex-1 min-h-0 flex flex-col">

@@ -11,7 +11,7 @@ import {
     ListPlus, Info, Download, Filter, FilterX, Play, Plus, Trash2,
     Edit3, Tv, Smartphone, Image as ImageIcon, RefreshCw,
     Layers, CheckSquare, ChevronRight, ChevronDown,
-    SlidersHorizontal, Eye, AlertTriangle, FileCheck
+    SlidersHorizontal, Eye, AlertTriangle, FileCheck, Clock, RotateCcw
 } from 'lucide-react';
 import { Section } from '@/components/organisms/Section';
 import { Modal } from '@/components/organisms/Modal';
@@ -25,6 +25,8 @@ import clsx from 'clsx';
 import { ExpressiveLoading } from '@/components/atoms/ExpressiveLoading';
 import { toast } from 'sonner';
 import { useCompanion } from '@/hooks/useCompanion';
+import { FileSavedFeedback } from '@/components/molecules/FileSavedFeedback';
+import { addTemporaryReport } from '@/lib/reportsCache';
 
 export function matchesFilterPattern(text: string, pattern: string): boolean {
     if (!text || !pattern) return false;
@@ -301,11 +303,17 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     const [reportAnalystName, setReportAnalystName] = useState(() => {
         return localStorage.getItem('checkup_reportAnalystName') || '';
     });
+    const [reportResult, setReportResult] = useState<'approved' | 'rejected' | 'pending'>(() => {
+        return (localStorage.getItem('checkup_reportResult') as any) || 'approved';
+    });
+    const [reportComments, setReportComments] = useState<string>(() => {
+        return localStorage.getItem('checkup_reportComments') || '';
+    });
 
     const [reportPropsCompare, setReportPropsCompare] = useState<'all' | 'divergent' | 'none'>(() => {
         return (localStorage.getItem('checkup_reportPropsCompare') as any) || 'all';
     });
-    const [reportShowPropsBase, setReportShowPropsBase] = useState(() => {
+    const [reportShowPropsBase] = useState(() => {
         return localStorage.getItem('checkup_reportShowPropsBase') !== 'false';
     });
     const [reportStandardChecks, setReportStandardChecks] = useState<'all' | 'divergent' | 'none'>(() => {
@@ -351,10 +359,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         const stored = localStorage.getItem('checkup_packageFilterPrefixes');
         return stored ? JSON.parse(stored) : ['android', 'com.android', 'com.google'];
     });
-    const [propsFilterMode, setPropsFilterMode] = useState<'exclude' | 'include'>(() => {
+    const [propsFilterMode] = useState<'exclude' | 'include'>(() => {
         return (localStorage.getItem('checkup_propsFilterMode') as any) || 'exclude';
     });
-    const [propsFilterPrefixes, setPropsFilterPrefixes] = useState<string[]>(() => {
+    const [propsFilterPrefixes] = useState<string[]>(() => {
         const stored = localStorage.getItem('checkup_propsFilterPrefixes');
         return stored ? JSON.parse(stored) : ['ro.soc.model'];
     });
@@ -371,6 +379,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             'ro.zygote', 'sys.usb.config'
         ];
     });
+
+    const [lastSavedReport, setLastSavedReport] = useState<string | null>(null);
 
     useEffect(() => {
         localStorage.setItem('checkup_reportAnalystName', reportAnalystName);
@@ -971,8 +981,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         setIsLoading(true);
         try {
             const allProps = await fetchDeviceProperties(selectedDevice);
-            
-            // Filter properties matching basePropsPrefixes
+
+            // Filter properties strictly matching basePropsPrefixes
             const filteredBaseProps: Record<string, string> = {};
             for (const [k, v] of Object.entries(allProps)) {
                 const isBase = basePropsPrefixes.some(prefix => matchesFilterPattern(k, prefix));
@@ -981,30 +991,33 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 }
             }
 
-            // Merge only the filtered base properties with existing devicePropsCache (preserving Companion specs)
-            setDevicePropsCache(prev => ({
-                ...prev,
-                ...filteredBaseProps
-            }));
+            // Strictly set devicePropsCache to the filtered base properties (pruning all non-matching properties)
+            setDevicePropsCache(filteredBaseProps);
 
-            // If golden comparison is active, also append missing base props to comparisons
+            // If golden comparison is active, also synchronize comparisons strictly against filtered base props
             if (comparisons.length > 0) {
-                const existingKeys = new Set(comparisons.map(c => c.key));
-                const newEntries: PropComparison[] = [];
-                for (const [k, v] of Object.entries(filteredBaseProps)) {
-                    if (!existingKeys.has(k)) {
-                        newEntries.push({
-                            key: k,
-                            expected: '-',
-                            found: v,
-                            isMatch: false,
-                            isExtra: true
-                        });
+                const expectedMap = new Map<string, string>();
+                comparisons.forEach(c => {
+                    if (c.expected && c.expected !== '-') {
+                        expectedMap.set(c.key, c.expected);
                     }
-                }
-                if (newEntries.length > 0) {
-                    setComparisons(prev => [...prev, ...newEntries]);
-                }
+                });
+
+                const allKeys = Array.from(new Set([...Array.from(expectedMap.keys()), ...Object.keys(filteredBaseProps)]));
+                const newComparisons: PropComparison[] = allKeys.map(key => {
+                    const expected = expectedMap.get(key) || '';
+                    const found = filteredBaseProps[key] || '';
+                    const isMatch = Boolean(expected && found && expected === found);
+                    const isExtra = !expected && Boolean(found);
+                    return {
+                        key,
+                        expected: expected || '-',
+                        found: found || '-',
+                        isMatch,
+                        isExtra
+                    };
+                });
+                setComparisons(newComparisons);
             }
             toast.success(t('toolbox.checkup.base_props_loaded', 'Base device properties loaded successfully!'), { id: 'base-props-loaded' });
         } catch (error) {
@@ -1032,7 +1045,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 const fullProps = await fetchDeviceProperties(selectedDevice);
                 const expectedProps = goldenData.properties || {};
 
-                // Filter device properties matching user-configured basePropsPrefixes OR explicitly present in golden
+                // Filter device properties strictly matching user-configured basePropsPrefixes OR explicitly present in golden
                 const relevantDeviceProps: Record<string, string> = {};
                 for (const [k, v] of Object.entries(fullProps)) {
                     const isBase = basePropsPrefixes.some(prefix => matchesFilterPattern(k, prefix));
@@ -1042,22 +1055,21 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     }
                 }
 
-                // Preserve companion specs that were in devicePropsCache or fullProps
-                const currentDeviceProps = { ...devicePropsCache, ...relevantDeviceProps };
-                setDevicePropsCache(currentDeviceProps);
+                // Strictly set current device properties
+                setDevicePropsCache(relevantDeviceProps);
 
-                // 1. Process Properties (Full union of golden properties and relevant device/companion properties)
+                // 1. Process Properties (Full union of golden properties and relevant device properties)
                 if (goldenData.properties) {
-                    const allKeys = Array.from(new Set([...Object.keys(expectedProps), ...Object.keys(currentDeviceProps)]));
+                    const allKeys = Array.from(new Set([...Object.keys(expectedProps), ...Object.keys(relevantDeviceProps)]));
                     const newComparisons: PropComparison[] = allKeys.map(key => {
                         const expected = expectedProps[key] || '';
-                        const found = currentDeviceProps[key] || '';
+                        const found = relevantDeviceProps[key] || '';
                         const isMatch = Boolean(expected && found && expected === found);
                         const isExtra = !expected && Boolean(found);
                         return {
                             key,
                             expected: expected || '-',
-                            found,
+                            found: found || '-',
                             isMatch,
                             isExtra
                         };
@@ -1356,10 +1368,16 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         if (!selectedDevice) return null;
         try {
             let currentDeviceProps = devicePropsCache;
-            if (!currentDeviceProps || !currentDeviceProps['sys.boot_completed']) {
+            if (!currentDeviceProps || Object.keys(currentDeviceProps).length === 0) {
                 const fullProps = await fetchDeviceProperties(selectedDevice);
-                currentDeviceProps = { ...currentDeviceProps, ...fullProps };
-                setDevicePropsCache(currentDeviceProps);
+                const filtered: Record<string, string> = {};
+                for (const [k, v] of Object.entries(fullProps)) {
+                    if (basePropsPrefixes.some(prefix => matchesFilterPattern(k, prefix))) {
+                        filtered[k] = v;
+                    }
+                }
+                currentDeviceProps = filtered;
+                setDevicePropsCache(filtered);
             }
 
             const deviceName = currentDeviceProps['ro.product.model'] || currentDeviceProps['ro.product.marketname'] || 'Unknown Device';
@@ -1375,10 +1393,19 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 });
             }
 
+            const resultLabel = reportResult === 'approved'
+                ? t('toolbox.checkup.report.approved', 'Approved')
+                : reportResult === 'rejected'
+                    ? t('toolbox.checkup.report.rejected', 'Rejected')
+                    : t('toolbox.checkup.report.pending', 'Pending');
+
             let html = `<!DOCTYPE html>
 <html lang="${t('language', 'en')}">
 <head>
     <meta charset="UTF-8">
+    <meta name="report-result" content="${reportResult}">
+    <meta name="report-analyst" content="${reportAnalystName}">
+    <meta name="report-comments" content="${reportComments.trim().replace(/"/g, '&quot;')}">
     <title>${t('toolbox.checkup.report_title', 'Device Checkup Report')} - ${deviceName} - ${selectedDevice}</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 2rem; max-width: 1200px; margin: 0 auto; color: #333; }
@@ -1393,22 +1420,37 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         .warning { color: #d97706; font-weight: 500; }
         .info { color: #2563eb; font-weight: 500; }
         .badge-verified { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+        .badge-result { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .badge-result-approved { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+        .badge-result-rejected { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+        .badge-result-pending { background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; }
+        .badge-compliant-summary { font-size: 0.78rem; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
         code { background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; font-family: monospace; font-size: 0.85em; }
         .manual-img { max-height: 140px; max-width: 240px; object-fit: contain; border-radius: 6px; border: 1px solid #ddd; display: block; margin-top: 4px; }
-        .header-box { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid #eaeaea; }
+        .header-box { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid #eaeaea; }
     </style>
 </head>
 <body>
     ${settings.customLogoLight ? `<img src="${settings.customLogoLight}" alt="Logo" style="max-height: 48px; margin-bottom: 1rem;" />` : ''}
     <div class="header-box">
-        <div>
+        <div style="flex: 1; min-width: 0; margin-right: 1.5rem;">
             <h1 style="margin: 0 0 0.5rem 0;">${t('toolbox.checkup.report_title', 'Device Checkup Report')}</h1>
             <div style="font-size: 0.9rem; color: #666;">
                 <strong>${t('toolbox.checkup.report.analyst', 'Analyst')}:</strong> <span style="font-weight: 600; color: #111;">${reportAnalystName || 'N/A'}</span> &bull; 
                 <strong>${t('toolbox.checkup.date', 'Date')}:</strong> ${new Date().toLocaleString()}
             </div>
+            <div style="display: flex; gap: 1.5rem; align-items: flex-start; margin-top: 8px; padding: 10px 14px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <div style="flex-shrink: 0;">
+                    <strong style="display: block; font-size: 0.72rem; text-transform: uppercase; color: #64748b; margin-bottom: 3px;">${t('toolbox.checkup.report.result', 'Final Result')}</strong>
+                    <span class="badge-result badge-result-${reportResult}">${resultLabel}</span>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                    <strong style="display: block; font-size: 0.72rem; text-transform: uppercase; color: #64748b; margin-bottom: 3px;">${t('toolbox.checkup.report.comments', 'Comments / Observations')}</strong>
+                    <div style="font-size: 0.85rem; color: #334155; white-space: pre-wrap;">${reportComments.trim() ? reportComments.trim().replace(/</g, '&lt;').replace(/>/g, '&gt;') : '<em style="color: #94a3b8;">' + t('toolbox.checkup.report.no_comments', 'No comments recorded.') + '</em>'}</div>
+                </div>
+            </div>
         </div>
-        <div style="text-align: right; font-size: 0.9rem;">
+        <div style="text-align: right; font-size: 0.9rem; flex-shrink: 0;">
             <strong>${t('toolbox.checkup.device_name', 'Device Name')}:</strong> ${deviceName}<br>
             <strong>${t('toolbox.checkup.device_udid', 'Device UDID')}:</strong> <code>${selectedDevice}</code><br>
             <div style="margin-top: 6px;"><span class="badge-verified">&#10004; ${t('toolbox.checkup.all_sections_verified', 'All Included Sections Attested & Verified')}</span></div>
@@ -1420,6 +1462,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             // 1. Device Properties (if enabled)
             if (reportPropsCompare !== 'none') {
                 if (comparisons.length > 0) {
+                    const compliantPropCount = comparisons.filter(c => c.isMatch).length;
                     let propsToRender = reportPropsCompare === 'divergent' || aiMode
                         ? comparisons.filter(c => !c.isMatch)
                         : comparisons;
@@ -1429,7 +1472,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         <div class="section">
                             <div class="section-header">
                                 <span>${t('toolbox.checkup.prop_compare', '.prop Compare')}</span>
-                                <span class="badge-verified">&#10004; ${t('toolbox.checkup.verified', 'Conferido')}</span>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    ${reportPropsCompare === 'divergent' ? `<span class="badge-compliant-summary">&#10003; ${compliantPropCount} ${t('toolbox.checkup.report.compliant_hidden', 'matching items')}</span>` : ''}
+                                    <span class="badge-verified">&#10004; ${t('toolbox.checkup.verified', 'Conferido')}</span>
+                                </div>
                             </div>
                             <table>
                                 <thead>
@@ -1464,8 +1510,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         html += `</tbody></table></div>`;
                     }
                 } else {
-                    const entries = Object.entries(currentDeviceProps);
-                    if (entries.length > 0) {
+                    const filteredEntries = Object.entries(currentDeviceProps).filter(([k]) =>
+                        basePropsPrefixes.some(prefix => matchesFilterPattern(k, prefix))
+                    );
+                    if (filteredEntries.length > 0) {
                         html += `
                         <div class="section">
                             <div class="section-header">
@@ -1481,7 +1529,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                 </thead>
                                 <tbody>
                         `;
-                        entries.forEach(([key, val]) => {
+                        filteredEntries.forEach(([key, val]) => {
                             html += `
                                 <tr>
                                     <td><code>${key}</code></td>
@@ -1504,6 +1552,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         return !matchesPrefix;
                     });
 
+                    const compliantPkgCount = filteredComps.filter(c => c.isMatch).length;
+
                     if (reportPackages === 'divergent' || aiMode) {
                         filteredComps = filteredComps.filter(c => !c.isMatch);
                     }
@@ -1513,13 +1563,16 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         <div class="section">
                             <div class="section-header">
                                 <span>${t('toolbox.checkup.packages_compare', 'Packages Compare')}</span>
-                                <span class="badge-verified">&#10004; ${t('toolbox.checkup.verified', 'Conferido')}</span>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    ${reportPackages === 'divergent' ? `<span class="badge-compliant-summary">&#10003; ${compliantPkgCount} ${t('toolbox.checkup.report.compliant_hidden', 'matching items')}</span>` : ''}
+                                    <span class="badge-verified">&#10004; ${t('toolbox.checkup.verified', 'Conferido')}</span>
+                                </div>
                             </div>
                             <table>
                                 <thead>
                                     <tr>
                                         <th>${t('toolbox.checkup.package_name', 'Package')}</th>
-                                        <th>${t('toolbox.checkup.golden', 'Golden')}</th>
+                                        <th>${t('toolbox.checkup.expected', 'Expected')}</th>
                                         <th>${t('toolbox.checkup.device', 'Device')}</th>
                                         <th>${t('toolbox.checkup.status', 'Status')}</th>
                                     </tr>
@@ -1570,6 +1623,13 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
 
             // 3. Standard Checks (if enabled)
             let standardChecksToRender = standardChecks;
+            const compliantStandardCount = standardChecks.filter(c => {
+                if (checkResults[c.id]?.goldenExpected !== undefined) {
+                    return checkResults[c.id]?.isGoldenMatch;
+                }
+                return c.status === 'correct';
+            }).length;
+
             if (reportStandardChecks === 'divergent' || aiMode) {
                 standardChecksToRender = standardChecks.filter(c => {
                     if (checkResults[c.id]?.goldenExpected !== undefined) {
@@ -1584,7 +1644,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 <div class="section">
                     <div class="section-header">
                         <span>${t('toolbox.checkup.standard_checks', 'Standard Checks')}</span>
-                        <span class="badge-verified">&#10004; ${t('toolbox.checkup.verified', 'Conferido')}</span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            ${reportStandardChecks === 'divergent' ? `<span class="badge-compliant-summary">&#10003; ${compliantStandardCount} ${t('toolbox.checkup.report.compliant_hidden', 'matching items')}</span>` : ''}
+                            <span class="badge-verified">&#10004; ${t('toolbox.checkup.verified', 'Conferido')}</span>
+                        </div>
                     </div>
                     <table>
                         <thead>
@@ -1613,7 +1676,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         <tr>
                             <td><strong>${c.name}</strong><br><code>${c.command.join(' ')}</code></td>
                             <td>
-                                ${checkResults[c.id]?.goldenExpected !== undefined ? `<div>${t('toolbox.checkup.golden', 'Golden')}: <code>${checkResults[c.id]?.goldenExpected}</code></div>` : ''}
+                                ${checkResults[c.id]?.goldenExpected !== undefined ? `<div>${t('toolbox.checkup.expected', 'Expected')}: <code>${checkResults[c.id]?.goldenExpected}</code></div>` : ''}
                                 <div>${t('toolbox.checkup.found', 'Found')}: <code class="${statusClass}">${c.found || '-'}</code></div>
                             </td>
                             <td class="${statusClass}">${statusText}</td>
@@ -1625,6 +1688,13 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
 
             // 4. Additional Checks (if enabled)
             let additionalChecksToRender = additionalChecks;
+            const compliantAdditionalCount = additionalChecks.filter(c => {
+                if (additionalCheckResults[c.id]?.goldenExpected !== undefined) {
+                    return additionalCheckResults[c.id]?.isGoldenMatch;
+                }
+                return true;
+            }).length;
+
             if (reportAdditionalChecks === 'divergent' || aiMode) {
                 additionalChecksToRender = additionalChecks.filter(c => {
                     if (additionalCheckResults[c.id]?.goldenExpected !== undefined) {
@@ -1639,7 +1709,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 <div class="section">
                     <div class="section-header">
                         <span>${t('toolbox.checkup.additional_checks', 'Additional Checks')}</span>
-                        <span class="badge-verified">&#10004; ${t('toolbox.checkup.verified', 'Conferido')}</span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            ${reportAdditionalChecks === 'divergent' ? `<span class="badge-compliant-summary">&#10003; ${compliantAdditionalCount} ${t('toolbox.checkup.report.compliant_hidden', 'matching items')}</span>` : ''}
+                            <span class="badge-verified">&#10004; ${t('toolbox.checkup.verified', 'Conferido')}</span>
+                        </div>
                     </div>
                     <table>
                         <thead>
@@ -1665,7 +1738,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         <tr>
                             <td><strong>${c.name}</strong><br><code>${c.command.join(' ')}</code></td>
                             <td>
-                                ${additionalCheckResults[c.id]?.goldenExpected !== undefined ? `<div>${t('toolbox.checkup.golden', 'Golden')}: <code>${additionalCheckResults[c.id]?.goldenExpected}</code></div>` : ''}
+                                ${additionalCheckResults[c.id]?.goldenExpected !== undefined ? `<div>${t('toolbox.checkup.expected', 'Expected')}: <code>${additionalCheckResults[c.id]?.goldenExpected}</code></div>` : ''}
                                 <div>${t('toolbox.checkup.found', 'Found')}: <code>${c.found || '-'}</code></div>
                             </td>
                             <td class="${statusClass}">${statusText}</td>
@@ -1678,6 +1751,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             // 5. Companion BDD Tests (if enabled)
             if (reportShowCompanionBdd !== 'none' && companionBddSuites.length > 0) {
                 let companionSuitesToRender = companionBddSuites;
+                const compliantBddCount = companionBddSuites.filter(s => s.lastReport && s.lastReport.failedScenarios === 0).length;
+
                 if (reportShowCompanionBdd === 'divergent' || aiMode) {
                     companionSuitesToRender = companionBddSuites.filter(s => {
                         if (!s.lastReport) return false;
@@ -1690,7 +1765,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     <div class="section">
                         <div class="section-header">
                             <span>${t('toolbox.checkup.companion_bdd_tests', 'Companion BDD Tests')}</span>
-                            <span class="badge-verified">&#10004; ${t('toolbox.checkup.verified', 'Conferido')}</span>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                ${reportShowCompanionBdd === 'divergent' ? `<span class="badge-compliant-summary">&#10003; ${compliantBddCount} ${t('toolbox.checkup.report.compliant_hidden', 'matching items')}</span>` : ''}
+                                <span class="badge-verified">&#10004; ${t('toolbox.checkup.verified', 'Conferido')}</span>
+                            </div>
                         </div>
                         <table>
                             <thead>
@@ -1725,6 +1803,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             // 6. Manual Checks (if enabled)
             if (reportShowManualChecks !== 'none' && manualChecks.length > 0) {
                 let manualChecksToRender = manualChecks;
+                const compliantManualCount = manualChecks.filter(m => m.status === 'pass').length;
+
                 if (reportShowManualChecks === 'divergent' || aiMode) {
                     manualChecksToRender = manualChecks.filter(m => m.status === 'fail');
                 }
@@ -1734,7 +1814,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     <div class="section">
                         <div class="section-header">
                             <span>${t('toolbox.checkup.manual_checks', 'Manual Checks')}</span>
-                            <span class="badge-verified">&#10004; ${t('toolbox.checkup.verified', 'Conferido')}</span>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                ${reportShowManualChecks === 'divergent' ? `<span class="badge-compliant-summary">&#10003; ${compliantManualCount} ${t('toolbox.checkup.report.compliant_hidden', 'matching items')}</span>` : ''}
+                                <span class="badge-verified">&#10004; ${t('toolbox.checkup.verified', 'Conferido')}</span>
+                            </div>
                         </div>
                         <table>
                             <thead>
@@ -1769,6 +1852,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             // 7. UI Text Checks (if enabled)
             if (reportShowUiTexts !== 'none' && uiTextChecks.length > 0 && uiTextChecks.some(c => c.enabled)) {
                 let uiTextChecksToRender = uiTextChecks.filter(c => c.enabled);
+                const compliantUiTextCount = uiTextChecks.filter(c => c.enabled && c.isGoldenMatch === true).length;
+
                 if (reportShowUiTexts === 'divergent' || aiMode) {
                     uiTextChecksToRender = uiTextChecksToRender.filter(c => c.isGoldenMatch === false);
                 }
@@ -1778,7 +1863,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     <div class="section">
                         <div class="section-header">
                             <span>${t('toolbox.checkup.ui_text_checks', 'UI Text Checks')}</span>
-                            <span class="badge-verified">&#10004; ${t('toolbox.checkup.verified', 'Conferido')}</span>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                ${reportShowUiTexts === 'divergent' ? `<span class="badge-compliant-summary">&#10003; ${compliantUiTextCount} ${t('toolbox.checkup.report.compliant_hidden', 'matching items')}</span>` : ''}
+                                <span class="badge-verified">&#10004; ${t('toolbox.checkup.verified', 'Conferido')}</span>
+                            </div>
                         </div>
                         <table>
                             <thead>
@@ -2051,6 +2139,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
 
             if (filePath) {
                 await writeTextFile(filePath, JSON.stringify(goldenData, null, 2));
+                setLastSavedReport(filePath);
                 toast.success(t('toolbox.checkup.golden_file.saved', 'Golden file saved successfully!'), { id: toastId });
             } else {
                 toast.dismiss(toastId);
@@ -2067,9 +2156,9 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         value: 'all' | 'divergent' | 'none',
         onChange: (val: 'all' | 'divergent' | 'none') => void
     ) => {
+        const isAll = value === 'all';
+        const isDivergent = value === 'divergent';
         const isOff = value === 'none';
-        const isDivergent = isGoldenLoaded && value === 'divergent';
-        const isAll = value === 'all' || (!isGoldenLoaded && value === 'divergent');
         return (
             <div className={clsx(
                 "p-3 rounded-xl border transition-all flex flex-col justify-between gap-2.5",
@@ -2083,102 +2172,37 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     <span className="text-xs font-bold text-on-surface block mb-0.5">{title}</span>
                     <span className="text-[11px] text-on-surface-variant leading-tight block line-clamp-2">{description}</span>
                 </div>
-                {isGoldenLoaded ? (
-                    <div className="grid grid-cols-3 gap-1 bg-surface-variant/30 p-0.5 rounded-lg border border-outline-variant/30">
-                        <button
-                            type="button"
-                            onClick={() => onChange('all')}
-                            className={clsx(
-                                "text-[10px] font-medium py-1 px-1 rounded transition-all text-center",
-                                isAll ? "bg-primary text-white shadow-sm font-semibold" : "text-on-surface-variant hover:text-on-surface"
-                            )}
-                        >
-                            {t('common.all', 'All')}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => onChange('divergent')}
-                            className={clsx(
-                                "text-[10px] font-medium py-1 px-1 rounded transition-all text-center",
-                                isDivergent ? "bg-warning text-white shadow-sm font-semibold" : "text-on-surface-variant hover:text-on-surface"
-                            )}
-                        >
-                            {t('toolbox.checkup.report.divergent_short', 'Divergent')}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => onChange('none')}
-                            className={clsx(
-                                "text-[10px] font-medium py-1 px-1 rounded transition-all text-center",
-                                isOff ? "bg-surface-variant/80 text-on-surface shadow-sm font-semibold" : "text-on-surface-variant hover:text-on-surface"
-                            )}
-                        >
-                            {t('common.off', 'Off')}
-                        </button>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-2 gap-1 bg-surface-variant/30 p-0.5 rounded-lg border border-outline-variant/30">
-                        <button
-                            type="button"
-                            onClick={() => onChange('all')}
-                            className={clsx(
-                                "text-[10px] font-medium py-1 px-1 rounded transition-all text-center",
-                                !isOff ? "bg-primary text-white shadow-sm font-semibold" : "text-on-surface-variant hover:text-on-surface"
-                            )}
-                        >
-                            {t('common.on', 'On')}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => onChange('none')}
-                            className={clsx(
-                                "text-[10px] font-medium py-1 px-1 rounded transition-all text-center",
-                                isOff ? "bg-surface-variant/80 text-on-surface shadow-sm font-semibold" : "text-on-surface-variant hover:text-on-surface"
-                            )}
-                        >
-                            {t('common.off', 'Off')}
-                        </button>
-                    </div>
-                )}
-            </div>
-        );
-    };
-
-    const renderReportToggleControl = (
-        title: string,
-        description: string,
-        value: boolean,
-        onChange: (val: boolean) => void
-    ) => {
-        return (
-            <div className={clsx(
-                "p-3 rounded-xl border transition-all flex flex-col justify-between gap-2.5",
-                !value
-                    ? "bg-surface-variant/10 border-outline-variant/25 opacity-60"
-                    : "bg-primary/5 border-primary/30 shadow-sm"
-            )}>
-                <div>
-                    <span className="text-xs font-bold text-on-surface block mb-0.5">{title}</span>
-                    <span className="text-[11px] text-on-surface-variant leading-tight block line-clamp-2">{description}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-1 bg-surface-variant/30 p-0.5 rounded-lg border border-outline-variant/30">
+                <div className="grid grid-cols-3 gap-1 bg-surface-variant/30 p-0.5 rounded-lg border border-outline-variant/30">
                     <button
                         type="button"
-                        onClick={() => onChange(true)}
+                        onClick={() => onChange('all')}
                         className={clsx(
                             "text-[10px] font-medium py-1 px-1 rounded transition-all text-center",
-                            value ? "bg-primary text-white shadow-sm font-semibold" : "text-on-surface-variant hover:text-on-surface"
+                            isAll ? "bg-primary text-white shadow-sm font-semibold" : "text-on-surface-variant hover:text-on-surface"
                         )}
+                        title={t('common.on', 'On')}
                     >
                         {t('common.on', 'On')}
                     </button>
                     <button
                         type="button"
-                        onClick={() => onChange(false)}
+                        onClick={() => onChange('divergent')}
                         className={clsx(
                             "text-[10px] font-medium py-1 px-1 rounded transition-all text-center",
-                            !value ? "bg-surface-variant/80 text-on-surface shadow-sm font-semibold" : "text-on-surface-variant hover:text-on-surface"
+                            isDivergent ? "bg-warning text-white shadow-sm font-semibold" : "text-on-surface-variant hover:text-on-surface"
                         )}
+                        title={t('toolbox.checkup.report.divergent_short', 'Divergent')}
+                    >
+                        {t('toolbox.checkup.report.divergent_short', 'Divergent')}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => onChange('none')}
+                        className={clsx(
+                            "text-[10px] font-medium py-1 px-1 rounded transition-all text-center",
+                            isOff ? "bg-surface-variant/80 text-on-surface shadow-sm font-semibold" : "text-on-surface-variant hover:text-on-surface"
+                        )}
+                        title={t('common.off', 'Off')}
                     >
                         {t('common.off', 'Off')}
                     </button>
@@ -2186,6 +2210,49 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             </div>
         );
     };
+
+    // const renderReportToggleControl = (
+    //     title: string,
+    //     description: string,
+    //     value: boolean,
+    //     onChange: (val: boolean) => void
+    // ) => {
+    //     return (
+    //         <div className={clsx(
+    //             "p-3 rounded-xl border transition-all flex flex-col justify-between gap-2.5",
+    //             !value
+    //                 ? "bg-surface-variant/10 border-outline-variant/25 opacity-60"
+    //                 : "bg-primary/5 border-primary/30 shadow-sm"
+    //         )}>
+    //             <div>
+    //                 <span className="text-xs font-bold text-on-surface block mb-0.5">{title}</span>
+    //                 <span className="text-[11px] text-on-surface-variant leading-tight block line-clamp-2">{description}</span>
+    //             </div>
+    //             <div className="grid grid-cols-2 gap-1 bg-surface-variant/30 p-0.5 rounded-lg border border-outline-variant/30">
+    //                 <button
+    //                     type="button"
+    //                     onClick={() => onChange(true)}
+    //                     className={clsx(
+    //                         "text-[10px] font-medium py-1 px-1 rounded transition-all text-center",
+    //                         value ? "bg-primary text-white shadow-sm font-semibold" : "text-on-surface-variant hover:text-on-surface"
+    //                     )}
+    //                 >
+    //                     {t('common.on', 'On')}
+    //                 </button>
+    //                 <button
+    //                     type="button"
+    //                     onClick={() => onChange(false)}
+    //                     className={clsx(
+    //                         "text-[10px] font-medium py-1 px-1 rounded transition-all text-center",
+    //                         !value ? "bg-surface-variant/80 text-on-surface shadow-sm font-semibold" : "text-on-surface-variant hover:text-on-surface"
+    //                     )}
+    //                 >
+    //                     {t('common.off', 'Off')}
+    //                 </button>
+    //             </div>
+    //         </div>
+    //     );
+    // };
 
     const validateAndOpenReportModal = () => {
         setIsReportModalOpen(true);
@@ -2227,6 +2294,22 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             const html = await buildHtmlReport();
             if (!html) throw new Error("Failed to build HTML");
 
+            const deviceName = devicePropsCache['ro.product.model'] || devicePropsCache['ro.product.marketname'] || selectedDevice;
+            const reportTitle = `${t('toolbox.checkup.report_title', 'Device Checkup Report')} - ${deviceName}`;
+
+            // Register in session-scoped reports cache
+            const tempReport = addTemporaryReport({
+                title: reportTitle,
+                deviceModel: deviceName,
+                deviceUdid: selectedDevice,
+                analystName: reportAnalystName.trim() || 'N/A',
+                timestamp: new Date().toISOString(),
+                type: 'checkup',
+                result: reportResult,
+                comments: reportComments.trim() || undefined,
+                htmlContent: html,
+            });
+
             const filePath = await save({
                 filters: [{ name: 'HTML Report', extensions: ['html'] }],
                 defaultPath: `report_${selectedDevice.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.html`
@@ -2234,6 +2317,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
 
             if (filePath) {
                 await writeTextFile(filePath, html);
+                tempReport.filePath = filePath;
+                setLastSavedReport(filePath);
                 toast.success(t('toolbox.checkup.report_saved', 'Report saved successfully!'), { id: toastId });
             } else {
                 toast.dismiss(toastId);
@@ -2294,6 +2379,22 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 }
             } catch (_) { }
 
+            const deviceName = devicePropsCache['ro.product.model'] || devicePropsCache['ro.product.marketname'] || selectedDevice;
+            const reportTitle = `${t('toolbox.checkup.report.ai_verify_title', 'Verify with AI')} - ${deviceName}`;
+
+            // Register in session-scoped reports cache
+            const tempReport = addTemporaryReport({
+                title: reportTitle,
+                deviceModel: deviceName,
+                deviceUdid: selectedDevice,
+                analystName: reportAnalystName.trim() || 'N/A',
+                timestamp: new Date().toISOString(),
+                type: 'ai_checkup',
+                result: reportResult,
+                comments: reportComments.trim() || undefined,
+                htmlContent: modifiedHtml,
+            });
+
             const filePath = await save({
                 filters: [{ name: 'HTML Report', extensions: ['html'] }],
                 defaultPath: `report_ai_verified_${selectedDevice.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.html`
@@ -2301,6 +2402,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
 
             if (filePath) {
                 await writeTextFile(filePath, modifiedHtml);
+                tempReport.filePath = filePath;
+                setLastSavedReport(filePath);
                 toast.success(t('toolbox.checkup.report_saved', 'AI Verified Report saved successfully!'), { id: toastId });
             } else {
                 toast.dismiss(toastId);
@@ -2334,18 +2437,36 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
 
     // Filtered packages
     const filteredDevicePackages = useMemo(() => {
-        if (!packageSearchQuery) return devicePackages;
+        let pkgs = devicePackages;
+        if (packageFilterPrefixes.length > 0) {
+            pkgs = pkgs.filter(p => {
+                const matchesPrefix = packageFilterPrefixes.some(prefix => matchesFilterPattern(p.name, prefix));
+                if (packageFilterMode === 'include') return matchesPrefix;
+                return !matchesPrefix;
+            });
+        }
+        if (!packageSearchQuery) return pkgs;
         const q = packageSearchQuery.toLowerCase();
-        return devicePackages.filter(p => p.name.toLowerCase().includes(q) || (p.version && p.version.toLowerCase().includes(q)));
-    }, [devicePackages, packageSearchQuery]);
+        return pkgs.filter(p => p.name.toLowerCase().includes(q) || (p.version && p.version.toLowerCase().includes(q)));
+    }, [devicePackages, packageSearchQuery, packageFilterPrefixes, packageFilterMode]);
+
+    const packageComparisonsToCount = useMemo(() => {
+        if (packageFilterPrefixes.length === 0) return packageComparisons;
+        return packageComparisons.filter(p => {
+            const matchesPrefix = packageFilterPrefixes.some(prefix => matchesFilterPattern(p.name, prefix));
+            if (packageFilterMode === 'include') return matchesPrefix;
+            return !matchesPrefix;
+        });
+    }, [packageComparisons, packageFilterPrefixes, packageFilterMode]);
 
     const filteredPackageComparisons = useMemo(() => {
-        return packageComparisons.filter(p => {
+        let comps = packageComparisonsToCount;
+        return comps.filter(p => {
             if (filterDivergent && p.isMatch) return false;
             if (packageSearchQuery && !p.name.toLowerCase().includes(packageSearchQuery.toLowerCase())) return false;
             return true;
         });
-    }, [packageComparisons, filterDivergent, packageSearchQuery]);
+    }, [packageComparisonsToCount, filterDivergent, packageSearchQuery]);
 
     const disabled = isTestRunning && !allowActionsDuringTest;
 
@@ -2364,6 +2485,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         : "text-on-surface-variant/70 hover:bg-surface-variant/40 border border-outline-variant/30 hover:text-on-surface"
                 )}
                 title={isVerified ? t('toolbox.checkup.verified_tooltip', 'Section verified by analyst') : t('toolbox.checkup.unverified_tooltip', 'Click to attest verification')}
+                data-position="left"
             >
                 <CheckCircle2 size={14} className={isVerified ? "text-success" : "text-on-surface-variant/40"} />
                 <span>{isVerified ? t('toolbox.checkup.verified', 'Conferido') : t('toolbox.checkup.not_verified', 'Não Conferido')}</span>
@@ -2409,6 +2531,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                     : "border-outline-variant/30 text-on-surface-variant hover:text-on-surface"
                             )}
                             title={filterDivergent ? t('toolbox.checkup.show_all', 'Show all') : t('toolbox.checkup.show_only_divergent', 'Show only divergences')}
+                            data-position="left"
                         >
                             {filterDivergent ? <FilterX size={14} /> : <Filter size={14} />}
                             <span>{filterDivergent ? t('toolbox.checkup.show_all', 'Show All') : t('toolbox.checkup.show_only_divergent', 'Only Divergences')}</span>
@@ -2422,6 +2545,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                             onClick={handleClearGolden}
                             className="h-8 px-2.5 text-xs text-error hover:bg-error/10 hover:text-error border border-error/20 flex items-center gap-1.5"
                             title={t('toolbox.checkup.clear_golden', 'Clear Comparison')}
+                            data-position="left"
                         >
                             <Trash2 size={14} />
                             <span>{t('toolbox.checkup.clear_golden', 'Clear Comparison')}</span>
@@ -2434,6 +2558,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         onClick={generateGoldenFile}
                         aria-label={t('toolbox.checkup.generate_golden_file', 'Generate Golden File')}
                         title={t('toolbox.checkup.generate_golden_file', 'Generate Golden File')}
+                        data-position="left"
                         disabled={disabled}
                         className="h-8 px-2.5 text-xs flex items-center gap-1.5"
                     >
@@ -2447,6 +2572,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         onClick={handleImportGoldenFile}
                         aria-label={t('toolbox.checkup.import_golden_file', 'Import Golden File')}
                         title={t('toolbox.checkup.import_golden_file', 'Import Golden File')}
+                        data-position="left"
                         disabled={disabled}
                         className="h-8 px-2.5 text-xs flex items-center gap-1.5"
                     >
@@ -2458,13 +2584,14 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         variant="ghost"
                         size="sm"
                         onClick={() => setIsBasePropsModalOpen(true)}
-                        aria-label={t('toolbox.checkup.base_props.config_title', 'Base Props Configuration')}
-                        title={t('toolbox.checkup.base_props.config_title', 'Base Props Configuration')}
+                        aria-label={t('toolbox.checkup.search_config.config_title', 'Search Configuration')}
+                        title={t('toolbox.checkup.search_config.config_title', 'Search Configuration')}
+                        data-position="left"
                         disabled={disabled}
                         className="h-8 px-2.5 text-xs flex items-center gap-1.5"
                     >
                         <SlidersHorizontal size={14} />
-                        <span>{t('toolbox.checkup.base_props_btn', 'Base Props')}</span>
+                        <span>{t('toolbox.checkup.search_config_btn', 'Search Settings')}</span>
                     </Button>
 
                     <Button
@@ -2472,6 +2599,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         disabled={disabled || isLoading}
                         onClick={validateAndOpenReportModal}
                         title={t('toolbox.checkup.generate_report', 'Generate Report')}
+                        data-position="left"
                         size="sm"
                         className="h-8 px-3.5 text-xs flex items-center gap-1.5 shadow-md"
                     >
@@ -2480,6 +2608,12 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     </Button>
                 </div>
             </div>
+
+            {/* File Saved Feedback */}
+            <FileSavedFeedback
+                path={lastSavedReport}
+                onClose={() => setLastSavedReport(null)}
+            />
 
             {/* Row 1: Device Properties & Installed Packages (Side-by-Side) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[420px]">
@@ -2509,6 +2643,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                 onClick={handleLoadRemainingProps}
                                 className="h-8 px-2.5 text-xs flex items-center gap-1.5"
                                 title={t('toolbox.checkup.load_remaining', 'Load Base Props')}
+                                data-position="left"
                             >
                                 <FileText size={14} />
                                 <span>{isSearchFocused ? "" : t('toolbox.checkup.load_remaining', 'Load Base Props')}</span>
@@ -2623,16 +2758,17 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                 disabled={disabled || isLoadingPackages}
                                 className="h-8 w-8 p-0 flex items-center justify-center shrink-0 rounded-md"
                                 title={t('common.refresh', 'Refresh')}
+                                data-position="left"
                             >
                                 <RefreshCw size={14} className={clsx(isLoadingPackages && "animate-spin")} />
                             </Button>
                         </div>
                     }
                     menus={
-                        packageComparisons.length > 0 && packageComparisons.some(p => p.goldenVersion !== undefined) ? (
+                        packageComparisonsToCount.length > 0 && packageComparisonsToCount.some(p => p.goldenVersion !== undefined) ? (
                             <div className="flex items-center gap-2">
                                 <span className="text-xs px-2 h-8 flex items-center justify-center bg-surface-variant/30 text-on-surface rounded-md font-mono">
-                                    {packageComparisons.filter(p => p.isMatch).length} / {packageComparisons.length}
+                                    {packageComparisonsToCount.filter(p => p.isMatch).length} / {packageComparisonsToCount.length}
                                 </span>
                             </div>
                         ) : undefined
@@ -2651,7 +2787,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                     <thead className="bg-surface-variant/30 backdrop-blur-md sticky top-0 shadow-sm z-10 text-on-surface-variant">
                                         <tr>
                                             <th className="p-2.5 font-medium border-b border-outline-variant/30 w-4/12">{t('toolbox.checkup.package_name', 'Package')}</th>
-                                            <th className="p-2.5 font-medium border-b border-outline-variant/30 w-3/12">{t('toolbox.checkup.golden', 'Golden')}</th>
+                                            <th className="p-2.5 font-medium border-b border-outline-variant/30 w-3/12">{t('toolbox.checkup.expected', 'Expected')}</th>
                                             <th className="p-2.5 font-medium border-b border-outline-variant/30 w-3/12">{t('toolbox.checkup.device', 'Device')}</th>
                                             <th className="p-2.5 font-medium border-b border-outline-variant/30 w-2/12 text-center">Status</th>
                                         </tr>
@@ -2736,6 +2872,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                 variant="secondary"
                                 size="sm"
                                 title={t('toolbox.checkup.run_checks', 'Run Checks')}
+                                data-position="left"
                                 onClick={runStandardChecks}
                                 disabled={disabled || standardChecks.some(c => c.status === 'running')}
                                 className="h-8 px-2.5 text-xs flex items-center gap-1.5"
@@ -2794,6 +2931,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                 variant="secondary"
                                 size="sm"
                                 title={t('toolbox.checkup.run_checks', 'Run Checks')}
+                                data-position="left"
                                 onClick={runAdditionalChecks}
                                 disabled={disabled || additionalChecks.some(c => c.status === 'running')}
                                 className="h-8 px-2.5 text-xs flex items-center gap-1.5"
@@ -2839,6 +2977,218 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 </Section>
             </div>
 
+            {/* Manual Checks Panel */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[380px]">
+                <Section
+                    title={t('toolbox.checkup.manual_checks', 'Manual Checklist')}
+                    icon={CheckSquare}
+                    className="flex flex-col min-h-[380px] overflow-hidden"
+                    contentClassName="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-0"
+                    actions={
+                        <div className="flex items-center gap-2">
+                            {renderVerifiedButton('manualChecks')}
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={openAddManualCheck}
+                                disabled={disabled}
+                                className="h-8 px-2.5 text-xs flex items-center gap-1.5"
+                                title={t('toolbox.checkup.add_check', 'Add Check')}
+                                data-position="left"
+                            >
+                                <Plus size={14} />
+                                <span>{t('toolbox.checkup.add_check', 'Add Check')}</span>
+                            </Button>
+                        </div>
+                    }
+                >
+                    {manualChecks.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full text-on-surface-variant/40 p-8 text-center min-h-[180px]">
+                            <CheckSquare size={36} className="mb-2 opacity-50" />
+                            <p className="text-xs max-w-[260px]">
+                                {t('toolbox.checkup.no_manual_checks', 'No manual checks added yet. Click "Add Check" to record custom hardware/visual inspections.')}
+                            </p>
+                        </div>
+                    ) : (
+                        manualChecks.map(item => {
+                            const isPass = item.status === 'pass';
+                            const isFail = item.status === 'fail';
+
+                            return (
+                                <div key={item.id} className="p-3 rounded-xl bg-surface/50 border border-outline-variant/30 hover:border-outline-variant/60 transition-all flex flex-col gap-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <span className={clsx(
+                                                "text-[10px] px-2 py-0.5 rounded font-semibold border uppercase",
+                                                isPass ? "bg-success/10 text-success border-success/20" : (isFail ? "bg-error/10 text-error border-error/20" : "bg-surface-variant/40 text-on-surface-variant border-outline-variant/30")
+                                            )}>
+                                                {isPass ? t('toolbox.checkup.conforme', 'CONFORME') : (isFail ? t('toolbox.checkup.nao_conforme', 'NÃO CONFORME') : 'N/A')}
+                                            </span>
+                                            <h4 className="text-xs font-semibold text-on-surface">{item.name}</h4>
+                                        </div>
+
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => openEditManualCheck(item)}
+                                                className="h-7 w-7 p-0 flex items-center justify-center rounded"
+                                                title={t('common.edit', 'Edit')}
+                                                data-position="left"
+                                            >
+                                                <Edit3 size={12} className="text-on-surface-variant/70" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => deleteManualCheck(item.id)}
+                                                className="h-7 w-7 p-0 flex items-center justify-center rounded hover:text-error"
+                                                title={t('common.delete', 'Delete')}
+                                                data-position="left"
+                                            >
+                                                <Trash2 size={12} />
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    <div className="text-xs text-on-surface-variant">
+                                        {item.type === 'image' && item.valueImageBase64 ? (
+                                            <div className="flex items-center gap-3 mt-1">
+                                                <div
+                                                    className="relative cursor-pointer group rounded-lg overflow-hidden border border-outline-variant/40 max-w-[120px] max-h-[80px]"
+                                                    onClick={() => setSelectedImagePreview(item.valueImageBase64 || null)}
+                                                >
+                                                    <img src={item.valueImageBase64} alt={item.name} className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                                        <Eye size={16} />
+                                                    </div>
+                                                </div>
+                                                <span className="text-[11px] text-on-surface-variant/70 italic">{t('toolbox.checkup.click_to_zoom', 'Click thumbnail to zoom')}</span>
+                                            </div>
+                                        ) : (
+                                            <div className="font-mono text-[11px] text-on-surface bg-surface-variant/20 p-1.5 rounded border border-outline-variant/20">
+                                                {item.valueText || '-'}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {item.notes && (
+                                        <p className="text-[11px] text-on-surface-variant/80 italic border-t border-outline-variant/10 pt-1">
+                                            <strong>{t('toolbox.checkup.notes', 'Obs')}:</strong> {item.notes}
+                                        </p>
+                                    )}
+                                </div>
+                            );
+                        })
+                    )}
+                </Section>
+
+                {/* Row 4: UI Text Checks & Interactive Hardware Tests */}
+                {/* UI Text Checks Panel */}
+                <Section
+                    title={t('toolbox.checkup.ui_text_checks', 'Screen & UI Text Check')}
+                    icon={Tv}
+                    className="flex flex-col min-h-[380px] overflow-hidden"
+                    contentClassName="flex-1 overflow-y-auto p-3 space-y-3 min-h-0"
+                    actions={
+                        <div className="flex items-center gap-2">
+                            {renderVerifiedButton('uiTextChecks')}
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={runAllUiTextChecks}
+                                disabled={disabled || uiTextChecks.some(c => c.status === 'running')}
+                                className="h-8 px-2.5 text-xs flex items-center gap-1.5"
+                                title={t('toolbox.checkup.run_all', 'Run All')}
+                                data-position="left"
+                            >
+                                <Play size={14} className={clsx(uiTextChecks.some(c => c.status === 'running') && "animate-spin")} />
+                                <span>{t('toolbox.checkup.run_all', 'Run All')}</span>
+                            </Button>
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => {
+                                    setEditingUiCheck(null);
+                                    setUiCheckNameInput('');
+                                    setUiCheckActivityInput('');
+                                    setUiCheckDelayInput('1500');
+                                    setIsUiCheckModalOpen(true);
+                                }}
+                                disabled={disabled}
+                                className="h-8 px-2.5 text-xs flex items-center gap-1.5"
+                                title={t('common.add', 'Add')}
+                                data-position="left"
+                            >
+                                <Plus size={14} />
+                                <span>{t('common.add', 'Add')}</span>
+                            </Button>
+                        </div>
+                    }
+                >
+                    {uiTextChecks.map(check => (
+                        <div key={check.id} className="p-3 rounded-xl bg-surface/50 border border-outline-variant/30 flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        checked={check.enabled}
+                                        onChange={(e) => {
+                                            const enabled = e.target.checked;
+                                            setUiTextChecks(prev => prev.map(c => c.id === check.id ? { ...c, enabled } : c));
+                                        }}
+                                        className="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4"
+                                    />
+                                    <div>
+                                        <h4 className="text-xs font-semibold text-on-surface">{check.name}</h4>
+                                        <code className="text-[10px] text-on-surface-variant/70">{check.activity || 'Current Screen'}</code>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => runSingleUiTextCheck(check)}
+                                        disabled={disabled || check.status === 'running'}
+                                        className="h-7 px-2 text-xs"
+                                        title={t('common.run', 'Run')}
+                                        data-position="left"
+                                    >
+                                        <Play size={12} className={clsx(check.status === 'running' && "animate-spin")} />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                            setEditingUiCheck(check);
+                                            setUiCheckNameInput(check.name);
+                                            setUiCheckActivityInput(check.activity);
+                                            setUiCheckDelayInput(String(check.delayMs || 1500));
+                                            setIsUiCheckModalOpen(true);
+                                        }}
+                                        className="h-7 w-7 p-0 flex items-center justify-center rounded"
+                                        title={t('common.edit', 'Edit')}
+                                        data-position="left"
+                                    >
+                                        <Edit3 size={12} />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setUiTextChecks(prev => prev.filter(c => c.id !== check.id))}
+                                        className="h-7 w-7 p-0 flex items-center justify-center rounded hover:text-error"
+                                        title={t('common.delete', 'Delete')}
+                                        data-position="left"
+                                    >
+                                        <Trash2 size={12} />
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </Section>
+            </div>
+
             {/* Row 3: Companion BDD Tests & Manual Checks */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[380px]">
                 {/* Companion BDD Tests Panel */}
@@ -2857,6 +3207,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                 disabled={disabled || isLoadingCompanionTests}
                                 className="h-8 w-8 p-0 flex items-center justify-center shrink-0 rounded-md"
                                 title={t('common.refresh', 'Sync Tests')}
+                                data-position="left"
                             >
                                 <RefreshCw size={14} className={clsx(isLoadingCompanionTests && "animate-spin")} />
                             </Button>
@@ -2937,204 +3288,6 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     )}
                 </Section>
 
-                {/* Manual Checks Panel */}
-                <Section
-                    title={t('toolbox.checkup.manual_checks', 'Manual Checklist')}
-                    icon={CheckSquare}
-                    className="flex flex-col min-h-[380px] overflow-hidden"
-                    contentClassName="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-0"
-                    actions={
-                        <div className="flex items-center gap-2">
-                            {renderVerifiedButton('manualChecks')}
-                            <Button
-                                variant="primary"
-                                size="sm"
-                                onClick={openAddManualCheck}
-                                disabled={disabled}
-                                className="h-8 px-2.5 text-xs flex items-center gap-1.5"
-                            >
-                                <Plus size={14} />
-                                <span>{t('toolbox.checkup.add_check', 'Add Check')}</span>
-                            </Button>
-                        </div>
-                    }
-                >
-                    {manualChecks.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full text-on-surface-variant/40 p-8 text-center min-h-[180px]">
-                            <CheckSquare size={36} className="mb-2 opacity-50" />
-                            <p className="text-xs max-w-[260px]">
-                                {t('toolbox.checkup.no_manual_checks', 'No manual checks added yet. Click "Add Check" to record custom hardware/visual inspections.')}
-                            </p>
-                        </div>
-                    ) : (
-                        manualChecks.map(item => {
-                            const isPass = item.status === 'pass';
-                            const isFail = item.status === 'fail';
-
-                            return (
-                                <div key={item.id} className="p-3 rounded-xl bg-surface/50 border border-outline-variant/30 hover:border-outline-variant/60 transition-all flex flex-col gap-2">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <span className={clsx(
-                                                "text-[10px] px-2 py-0.5 rounded font-semibold border uppercase",
-                                                isPass ? "bg-success/10 text-success border-success/20" : (isFail ? "bg-error/10 text-error border-error/20" : "bg-surface-variant/40 text-on-surface-variant border-outline-variant/30")
-                                            )}>
-                                                {isPass ? t('toolbox.checkup.conforme', 'CONFORME') : (isFail ? t('toolbox.checkup.nao_conforme', 'NÃO CONFORME') : 'N/A')}
-                                            </span>
-                                            <h4 className="text-xs font-semibold text-on-surface">{item.name}</h4>
-                                        </div>
-
-                                        <div className="flex items-center gap-1">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => openEditManualCheck(item)}
-                                                className="h-7 w-7 p-0 flex items-center justify-center rounded"
-                                                title={t('common.edit', 'Edit')}
-                                            >
-                                                <Edit3 size={12} className="text-on-surface-variant/70" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => deleteManualCheck(item.id)}
-                                                className="h-7 w-7 p-0 flex items-center justify-center rounded hover:text-error"
-                                                title={t('common.delete', 'Delete')}
-                                            >
-                                                <Trash2 size={12} />
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                    <div className="text-xs text-on-surface-variant">
-                                        {item.type === 'image' && item.valueImageBase64 ? (
-                                            <div className="flex items-center gap-3 mt-1">
-                                                <div
-                                                    className="relative cursor-pointer group rounded-lg overflow-hidden border border-outline-variant/40 max-w-[120px] max-h-[80px]"
-                                                    onClick={() => setSelectedImagePreview(item.valueImageBase64 || null)}
-                                                >
-                                                    <img src={item.valueImageBase64} alt={item.name} className="w-full h-full object-cover" />
-                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                                                        <Eye size={16} />
-                                                    </div>
-                                                </div>
-                                                <span className="text-[11px] text-on-surface-variant/70 italic">{t('toolbox.checkup.click_to_zoom', 'Click thumbnail to zoom')}</span>
-                                            </div>
-                                        ) : (
-                                            <div className="font-mono text-[11px] text-on-surface bg-surface-variant/20 p-1.5 rounded border border-outline-variant/20">
-                                                {item.valueText || '-'}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {item.notes && (
-                                        <p className="text-[11px] text-on-surface-variant/80 italic border-t border-outline-variant/10 pt-1">
-                                            <strong>{t('toolbox.checkup.notes', 'Obs')}:</strong> {item.notes}
-                                        </p>
-                                    )}
-                                </div>
-                            );
-                        })
-                    )}
-                </Section>
-            </div>
-
-            {/* Row 4: UI Text Checks & Interactive Hardware Tests */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[380px]">
-                {/* UI Text Checks Panel */}
-                <Section
-                    title={t('toolbox.checkup.ui_text_checks', 'Screen & UI Text Check')}
-                    icon={Tv}
-                    className="flex flex-col min-h-[380px] overflow-hidden"
-                    contentClassName="flex-1 overflow-y-auto p-3 space-y-3 min-h-0"
-                    actions={
-                        <div className="flex items-center gap-2">
-                            {renderVerifiedButton('uiTextChecks')}
-                            <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={runAllUiTextChecks}
-                                disabled={disabled || uiTextChecks.some(c => c.status === 'running')}
-                                className="h-8 px-2.5 text-xs flex items-center gap-1.5"
-                            >
-                                <Play size={14} className={clsx(uiTextChecks.some(c => c.status === 'running') && "animate-spin")} />
-                                <span>{t('toolbox.checkup.run_all', 'Run All')}</span>
-                            </Button>
-                            <Button
-                                variant="primary"
-                                size="sm"
-                                onClick={() => {
-                                    setEditingUiCheck(null);
-                                    setUiCheckNameInput('');
-                                    setUiCheckActivityInput('');
-                                    setUiCheckDelayInput('1500');
-                                    setIsUiCheckModalOpen(true);
-                                }}
-                                disabled={disabled}
-                                className="h-8 px-2.5 text-xs flex items-center gap-1.5"
-                            >
-                                <Plus size={14} />
-                                <span>{t('common.add', 'Add')}</span>
-                            </Button>
-                        </div>
-                    }
-                >
-                    {uiTextChecks.map(check => (
-                        <div key={check.id} className="p-3 rounded-xl bg-surface/50 border border-outline-variant/30 flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        checked={check.enabled}
-                                        onChange={(e) => {
-                                            const enabled = e.target.checked;
-                                            setUiTextChecks(prev => prev.map(c => c.id === check.id ? { ...c, enabled } : c));
-                                        }}
-                                        className="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4"
-                                    />
-                                    <div>
-                                        <h4 className="text-xs font-semibold text-on-surface">{check.name}</h4>
-                                        <code className="text-[10px] text-on-surface-variant/70">{check.activity || 'Current Screen'}</code>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => runSingleUiTextCheck(check)}
-                                        disabled={disabled || check.status === 'running'}
-                                        className="h-7 px-2 text-xs"
-                                    >
-                                        <Play size={12} className={clsx(check.status === 'running' && "animate-spin")} />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                            setEditingUiCheck(check);
-                                            setUiCheckNameInput(check.name);
-                                            setUiCheckActivityInput(check.activity);
-                                            setUiCheckDelayInput(String(check.delayMs || 1500));
-                                            setIsUiCheckModalOpen(true);
-                                        }}
-                                        className="h-7 w-7 p-0 flex items-center justify-center rounded"
-                                    >
-                                        <Edit3 size={12} />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setUiTextChecks(prev => prev.filter(c => c.id !== check.id))}
-                                        className="h-7 w-7 p-0 flex items-center justify-center rounded hover:text-error"
-                                    >
-                                        <Trash2 size={12} />
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </Section>
-
                 {/* Interactive Hardware Tests Panel */}
                 <Section
                     title={t('toolbox.checkup.interactive_tests', 'Interactive Hardware Tests')}
@@ -3173,33 +3326,6 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 </Section>
             </div>
 
-            {/* Base Props Configuration Modal */}
-            <Modal
-                isOpen={isBasePropsModalOpen}
-                onClose={() => setIsBasePropsModalOpen(false)}
-                title={t('toolbox.checkup.base_props.config_title', 'Base Props Configuration')}
-                className="max-w-2xl w-[90vw]"
-            >
-                <div className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-2">
-                    <p className="text-xs text-on-surface-variant">
-                        {t('toolbox.checkup.base_props.config_desc', 'Configure the prefixes used to fetch base properties for the golden file and the properties comparison list.')}
-                    </p>
-                    <div className="bg-surface-variant/30 p-4 rounded-xl border border-outline-variant/30 flex flex-col gap-4">
-                        <TagInput
-                            label={t('toolbox.checkup.base_props.prefixes', 'Prefixes (e.g. ro.build)')}
-                            tags={basePropsPrefixes}
-                            onChange={setBasePropsPrefixes}
-                            placeholder={t('toolbox.checkup.base_props.add_prefix', 'Add prefix...')}
-                        />
-                    </div>
-                </div>
-                <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-outline-variant/30">
-                    <Button variant="primary" onClick={() => setIsBasePropsModalOpen(false)}>
-                        {t('common.done', 'Done')}
-                    </Button>
-                </div>
-            </Modal>
-
             {/* Manual Check Add/Edit Modal */}
             <Modal
                 isOpen={isManualCheckModalOpen}
@@ -3229,6 +3355,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                 size="sm"
                                 onClick={() => setManualCheckType('text')}
                                 className="h-8 text-xs flex items-center justify-center gap-1.5"
+                                title={t('toolbox.checkup.type_text', 'Text / Specs')}
+                                data-position="bottom"
                             >
                                 <FileText size={14} />
                                 <span>{t('toolbox.checkup.type_text', 'Text / Specs')}</span>
@@ -3238,6 +3366,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                 size="sm"
                                 onClick={() => setManualCheckType('image')}
                                 className="h-8 text-xs flex items-center justify-center gap-1.5"
+                                title={t('toolbox.checkup.type_image', 'Photo / Evidence')}
+                                data-position="bottom"
                             >
                                 <ImageIcon size={14} />
                                 <span>{t('toolbox.checkup.type_image', 'Photo / Evidence')}</span>
@@ -3253,7 +3383,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                             <Input
                                 value={manualCheckValueText}
                                 onChange={(e) => setManualCheckValueText(e.target.value)}
-                                placeholder="e.g. 1080x2400 AMOLED 120Hz, No scratches"
+                                placeholder={t('toolbox.checkup.manual_value_placeholder', 'e.g. 1080x2400 AMOLED 120Hz, No scratches')}
                             />
                         </div>
                     ) : (
@@ -3266,13 +3396,13 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                     <div className="relative rounded-xl overflow-hidden border border-outline-variant/40 max-h-[160px] bg-black/20 flex items-center justify-center">
                                         <img src={manualCheckValueImage} alt="Preview" className="max-h-[160px] object-contain" />
                                     </div>
-                                    <Button variant="outline" size="sm" onClick={handlePickManualImage} className="h-8 text-xs">
+                                    <Button variant="outline" size="sm" onClick={handlePickManualImage} className="h-8 text-xs" title={t('toolbox.checkup.change_image', 'Change Image')} data-position="bottom">
                                         <Upload size={14} className="mr-1.5" />
                                         {t('toolbox.checkup.change_image', 'Change Image')}
                                     </Button>
                                 </div>
                             ) : (
-                                <Button variant="outline" size="sm" onClick={handlePickManualImage} className="w-full h-16 border-dashed text-xs flex flex-col items-center justify-center gap-1">
+                                <Button variant="outline" size="sm" onClick={handlePickManualImage} className="w-full h-16 border-dashed text-xs flex flex-col items-center justify-center gap-1" title={t('toolbox.checkup.upload_image_btn', 'Select Image File (PNG, JPG, WEBP)...')} data-position="bottom">
                                     <ImageIcon size={20} className="text-on-surface-variant/60" />
                                     <span>{t('toolbox.checkup.upload_image_btn', 'Select Image File (PNG, JPG, WEBP)...')}</span>
                                 </Button>
@@ -3290,6 +3420,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                 size="sm"
                                 onClick={() => setManualCheckStatus('pass')}
                                 className={clsx("h-8 text-xs", manualCheckStatus === 'pass' && "bg-success border-success text-white")}
+                                title={t('toolbox.checkup.conforme', 'CONFORME')}
+                                data-position="bottom"
                             >
                                 {t('toolbox.checkup.conforme', 'CONFORME')}
                             </Button>
@@ -3298,6 +3430,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                 size="sm"
                                 onClick={() => setManualCheckStatus('fail')}
                                 className={clsx("h-8 text-xs", manualCheckStatus === 'fail' && "bg-error border-error text-white")}
+                                title={t('toolbox.checkup.nao_conforme', 'NÃO CONF.')}
+                                data-position="bottom"
                             >
                                 {t('toolbox.checkup.nao_conforme', 'NÃO CONF.')}
                             </Button>
@@ -3306,6 +3440,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                 size="sm"
                                 onClick={() => setManualCheckStatus('na')}
                                 className="h-8 text-xs"
+                                title={t('toolbox.checkup.not_applicable', 'Not Applicable')}
+                                data-position="bottom"
                             >
                                 N/A
                             </Button>
@@ -3326,10 +3462,16 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 </div>
 
                 <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-outline-variant/30">
-                    <Button variant="ghost" onClick={() => setIsManualCheckModalOpen(false)}>
+                    <Button variant="ghost" onClick={() => setIsManualCheckModalOpen(false)}
+                        title={t('common.cancel', 'Cancel')}
+                        data-position="top"
+                    >
                         {t('common.cancel', 'Cancel')}
                     </Button>
-                    <Button variant="primary" onClick={saveManualCheck}>
+                    <Button variant="primary" onClick={saveManualCheck}
+                        title={t('common.save', 'Save')}
+                        data-position="top"
+                    >
                         {t('common.save', 'Save')}
                     </Button>
                 </div>
@@ -3357,28 +3499,112 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 className="max-w-4xl w-[90vw]"
             >
                 <div className="flex flex-col gap-6 max-h-[72vh] overflow-y-auto pr-2">
-                    {/* Mandatory Analyst Name Header */}
-                    <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 flex flex-col gap-2">
-                        <label className="text-xs font-bold text-on-surface flex items-center gap-1.5">
-                            <CheckCircle2 size={14} className="text-primary" />
-                            <span>{t('toolbox.checkup.report.analyst_name', 'Analyst Name')}</span>
-                            <span className="text-error">*</span>
-                        </label>
-                        <Input
-                            value={reportAnalystName}
-                            onChange={(e) => setReportAnalystName(e.target.value)}
-                            placeholder={t('toolbox.checkup.report.analyst_placeholder', 'Enter the QA / Hardware Analyst name')}
-                            className={clsx(
-                                "h-9 text-sm",
-                                !reportAnalystName.trim() && "border-error focus:ring-error"
-                            )}
-                        />
-                        {!reportAnalystName.trim() && (
-                            <span className="text-[11px] text-error font-medium flex items-center gap-1">
-                                <AlertTriangle size={12} />
-                                {t('toolbox.checkup.report.analyst_required_warning', 'Mandatory field: The report cannot be generated without the analyst name.')}
-                            </span>
-                        )}
+                    {/* Analyst Name, Final Result & Comments Header */}
+                    <div className="p-4 rounded-xl bg-surface-variant/20 border border-outline-variant/30 flex flex-col gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                                    <CheckCircle2 size={14} className="text-primary" />
+                                    <span>{t('toolbox.checkup.report.analyst_name', 'Analyst Name')}</span>
+                                    <span className="text-error">*</span>
+                                </label>
+                                <Input
+                                    value={reportAnalystName}
+                                    onChange={(e) => {
+                                        setReportAnalystName(e.target.value);
+                                        localStorage.setItem('checkup_reportAnalystName', e.target.value);
+                                    }}
+                                    placeholder={t('toolbox.checkup.report.analyst_placeholder', 'Enter the QA / Hardware Analyst name')}
+                                    className={clsx(
+                                        "h-9 text-sm",
+                                        !reportAnalystName.trim() && "border-error focus:ring-error"
+                                    )}
+                                />
+                                {!reportAnalystName.trim() && (
+                                    <span className="text-[11px] text-error font-medium flex items-center gap-1">
+                                        <AlertTriangle size={12} />
+                                        {t('toolbox.checkup.report.analyst_required_warning', 'Mandatory field: The report cannot be generated without the analyst name.')}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-xs font-bold text-on-surface">
+                                    {t('toolbox.checkup.report.result', 'Final Result')}
+                                </label>
+                                <div className="grid grid-cols-3 gap-1.5 h-9 bg-surface-variant/40 p-1 rounded-xl border border-outline-variant/30 items-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setReportResult('approved');
+                                            localStorage.setItem('checkup_reportResult', 'approved');
+                                        }}
+                                        className={clsx(
+                                            "h-7 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1",
+                                            reportResult === 'approved'
+                                                ? "bg-success text-white shadow-sm"
+                                                : "text-on-surface-variant hover:text-on-surface"
+                                        )}
+                                        title={t('toolbox.checkup.report.approved', 'Approved')}
+                                        data-position="top"
+                                    >
+                                        <CheckCircle2 size={12} />
+                                        <span>{t('toolbox.checkup.report.approved', 'Approved')}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setReportResult('rejected');
+                                            localStorage.setItem('checkup_reportResult', 'rejected');
+                                        }}
+                                        className={clsx(
+                                            "h-7 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1",
+                                            reportResult === 'rejected'
+                                                ? "bg-error text-white shadow-sm"
+                                                : "text-on-surface-variant hover:text-on-surface"
+                                        )}
+                                        title={t('toolbox.checkup.report.rejected', 'Rejected')}
+                                        data-position="top"
+                                    >
+                                        <XCircle size={12} />
+                                        <span>{t('toolbox.checkup.report.rejected', 'Rejected')}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setReportResult('pending');
+                                            localStorage.setItem('checkup_reportResult', 'pending');
+                                        }}
+                                        className={clsx(
+                                            "h-7 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1",
+                                            reportResult === 'pending'
+                                                ? "bg-amber-500 text-white shadow-sm"
+                                                : "text-on-surface-variant hover:text-on-surface"
+                                        )}
+                                        title={t('toolbox.checkup.report.pending', 'Pending')}
+                                        data-position="top"
+                                    >
+                                        <Clock size={12} />
+                                        <span>{t('toolbox.checkup.report.pending', 'Pending')}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold text-on-surface">
+                                {t('toolbox.checkup.report.comments', 'Comments / Observations')}
+                            </label>
+                            <Textarea
+                                value={reportComments}
+                                onChange={(e) => {
+                                    setReportComments(e.target.value);
+                                    localStorage.setItem('checkup_reportComments', e.target.value);
+                                }}
+                                placeholder={t('toolbox.checkup.report.comments_placeholder', 'Add general observations, justifications, or test notes...')}
+                                className="text-xs min-h-[56px] max-h-[96px]"
+                            />
+                        </div>
                     </div>
 
                     {/* Section Visibility Toggles */}
@@ -3416,13 +3642,6 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                             )}
 
                             {renderReportSectionControl(
-                                t('toolbox.checkup.report.companion_bdd_title', 'Companion BDD Tests'),
-                                t('toolbox.checkup.report.companion_bdd_desc', 'Include mobile BDD execution reports'),
-                                reportShowCompanionBdd,
-                                setReportShowCompanionBdd
-                            )}
-
-                            {renderReportSectionControl(
                                 t('toolbox.checkup.report.manual_checks_title', 'Manual Checklist'),
                                 t('toolbox.checkup.report.manual_checks_desc', 'Include custom visual inspections & photos'),
                                 reportShowManualChecks,
@@ -3437,88 +3656,34 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                             )}
 
                             {renderReportSectionControl(
+                                t('toolbox.checkup.report.companion_bdd_title', 'Companion BDD Tests'),
+                                t('toolbox.checkup.report.companion_bdd_desc', 'Include mobile BDD execution reports'),
+                                reportShowCompanionBdd,
+                                setReportShowCompanionBdd
+                            )}
+
+                            {renderReportSectionControl(
                                 t('toolbox.checkup.report.interactive_tests_title', 'Interactive Hardware'),
                                 t('toolbox.checkup.report.interactive_tests_desc', 'Include touchscreen & button checks'),
                                 reportShowInteractiveTests,
                                 setReportShowInteractiveTests
                             )}
 
-                            {renderReportToggleControl(
+                            {/* {renderReportToggleControl(
                                 t('toolbox.checkup.report.extra_props_title', 'Extra Properties'),
                                 t('toolbox.checkup.report.extra_props_desc', 'Include device extra base properties'),
                                 reportShowPropsBase,
                                 setReportShowPropsBase
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Advanced Filter Settings */}
-                    <div>
-                        <h3 className="text-xs font-bold text-on-surface uppercase tracking-wider mb-3">
-                            {t('toolbox.checkup.report.advanced_filters', 'Advanced Filters')}
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="p-3 rounded-xl bg-surface-variant/20 border border-outline-variant/30 flex flex-col gap-2.5">
-                                <span className="text-xs font-semibold text-on-surface">{t('toolbox.checkup.report.packages_filter', 'Package Filter')}</span>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <Button
-                                        variant={packageFilterMode === 'exclude' ? 'primary' : 'outline'}
-                                        size="sm"
-                                        onClick={() => setPackageFilterMode('exclude')}
-                                        className="h-7 text-xs"
-                                    >
-                                        {t('toolbox.checkup.report.btn_exclude', 'Exclude Prefixes')}
-                                    </Button>
-                                    <Button
-                                        variant={packageFilterMode === 'include' ? 'primary' : 'outline'}
-                                        size="sm"
-                                        onClick={() => setPackageFilterMode('include')}
-                                        className="h-7 text-xs"
-                                    >
-                                        {t('toolbox.checkup.report.btn_include', 'Include Only')}
-                                    </Button>
-                                </div>
-                                <TagInput
-                                    label=""
-                                    tags={packageFilterPrefixes}
-                                    onChange={setPackageFilterPrefixes}
-                                    placeholder={t('toolbox.checkup.report.add_prefix', 'Add prefix...')}
-                                />
-                            </div>
-
-                            <div className="p-3 rounded-xl bg-surface-variant/20 border border-outline-variant/30 flex flex-col gap-2.5">
-                                <span className="text-xs font-semibold text-on-surface">{t('toolbox.checkup.report.props_filter', 'Extra Props Filter')}</span>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <Button
-                                        variant={propsFilterMode === 'exclude' ? 'primary' : 'outline'}
-                                        size="sm"
-                                        onClick={() => setPropsFilterMode('exclude')}
-                                        className="h-7 text-xs"
-                                    >
-                                        {t('toolbox.checkup.report.btn_exclude', 'Exclude Prefixes')}
-                                    </Button>
-                                    <Button
-                                        variant={propsFilterMode === 'include' ? 'primary' : 'outline'}
-                                        size="sm"
-                                        onClick={() => setPropsFilterMode('include')}
-                                        className="h-7 text-xs"
-                                    >
-                                        {t('toolbox.checkup.report.btn_include', 'Include Only')}
-                                    </Button>
-                                </div>
-                                <TagInput
-                                    label=""
-                                    tags={propsFilterPrefixes}
-                                    onChange={setPropsFilterPrefixes}
-                                    placeholder={t('toolbox.checkup.report.add_prefix', 'Add prefix...')}
-                                />
-                            </div>
+                            )} */}
                         </div>
                     </div>
                 </div>
 
                 <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-outline-variant/30">
-                    <Button variant="ghost" onClick={() => setIsReportModalOpen(false)}>
+                    <Button variant="ghost" onClick={() => setIsReportModalOpen(false)}
+                        title={t('toolbox.checkup.report.cancel', 'Cancel')}
+                        data-position="top"
+                    >
                         {t('toolbox.checkup.report.cancel', 'Cancel')}
                     </Button>
                     <SplitButton
@@ -3538,44 +3703,108 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 </div>
             </Modal>
 
-            {/* Base Props Configuration Modal */}
+            {/* Search Configuration Modal */}
             <Modal
                 isOpen={isBasePropsModalOpen}
                 onClose={() => setIsBasePropsModalOpen(false)}
-                title={t('toolbox.checkup.base_props.config_title', 'Base Props Configuration')}
-                className="max-w-xl w-[90vw]"
+                title={t('toolbox.checkup.search_config.config_title', 'Search Configuration')}
+                className="max-w-2xl w-[90vw]"
             >
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-6 max-h-[72vh] overflow-y-auto pr-2">
                     <p className="text-xs text-on-surface-variant leading-relaxed">
-                        {t('toolbox.checkup.base_props.config_desc', 'Configure the prefixes used to fetch base properties for the golden file and property comparison list.')}
+                        {t('toolbox.checkup.search_config.config_desc', 'Configure search filters for device properties (.prop) and installed packages (apps) for inspection, comparison, and report generation.')}
                     </p>
-                    <div>
+
+                    {/* Section 1: Device Properties (.prop) */}
+                    <div className="p-4 rounded-xl bg-surface-variant/20 border border-outline-variant/30 flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-xs font-bold text-on-surface uppercase tracking-wider">
+                                    {t('toolbox.checkup.search_config.props_section_title', 'Device Properties (.prop)')}
+                                </h3>
+                                <p className="text-[11px] text-on-surface-variant mt-0.5">
+                                    {t('toolbox.checkup.search_config.props_section_desc', 'Property prefixes to be queried and compared (e.g. ro.build, ro.product).')}
+                                </p>
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setBasePropsPrefixes([
+                                    'gsm.version.', 'persist.sys.device_provisioned', 'persist.sys.fuse', 'persist.sys.usb.config',
+                                    'persist.vendor.connsys.', 'ro.board.', 'ro.boot.hardware', 'ro.boot.serialno', 'ro.boot.vbmeta.',
+                                    'ro.boot.verifiedbootstate', 'ro.boot.veritymode', 'ro.bootloader', 'ro.build.', 'ro.config.low_ram',
+                                    'ro.crypto.', 'ro.debuggable', 'ro.hardware.', 'ro.odm.', 'ro.product.', 'ro.secure', 'ro.revision',
+                                    'ro.serialno', 'ro.soc.model', 'ro.system.', 'ro.telephony.', 'ro.vendor.mediatek.', 'ro.vendor.wifi.',
+                                    'ro.zygote', 'sys.usb.config'
+                                ])}
+                                className="text-[11px] h-7 px-2 text-on-surface-variant hover:text-on-surface flex items-center gap-1"
+                                title={t('toolbox.checkup.search_config.reset_defaults', 'Reset to Defaults')}
+                                data-position="top"
+                            >
+                                <RotateCcw size={12} />
+                                <span>{t('toolbox.checkup.search_config.reset_defaults', 'Reset Defaults')}</span>
+                            </Button>
+                        </div>
                         <TagInput
-                            label={t('toolbox.checkup.base_props.prefixes', 'Prefixes (e.g. ro.build)')}
+                            label={t('toolbox.checkup.search_config.props_prefixes', 'Property Prefixes')}
                             tags={basePropsPrefixes}
                             onChange={setBasePropsPrefixes}
-                            placeholder={t('toolbox.checkup.base_props.add_prefix', 'Add prefix...')}
+                            placeholder={t('toolbox.checkup.search_config.add_prefix', 'Add prefix...')}
+                        />
+                    </div>
+
+                    {/* Section 2: Installed Packages (Apps) */}
+                    <div className="p-4 rounded-xl bg-surface-variant/20 border border-outline-variant/30 flex flex-col gap-3">
+                        <div>
+                            <h3 className="text-xs font-bold text-on-surface uppercase tracking-wider">
+                                {t('toolbox.checkup.search_config.packages_section_title', 'Installed Applications (Packages)')}
+                            </h3>
+                            <p className="text-[11px] text-on-surface-variant mt-0.5">
+                                {t('toolbox.checkup.search_config.packages_section_desc', 'Package filters to be queried and displayed on the interface and reports.')}
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 max-w-xs">
+                            <Button
+                                variant={packageFilterMode === 'exclude' ? 'primary' : 'outline'}
+                                size="sm"
+                                onClick={() => setPackageFilterMode('exclude')}
+                                className="h-7 text-xs"
+                                title={t('toolbox.checkup.search_config.packages_mode_exclude', 'Exclude Prefixes')}
+                                data-position="bottom"
+                            >
+                                {t('toolbox.checkup.search_config.packages_mode_exclude', 'Exclude Prefixes')}
+                            </Button>
+                            <Button
+                                variant={packageFilterMode === 'include' ? 'primary' : 'outline'}
+                                size="sm"
+                                onClick={() => setPackageFilterMode('include')}
+                                className="h-7 text-xs"
+                                title={t('toolbox.checkup.search_config.packages_mode_include', 'Include Only')}
+                                data-position="bottom"
+                            >
+                                {t('toolbox.checkup.search_config.packages_mode_include', 'Include Only')}
+                            </Button>
+                        </div>
+
+                        <TagInput
+                            label={t('toolbox.checkup.search_config.packages_prefixes', 'Package Prefixes')}
+                            tags={packageFilterPrefixes}
+                            onChange={setPackageFilterPrefixes}
+                            placeholder={t('toolbox.checkup.search_config.add_prefix', 'Add prefix...')}
                         />
                     </div>
                 </div>
-                <div className="flex justify-between items-center mt-6 pt-4 border-t border-outline-variant/30">
+
+                <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-outline-variant/30">
                     <Button
-                        variant="ghost"
+                        variant="primary"
                         size="sm"
-                        onClick={() => setBasePropsPrefixes([
-                            'gsm.version.', 'persist.sys.device_provisioned', 'persist.sys.fuse', 'persist.sys.usb.config',
-                            'persist.vendor.connsys.', 'ro.board.', 'ro.boot.hardware', 'ro.boot.serialno', 'ro.boot.vbmeta.',
-                            'ro.boot.verifiedbootstate', 'ro.boot.veritymode', 'ro.bootloader', 'ro.build.', 'ro.config.low_ram',
-                            'ro.crypto.', 'ro.debuggable', 'ro.hardware.', 'ro.odm.', 'ro.product.', 'ro.secure', 'ro.revision',
-                            'ro.serialno', 'ro.soc.model', 'ro.system.', 'ro.telephony.', 'ro.vendor.mediatek.', 'ro.vendor.wifi.',
-                            'ro.zygote', 'sys.usb.config'
-                        ])}
-                        className="text-xs text-on-surface-variant hover:text-on-surface"
+                        onClick={() => setIsBasePropsModalOpen(false)}
+                        title={t('common.done', 'Done')}
+                        data-position="left"
                     >
-                        {t('toolbox.checkup.base_props.reset_defaults', 'Reset to Defaults')}
-                    </Button>
-                    <Button variant="primary" size="sm" onClick={() => setIsBasePropsModalOpen(false)}>
-                        {t('common.save', 'Save')}
+                        {t('common.done', 'Done')}
                     </Button>
                 </div>
             </Modal>
@@ -3600,10 +3829,16 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     />
                 </div>
                 <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-outline-variant/30">
-                    <Button variant="ghost" onClick={() => setIsAiVerifyModalOpen(false)} disabled={isAiVerifying}>
+                    <Button variant="ghost" onClick={() => setIsAiVerifyModalOpen(false)} disabled={isAiVerifying}
+                        title={t('toolbox.checkup.report.cancel', 'Cancel')}
+                        data-position="top"
+                    >
                         {t('toolbox.checkup.report.cancel', 'Cancel')}
                     </Button>
-                    <Button variant="primary" onClick={verifyReportWithAI} disabled={isAiVerifying || !aiRequirementsPrompt.trim()}>
+                    <Button variant="primary" onClick={verifyReportWithAI} disabled={isAiVerifying || !aiRequirementsPrompt.trim()}
+                        title={t('toolbox.checkup.report.start_verification', 'Start Verification')}
+                        data-position="top"
+                    >
                         {isAiVerifying ? t('toolbox.checkup.report.ai_verifying', 'Verifying...') : t('toolbox.checkup.report.start_verification', 'Start Verification')}
                     </Button>
                 </div>
@@ -3644,7 +3879,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     </div>
                 </div>
                 <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-outline-variant/30">
-                    <Button variant="ghost" onClick={() => setIsUiCheckModalOpen(false)}>
+                    <Button variant="ghost" onClick={() => setIsUiCheckModalOpen(false)}
+                        title={t('common.cancel', 'Cancel')}
+                        data-position="top"
+                    >
                         {t('common.cancel', 'Cancel')}
                     </Button>
                     <Button
@@ -3671,6 +3909,8 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                             }
                             setIsUiCheckModalOpen(false);
                         }}
+                        title={t('common.save', 'Save')}
+                        data-position="top"
                     >
                         {t('common.save', 'Save')}
                     </Button>
