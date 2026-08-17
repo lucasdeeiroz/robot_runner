@@ -111,8 +111,8 @@ fun HomePage(
 ) {
     var currentSection by remember { mutableIntStateOf(0) } // 0: Home, 1: Run, 2: Toolbox
     var subTabHome by remember { mutableIntStateOf(0) } // 0: Dashboard, 1: Connect, 2: Network
-    var subTabRun by remember { mutableIntStateOf(0) } // 0: Launcher, 1: Inspector, 2: Mapper, 3: Scenarios
-    var subTabToolbox by remember { mutableIntStateOf(0) } // 0: Logcat, 1: Perf, 2: Stopwatch, 3: Shell, 4: Apps, 5: Hardware, 6: Checkup, 7: Console, 8: Webview, 9: History
+    var subTabRun by remember { mutableIntStateOf(0) } // 0: BDD, 1: Inspector, 2: Explorer
+    var subTabToolbox by remember { mutableIntStateOf(0) } // 0: Logcat, 1: Perf, 2: Stopwatch, 3: Shell, 4: Apps, 5: Checkup
     
     var profileMenuExpanded by remember { mutableStateOf(false) }
 
@@ -165,8 +165,7 @@ fun HomePage(
                                 tabs = listOf(
                                     PillTabItem(stringResource(id = R.string.tab_bdd_runner), Icons.Rounded.PlayArrow),
                                     PillTabItem(stringResource(id = R.string.tab_ui_inspector), Icons.Rounded.Search),
-                                    PillTabItem(stringResource(id = R.string.tab_explorer), Icons.Rounded.Explore),
-                                    // PillTabItem(stringResource(id = R.string.tab_scenarios), Icons.AutoMirrored.Rounded.List)
+                                    PillTabItem(stringResource(id = R.string.tab_explorer), Icons.Rounded.Explore)
                                 ),
                                 selectedIndex = subTabRun,
                                 onTabSelected = { subTabRun = it }
@@ -180,9 +179,7 @@ fun HomePage(
                                     PillTabItem(stringResource(id = R.string.tab_stopwatch), Icons.Rounded.Timer),
                                     PillTabItem(stringResource(id = R.string.tab_shell), Icons.Rounded.Terminal),
                                     PillTabItem(stringResource(id = R.string.tab_apps), Icons.Rounded.Apps),
-                                    PillTabItem(stringResource(id = R.string.tab_checkup), Icons.Rounded.Memory),
-                                    PillTabItem(stringResource(id = R.string.tab_history), Icons.Rounded.History)
-                                    // PillTabItem(stringResource(id = R.string.tab_webview), Icons.Rounded.Language),
+                                    PillTabItem(stringResource(id = R.string.tab_checkup), Icons.Rounded.Memory)
                                 ),
                                 selectedIndex = subTabToolbox,
                                 onTabSelected = { subTabToolbox = it }
@@ -386,7 +383,7 @@ fun HomePage(
                             0 -> TestsSubTab()
                             1 -> InspectorSubTab()
                             2 -> ExplorerSubTab()
-                            3 -> PlaceholderTabContent(stringResource(id = R.string.tab_scenarios_ai))
+                            else -> TestsSubTab()
                         }
                         2 -> when (subTabToolbox) {
                             0 -> LogcatSubTab()
@@ -398,8 +395,7 @@ fun HomePage(
                                 detailedSpecs = detailedSpecs,
                                 onLaunchDisplayTest = onLaunchDisplayTest
                             )
-                            6 -> PlaceholderTabContent(stringResource(id = R.string.tab_history))
-                            // 7 -> PlaceholderTabContent(stringResource(id = R.string.tab_webview))
+                            else -> LogcatSubTab()
                         }
                     }
                 }

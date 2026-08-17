@@ -157,29 +157,5 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
   - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
   - [x] Revisar a lógica de busca heurística e exploração (DFS Grafo) do aplicativo (`AutonomousExplorerEngine.kt`).
 
-## Fase: Implementação da Aba Scenarios (Run)
-  - [ ] Internacionalizar todos os textos.
-  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
-  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
-  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
-  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
-  - [ ] Criar interface (atualmente placeholder) e integração AI no Companion App, substituindo o placeholder pela tela interativa.
-
-## Fase: Implementação da Aba Webview (Toolbox)
-  - [ ] Internacionalizar todos os textos.
-  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
-  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
-  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
-  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
-  - [ ] Adicionar suporte a inspeção webview híbrida via Companion App.
-
-## Fase: Implementação da Aba History (Toolbox)
-  - [ ] Internacionalizar todos os textos.
-  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
-  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
-  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
-  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
-  - [ ] Construir layout para listagem de todos os relatórios `.json` e `.pdf` já gerados no aparelho local.
-
 ---
 *Nota: Atualize o status (`[x]`, `[/]`, `[ ]`) deste documento conforme as tarefas avancem, servindo de base contínua de consulta para o projeto.*

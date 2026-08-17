@@ -198,6 +198,28 @@ class CompanionHttpServer(
                 }
             }
 
+            "/rrt/suites", "/tests/suites", "/tests/history" -> {
+                RrtEngine.reloadSavedSuites(context)
+                val suites = RrtEngine.savedSuitesFlow.value
+                val array = JsonArray()
+                suites.forEach { suite ->
+                    val obj = JsonObject().apply {
+                        addProperty("id", suite.id)
+                        addProperty("name", suite.name)
+                        addProperty("targetPackage", suite.targetPackage)
+                        addProperty("lastModified", suite.lastModified)
+                        if (suite.lastReport != null) {
+                            add("lastReport", gson.toJsonTree(suite.lastReport))
+                        }
+                    }
+                    array.add(obj)
+                }
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    add("suites", array)
+                }
+            }
+
             "/action/tap" -> {
                 val service = CompanionAccessibilityService.instance
                 if (service != null) {
