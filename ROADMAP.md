@@ -75,22 +75,6 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
   - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
   - [x] Otimizar a execução de suítes de automação RRT persistidas em dados locais e validação de relatórios exportados.
 
-## Fase: Revisão da Aba UI Inspector (Run)
-  - [ ] Internacionalizar todos os textos.
-  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
-  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
-  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
-  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
-- [ ] Assegurar sub-10ms na leitura de árvore hierárquica e envio do payload para o Desktop.
-
-## Fase: Revisão da Aba Explorer (Run)
-  - [ ] Internacionalizar todos os textos.
-  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
-  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
-  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
-  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
-  - [ ] Revisar a lógica de busca heurística e exploração (DFS Grafo) do aplicativo.
-
 ## Fase: Revisão da Aba Logcat (Toolbox)
   - [x] Internacionalizar todos os textos.
   - [x] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
@@ -147,7 +131,31 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
   - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
   - [x] Validar extração do JSON Golden File e geração offline do Relatório de Auditoria PDF.
 
+## Fase: Implementação da Aba Run Console (Toolbox)
+  - [x] Internacionalizar todos os textos.
+  - [x] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [x] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [x] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
+  - [x] Consolidado e integrado nativamente dentro da aba Tests (`ui/components/tabs/run/TestsSubTab.kt`).
+
 ---
+
+## Fase: Revisão da Aba UI Inspector (Run)
+  - [x] Internacionalizar todos os textos.
+  - [x] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop (`ui/components/tabs/run/InspectorSubTab.kt`).
+  - [x] Equiparar funcionalidades com a respectiva aba no RR Desktop (Árvore interativa, 4 Multi-Locators, Step Recorder, Exportação BDD/Robot, JSON Maps, Floating HUD).
+  - [x] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
+  - [x] Assegurar sub-10ms na leitura de árvore hierárquica e envio do payload para o Desktop (aliases `/tree`, `/ui/tree`, `/ui-tree`).
+
+## Fase: Revisão da Aba Explorer (Run)
+  - [ ] Internacionalizar todos os textos.
+  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
+  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
+  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
+  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
+  - [ ] Revisar a lógica de busca heurística e exploração (DFS Grafo) do aplicativo.
 
 ## Fase: Implementação da Aba Scenarios (Run)
   - [ ] Internacionalizar todos os textos.
@@ -156,14 +164,6 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
   - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
   - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
   - [ ] Criar interface (atualmente placeholder) e integração AI no Companion App, substituindo o placeholder pela tela interativa.
-
-## Fase: Implementação da Aba Run Console (Toolbox)
-  - [x] Internacionalizar todos os textos.
-  - [x] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
-  - [x] Equiparar funcionalidades com a respectiva aba no RR Desktop.
-  - [x] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
-  - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
-  - [x] Consolidado e integrado nativamente dentro da aba Tests (`ui/components/tabs/run/TestsSubTab.kt`).
 
 ## Fase: Implementação da Aba Webview (Toolbox)
   - [ ] Internacionalizar todos os textos.

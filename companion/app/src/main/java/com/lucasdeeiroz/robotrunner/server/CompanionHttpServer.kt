@@ -169,7 +169,7 @@ class CompanionHttpServer(
                 buildTelemetryPayload(targetPkg)
             }
 
-            "/ui-tree" -> {
+            "/ui-tree", "/tree", "/ui/tree" -> {
                 val service = CompanionAccessibilityService.instance
                 if (service != null) {
                     service.getInstantUiTreeJson()
@@ -548,6 +548,18 @@ class CompanionHttpServer(
                 JsonObject().apply {
                     addProperty("status", "ok")
                     add("elements", gson.toJsonTree(elements))
+                }
+            }
+
+            "/inspector/pending-snippet" -> {
+                val snippet = com.lucasdeeiroz.robotrunner.inspector.UiInspectorEngine.getAndConsumePendingSnippet()
+                JsonObject().apply {
+                    addProperty("status", "ok")
+                    addProperty("hasSnippet", snippet != null)
+                    if (snippet != null) {
+                        addProperty("snippet", snippet)
+                        addProperty("timestamp", System.currentTimeMillis())
+                    }
                 }
             }
 

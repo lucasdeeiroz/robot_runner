@@ -127,6 +127,12 @@
             android:exported="false"
             android:foregroundServiceType="specialUse" />
 
+        <!-- Inspector Overlay Service -->
+        <service
+            android:name=".overlay.InspectorOverlayService"
+            android:enabled="true"
+            android:exported="false" />
+
     </application>
 
 </manifest>

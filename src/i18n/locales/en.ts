@@ -320,7 +320,9 @@ export const en = {
             try_again: "Try Again",
             beta: "Beta",
             cancel: "Cancel",
+            dismiss: "Dismiss",
             save: "Save",
+            saving: "Saving...",
             saved: "Saved",
             save_and_run: "Save and Run",
             run: "Run",
@@ -2310,7 +2312,16 @@ export const en = {
             boosted: "Companion Boosted",
             status_active: "Companion Active",
             status_installed: "Companion Installed",
-            status_adb: "ADB Standard"
+            status_adb: "ADB Standard",
+            incoming_snippet_title: "Snippet .robot Received from Device",
+            incoming_snippet_desc: "A recorded test scenario was synced from the device.",
+            snippet_preview: "Preview",
+            lines: "lines",
+            copy_snippet: "Copy Snippet",
+            save_as_file: "Save File as...",
+            snippet_copied: "Snippet copied to clipboard!",
+            snippet_saved_success: "Robot Framework file saved successfully!",
+            snippet_save_error: "Failed to save Robot Framework file."
         },
         env_setup: {
             title: "Environment Setup",

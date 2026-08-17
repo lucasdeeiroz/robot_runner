@@ -320,7 +320,9 @@ export const pt = {
             try_again: "Tentar Novamente",
             beta: "Beta",
             cancel: "Cancelar",
+            dismiss: "Descartar",
             save: "Salvar",
+            saving: "Salvando...",
             saved: "Salvo",
             save_and_run: "Salvar e Executar",
             run: "Executar",
@@ -2312,7 +2314,16 @@ export const pt = {
             boosted: "Turbinado pelo Companion",
             status_active: "Companion Ativo",
             status_installed: "Companion Instalado",
-            status_adb: "ADB Padrão"
+            status_adb: "ADB Padrão",
+            incoming_snippet_title: "Snippet .robot Recebido do Dispositivo",
+            incoming_snippet_desc: "Um cenário de teste gravado foi sincronizado do dispositivo.",
+            snippet_preview: "Pré-visualização",
+            lines: "linhas",
+            copy_snippet: "Copiar Snippet",
+            save_as_file: "Salvar Arquivo como...",
+            snippet_copied: "Snippet copiado para a área de transferência!",
+            snippet_saved_success: "Arquivo Robot Framework salvo com sucesso!",
+            snippet_save_error: "Falha ao salvar arquivo Robot Framework."
         },
         env_setup: {
             title: "Configuração do Ambiente",

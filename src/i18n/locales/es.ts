@@ -317,7 +317,9 @@ export const es = {
             try_again: "Intentar de nuevo",
             beta: "Beta",
             cancel: "Cancelar",
+            dismiss: "Descartar",
             save: "Guardar",
+            saving: "Guardando...",
             saved: "Guardado",
             save_and_run: "Guardar y Ejecutar",
             run: "Ejecutar",
@@ -2320,7 +2322,16 @@ export const es = {
             boosted: "Potenciado por Companion",
             status_active: "Companion Activo",
             status_installed: "Companion Instalado",
-            status_adb: "ADB Estándar"
+            status_adb: "ADB Estándar",
+            incoming_snippet_title: "Snippet .robot Recibido del Dispositivo",
+            incoming_snippet_desc: "Un escenario de prueba grabado fue sincronizado del dispositivo.",
+            snippet_preview: "Vista previa",
+            lines: "líneas",
+            copy_snippet: "Copiar Snippet",
+            save_as_file: "Guardar Archivo como...",
+            snippet_copied: "¡Snippet copiado al portapapeles!",
+            snippet_saved_success: "¡Archivo Robot Framework guardado con éxito!",
+            snippet_save_error: "Error al guardar el archivo Robot Framework."
         },
         env_setup: {
             title: "Configuración del Entorno",

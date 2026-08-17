@@ -14,14 +14,20 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.text.SimpleDateFormat
 import java.util.Collections
+import java.util.Date
+import java.util.Locale
 
 object UiInspectorEngine {
 
     private val lastCapturedElements = Collections.synchronizedList(mutableListOf<InspectedElement>())
     private val _capturedElementsFlow = MutableStateFlow<List<InspectedElement>>(emptyList())
     val capturedElementsFlow: StateFlow<List<InspectedElement>> = _capturedElementsFlow.asStateFlow()
-    
+
+    private val _recordedStepsFlow = MutableStateFlow<List<RecordedStep>>(emptyList())
+    val recordedStepsFlow: StateFlow<List<RecordedStep>> = _recordedStepsFlow.asStateFlow()
+
     @Volatile
     var lastCapturedScreenName: String = "Active Screen"
         private set
@@ -44,8 +50,13 @@ object UiInspectorEngine {
                 val desc = item.get("contentDescription")?.asString ?: ""
                 val resId = (item.get("resourceId") ?: item.get("viewIdResourceName"))?.asString ?: ""
                 val clsName = item.get("className")?.asString ?: "android.view.View"
+                val pkgName = item.get("packageName")?.asString ?: ""
                 val isClickable = (item.get("isClickable") ?: item.get("clickable"))?.asBoolean ?: false
                 val isEditable = (item.get("isEditable") ?: item.get("editable"))?.asBoolean ?: false
+                val isEnabled = (item.get("isEnabled") ?: item.get("enabled"))?.asBoolean ?: true
+                val isFocused = (item.get("isFocused") ?: item.get("focused"))?.asBoolean ?: false
+                val isScrollable = (item.get("isScrollable") ?: item.get("scrollable"))?.asBoolean ?: false
+                val depth = item.get("depth")?.asInt ?: 0
 
                 val boundsStr = try {
                     val boundsElem = item.get("bounds")
@@ -66,28 +77,28 @@ object UiInspectorEngine {
                 }
 
                 val name = when {
-                    text.isNotBlank() -> text
-                    desc.isNotBlank() -> desc
+                    text.isNotBlank() -> text.trim()
+                    desc.isNotBlank() -> desc.trim()
                     resId.isNotBlank() -> resId.substringAfterLast('/')
                     else -> clsName.substringAfterLast('.')
                 }
 
                 val accId = when {
-                    desc.isNotBlank() -> desc
-                    text.isNotBlank() -> text
+                    desc.isNotBlank() -> desc.trim()
+                    text.isNotBlank() -> text.trim()
                     else -> ""
                 }
 
                 val uiSel = when {
-                    desc.isNotBlank() -> "new UiSelector().description(\"$desc\")"
-                    text.isNotBlank() -> "new UiSelector().text(\"$text\")"
+                    desc.isNotBlank() -> "new UiSelector().description(\"${desc.trim()}\")"
+                    text.isNotBlank() -> "new UiSelector().text(\"${text.trim()}\")"
                     resId.isNotBlank() -> "new UiSelector().resourceId(\"$resId\")"
                     else -> "new UiSelector().className(\"$clsName\")"
                 }
 
                 val xpath = when {
-                    desc.isNotBlank() -> "//$clsName[@content-desc=\"$desc\"]"
-                    text.isNotBlank() -> "//$clsName[@text=\"$text\"]"
+                    desc.isNotBlank() -> "//$clsName[@content-desc=\"${desc.trim()}\"]"
+                    text.isNotBlank() -> "//$clsName[@text=\"${text.trim()}\"]"
                     resId.isNotBlank() -> "//$clsName[@resource-id=\"$resId\"]"
                     else -> "//$clsName"
                 }
@@ -96,6 +107,7 @@ object UiInspectorEngine {
                     id = "el_${i + 1}",
                     name = name,
                     className = clsName,
+                    packageName = pkgName,
                     text = text,
                     contentDescription = desc,
                     resourceId = resId,
@@ -104,7 +116,11 @@ object UiInspectorEngine {
                     uiSelector = uiSel,
                     xpath = xpath,
                     isClickable = isClickable,
-                    isEditable = isEditable
+                    isEditable = isEditable,
+                    isEnabled = isEnabled,
+                    isFocused = isFocused,
+                    isScrollable = isScrollable,
+                    depth = depth
                 )
                 list.add(element)
             }
@@ -123,6 +139,96 @@ object UiInspectorEngine {
         return synchronized(lastCapturedElements) { ArrayList(lastCapturedElements) }
     }
 
+    fun addRecordedStep(step: RecordedStep) {
+        val current = _recordedStepsFlow.value.toMutableList()
+        current.add(step)
+        _recordedStepsFlow.value = current
+    }
+
+    fun deleteRecordedStep(stepId: String) {
+        val current = _recordedStepsFlow.value.toMutableList()
+        current.removeAll { it.id == stepId }
+        _recordedStepsFlow.value = current
+    }
+
+    fun clearRecordedSteps() {
+        _recordedStepsFlow.value = emptyList()
+    }
+
+    fun generateRobotSnippet(): String {
+        val steps = _recordedStepsFlow.value
+        if (steps.isEmpty()) return ""
+
+        val sb = StringBuilder()
+        sb.append("*** Settings ***\n")
+        sb.append("Documentation    Recorded test scenario via Robot Runner Companion UI Inspector\n")
+        sb.append("Library          AppiumLibrary\n\n")
+        sb.append("*** Test Cases ***\n")
+        sb.append("Cenário de Teste Gravado no Dispositivo\n")
+        sb.append("    [Documentation]    Sequência de passos gravados diretamente na tela do dispositivo\n")
+
+        steps.forEach { step ->
+            when (step.actionType.lowercase()) {
+                "click", "tap" -> {
+                    sb.append("    Wait Until Element Is Visible    ${step.locator}    15\n")
+                    sb.append("    Click Element    ${step.locator}\n")
+                }
+                "input", "set_text" -> {
+                    val inputVal = step.argument ?: ""
+                    sb.append("    Wait Until Element Is Visible    ${step.locator}    15\n")
+                    sb.append("    Input Text    ${step.locator}    $inputVal\n")
+                }
+                "wait", "wait_visible" -> {
+                    sb.append("    Wait Until Element Is Visible    ${step.locator}    15\n")
+                }
+                "assert", "assert_text" -> {
+                    val expected = step.argument ?: ""
+                    sb.append("    Wait Until Element Is Visible    ${step.locator}    15\n")
+                    sb.append("    Element Text Should Be    ${step.locator}    $expected\n")
+                }
+                else -> {
+                    sb.append("    # Action: ${step.actionType} on ${step.locator}\n")
+                }
+            }
+        }
+        return sb.toString()
+    }
+
+    private val _pendingSnippetForDesktop = MutableStateFlow<String?>(null)
+    val pendingSnippetForDesktop: StateFlow<String?> = _pendingSnippetForDesktop.asStateFlow()
+
+    fun queueSnippetForDesktop(snippet: String) {
+        _pendingSnippetForDesktop.value = snippet
+    }
+
+    fun getAndConsumePendingSnippet(): String? {
+        val snippet = _pendingSnippetForDesktop.value
+        _pendingSnippetForDesktop.value = null
+        return snippet
+    }
+
+    suspend fun exportRobotSnippetToFile(): File? = withContext(Dispatchers.IO) {
+        try {
+            val snippet = generateRobotSnippet()
+            if (snippet.isBlank()) return@withContext null
+
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            if (!downloadsDir.exists()) downloadsDir.mkdirs()
+
+            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val fileName = "snippet_$timeStamp.robot"
+            val file = File(downloadsDir, fileName)
+
+            FileOutputStream(file).use { out ->
+                out.write(snippet.toByteArray(Charsets.UTF_8))
+            }
+            file
+        } catch (e: Exception) {
+            Log.e("UiInspectorEngine", "Error exporting Robot snippet to file", e)
+            null
+        }
+    }
+
     suspend fun exportUiElementMapJson(screenName: String): File? = withContext(Dispatchers.IO) {
         try {
             val elementsSnapshot = getCapturedElementsSnapshot()
@@ -139,9 +245,10 @@ object UiInspectorEngine {
                 )
             }
 
+            val cleanScreenId = screenName.lowercase().replace("[^a-z0-9_]".toRegex(), "_")
             val map = UiElementMap(
                 version = "2.0",
-                screenId = screenName.lowercase().replace(" ", "_"),
+                screenId = cleanScreenId,
                 screenName = screenName,
                 elements = mapElements
             )
@@ -152,7 +259,8 @@ object UiInspectorEngine {
             val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             if (!downloadsDir.exists()) downloadsDir.mkdirs()
 
-            val fileName = "map_${map.screenId}.json"
+            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val fileName = "map_${cleanScreenId}_$timeStamp.json"
             val file = File(downloadsDir, fileName)
 
             FileOutputStream(file).use { out ->
@@ -164,4 +272,30 @@ object UiInspectorEngine {
             null
         }
     }
+
+    suspend fun exportUiDumpJson(): File? = withContext(Dispatchers.IO) {
+        try {
+            val service = CompanionAccessibilityService.instance ?: return@withContext null
+            val treeJson = service.getInstantUiTreeJson()
+
+            val gson = GsonBuilder().setPrettyPrinting().create()
+            val jsonStr = gson.toJson(treeJson)
+
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            if (!downloadsDir.exists()) downloadsDir.mkdirs()
+
+            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val fileName = "ui_dump_$timeStamp.json"
+            val file = File(downloadsDir, fileName)
+
+            FileOutputStream(file).use { out ->
+                out.write(jsonStr.toByteArray())
+            }
+            file
+        } catch (e: Exception) {
+            Log.e("UiInspectorEngine", "Error exporting UI dump JSON", e)
+            null
+        }
+    }
 }
+

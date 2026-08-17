@@ -20,6 +20,20 @@ export interface HostMetadata {
     os_name: string;
 }
 
+export interface IncomingSnippetData {
+    deviceUdid: string;
+    content: string;
+    timestamp: number;
+}
+
+let globalIncomingSnippet: IncomingSnippetData | null = null;
+const globalSnippetListeners = new Set<(snippet: IncomingSnippetData | null) => void>();
+
+export function setGlobalIncomingSnippet(snippet: IncomingSnippetData | null) {
+    globalIncomingSnippet = snippet;
+    globalSnippetListeners.forEach(listener => listener(snippet));
+}
+
 export interface CompanionDeviceInfo {
     status?: string;
     manufacturer: string;
@@ -88,6 +102,21 @@ export function useCompanion(selectedDevice: string | null) {
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const { settings } = useSettings();
     const { user } = useAuth();
+    const [incomingSnippet, setIncomingSnippet] = useState<IncomingSnippetData | null>(globalIncomingSnippet);
+
+    useEffect(() => {
+        const listener = (snippet: IncomingSnippetData | null) => {
+            setIncomingSnippet(snippet);
+        };
+        globalSnippetListeners.add(listener);
+        return () => {
+            globalSnippetListeners.delete(listener);
+        };
+    }, []);
+
+    const clearIncomingSnippet = useCallback(() => {
+        setGlobalIncomingSnippet(null);
+    }, []);
 
     const setStatus = useCallback((s: CompanionStatus) => {
         setStatusState(s);
@@ -204,6 +233,21 @@ export function useCompanion(selectedDevice: string | null) {
             throw e;
         }
     }, []);
+
+    const fetchPendingSnippet = useCallback(async (port = 9876) => {
+        try {
+            const snippet = await invoke<string | null>('fetch_companion_pending_snippet', { port });
+            if (snippet && selectedDevice) {
+                setGlobalIncomingSnippet({
+                    deviceUdid: selectedDevice,
+                    content: snippet,
+                    timestamp: Date.now()
+                });
+            }
+        } catch (e) {
+            // silent
+        }
+    }, [selectedDevice]);
 
     const enableAccessibility = useCallback(async () => {
         if (!selectedDevice) return;
@@ -376,7 +420,8 @@ export function useCompanion(selectedDevice: string | null) {
                 pollIntervalRef.current = setInterval(() => {
                     fetchDeviceStats(port);
                     fetchRecentEvents(port);
-                }, 5000);
+                    fetchPendingSnippet(port);
+                }, 3000);
             } else {
                 console.warn("[useCompanion] Initial HTTP fetch failed. Attempting silent launch of Companion app...");
                 try {
@@ -399,7 +444,8 @@ export function useCompanion(selectedDevice: string | null) {
                             pollIntervalRef.current = setInterval(() => {
                                 fetchDeviceStats(port);
                                 fetchRecentEvents(port);
-                            }, 5000);
+                                fetchPendingSnippet(port);
+                            }, 3000);
                         } else {
                             setStatus('disconnected');
                         }
@@ -608,6 +654,8 @@ export function useCompanion(selectedDevice: string | null) {
         pushPayload,
         syncTheme,
         syncHostInfo,
-        pushActivityEvent
+        pushActivityEvent,
+        incomingSnippet,
+        clearIncomingSnippet
     };
 }

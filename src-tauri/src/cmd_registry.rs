@@ -168,7 +168,8 @@ macro_rules! generate_robot_runner_handler {
             crate::companion::fetch_companion_artifacts,
             crate::companion::fetch_companion_fleet_peers,
             crate::companion::push_companion_payload,
-            crate::companion::get_host_metadata
+            crate::companion::get_host_metadata,
+            crate::companion::fetch_companion_pending_snippet
         ]
     };
 }

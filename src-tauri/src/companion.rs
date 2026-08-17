@@ -519,3 +519,45 @@ pub async fn get_host_metadata() -> AppResult<HostMetadata> {
         os_name,
     })
 }
+
+#[derive(serde::Deserialize)]
+#[allow(dead_code)]
+struct PendingSnippetResponse {
+    status: String,
+    #[serde(rename = "hasSnippet")]
+    has_snippet: bool,
+    snippet: Option<String>,
+}
+
+#[command]
+pub async fn fetch_companion_pending_snippet(port: Option<u16>) -> AppResult<Option<String>> {
+    let p = port.unwrap_or(9876);
+    let url = format!("http://127.0.0.1:{}/inspector/pending-snippet", p);
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_millis(2000))
+        .build()
+        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
+
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| AppError::FileSystemError(format!("Failed to fetch pending snippet: {}", e)))?;
+
+    if resp.status().is_success() {
+        let data: PendingSnippetResponse = resp
+            .json()
+            .await
+            .map_err(|e| AppError::FileSystemError(format!("Failed to parse pending snippet response: {}", e)))?;
+
+        if data.has_snippet {
+            Ok(data.snippet)
+        } else {
+            Ok(None)
+        }
+    } else {
+        Ok(None)
+    }
+}
+
