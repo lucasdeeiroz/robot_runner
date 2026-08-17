@@ -378,6 +378,10 @@
     <string name="desc_scanner_stopwatch">Mede o tempo de reconhecimento e latência de decodificação de código de barras (CameraX + ML Kit).</string>
     <string name="btn_start_logcat_session">Iniciar Sessão Logcat</string>
     <string name="btn_start_scanner_session">Iniciar Leitor de Câmera</string>
+    <string name="status_measuring">Medindo / Escaneando...</string>
+    <string name="status_camera_ready">Câmera Pronta</string>
+    <string name="msg_camera_permission_required">A permissão de câmera é necessária para usar o cronômetro de scanner.</string>
+    <string name="btn_grant_camera_permission">Conceder Permissão da Câmera</string>
     <string name="label_keywords">Palavras-chave (separadas por vírgula)</string>
     <string name="msg_camera_permission">Permissão de Câmera é necessáriápara o Leitor.</string>
     <string name="label_format">Formato: %1$d</string>

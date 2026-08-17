@@ -44,6 +44,7 @@ import com.lucasdeeiroz.robotrunner.service.CompanionAccessibilityService
 import com.lucasdeeiroz.robotrunner.stopwatch.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.concurrent.Executors
 
 enum class StopwatchMode { LOGCAT, SCANNER }
 
@@ -655,9 +656,18 @@ fun LogcatStopwatchContent() {
 fun ScannerStopwatchContent() {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    var isScanning by remember { mutableStateOf(ScannerStopwatchEngine.isScanning) }
-    var pendingLap by remember { mutableStateOf<ScannerLap?>(ScannerStopwatchEngine.pendingLap) }
-    var laps by remember { mutableStateOf<List<ScannerLap>>(emptyList()) }
+    val isScanning by ScannerStopwatchEngine.isScanningFlow.collectAsState()
+    val pendingLap by ScannerStopwatchEngine.pendingLapFlow.collectAsState()
+    val laps by ScannerStopwatchEngine.lapsFlow.collectAsState()
+
+    val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraExecutor.shutdown()
+        }
+    }
+
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -673,13 +683,9 @@ fun ScannerStopwatchContent() {
 
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
 
+    // Pre-warm MLKit client and native libs as soon as this tab is composed
     LaunchedEffect(Unit) {
-        while (true) {
-            isScanning = ScannerStopwatchEngine.isScanning
-            pendingLap = ScannerStopwatchEngine.pendingLap
-            laps = ScannerStopwatchEngine.getLapsSnapshot()
-            delay(500)
-        }
+        ScannerStopwatchEngine.warmUp()
     }
 
     Column(
@@ -785,26 +791,30 @@ fun ScannerStopwatchContent() {
                         }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
-                } else if (isScanning && hasCameraPermission) {
+                } else if (hasCameraPermission) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .aspectRatio(1f)
+                            .aspectRatio(1.2f)
                             .clip(RoundedCornerShape(12.dp))
                     ) {
                         AndroidView(
                             factory = { ctx ->
-                                val previewView = PreviewView(ctx)
+                                val previewView = PreviewView(ctx).apply {
+                                    scaleType = PreviewView.ScaleType.FILL_CENTER
+                                }
                                 cameraProviderFuture.addListener({
                                     val cameraProvider = cameraProviderFuture.get()
-                                    val preview = Preview.Builder().build().also {
-                                        it.setSurfaceProvider(previewView.surfaceProvider)
-                                    }
+
+                                    val preview = Preview.Builder()
+                                        .build().also {
+                                            it.setSurfaceProvider(previewView.surfaceProvider)
+                                        }
                                     val imageAnalysis = ImageAnalysis.Builder()
                                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                                         .build()
 
-                                    imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(ctx)) { imageProxy ->
+                                    imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
                                         ScannerStopwatchEngine.processImageProxy(imageProxy)
                                     }
 
@@ -826,26 +836,67 @@ fun ScannerStopwatchContent() {
                             },
                             modifier = Modifier.fillMaxSize()
                         )
+
+                        // Status Badge on Camera View
+                        Surface(
+                            color = if (isScanning) MaterialTheme.colorScheme.primary.copy(alpha = 0.85f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 12.dp)
+                        ) {
+                            Text(
+                                text = if (isScanning) stringResource(id = R.string.status_measuring) else stringResource(id = R.string.status_camera_ready),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isScanning) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                } else {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = stringResource(id = R.string.msg_camera_permission_required),
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = { launcher.launch(Manifest.permission.CAMERA) },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(id = R.string.btn_grant_camera_permission),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                if (pendingLap == null) {
+                if (pendingLap == null && hasCameraPermission) {
                     Button(
                         onClick = {
                             if (isScanning) {
                                 ScannerStopwatchEngine.stopSession()
                             } else {
-                                if (hasCameraPermission) {
-                                    ScannerStopwatchEngine.startSession()
-                                } else {
-                                    launcher.launch(Manifest.permission.CAMERA)
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(R.string.msg_camera_permission),
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
+                                ScannerStopwatchEngine.startSession()
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
