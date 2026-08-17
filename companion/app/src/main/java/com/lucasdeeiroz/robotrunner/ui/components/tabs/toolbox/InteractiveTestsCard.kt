@@ -106,10 +106,10 @@ fun InteractiveTestsCard(context: Context, onLaunchDisplayTest: () -> Unit) {
             TestRow(stringResource(id = R.string.test_pos_printer), "printer", testResults["printer"]) {
                 val runner = com.lucasdeeiroz.robotrunner.checkup.HardwareCheckupRunner(context)
                 val printed = runner.printTestReceipt()
-                InteractiveHardwareTester.updateResult("printer", printed)
                 if (!printed) {
                     Toast.makeText(context, context.getString(R.string.msg_pos_printer_unavailable), Toast.LENGTH_SHORT).show()
                 }
+                showDialogFor = "printer"
             }
         }
     }
@@ -194,10 +194,26 @@ private fun vibrateDevice(context: Context) {
 private fun toggleFlash(context: Context, state: Boolean) {
     try {
         val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        val cameraId = cameraManager.cameraIdList[0] // Assume first camera has flash
-        cameraManager.setTorchMode(cameraId, state)
-    } catch (e: Exception) {
-        // Flash not available
+        for (cameraId in cameraManager.cameraIdList) {
+            val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+            val hasFlash = characteristics.get(android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+            val isBack = characteristics.get(android.hardware.camera2.CameraCharacteristics.LENS_FACING) == android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK
+            if (hasFlash && isBack) {
+                cameraManager.setTorchMode(cameraId, state)
+                return
+            }
+        }
+        // Fallback: try any camera with flash
+        for (cameraId in cameraManager.cameraIdList) {
+            val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+            val hasFlash = characteristics.get(android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+            if (hasFlash) {
+                cameraManager.setTorchMode(cameraId, state)
+                return
+            }
+        }
+    } catch (e: Throwable) {
+        android.util.Log.w("InteractiveTests", "Flashlight toggle failed", e)
     }
 }
 

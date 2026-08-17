@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 export interface ScannerLap {
     cameraInitMs: number;
@@ -18,8 +19,12 @@ export function useScannerStopwatch(selectedDevice: string) {
     useEffect(() => {
         if (!selectedDevice) return;
         const interval = setInterval(() => {
-            fetch('http://127.0.0.1:9876/stopwatch/scanner/laps')
-                .then(res => res.json())
+            invoke<string>('trigger_companion_action', {
+                port: 9876,
+                endpoint: '/stopwatch/scanner/laps',
+                method: 'GET'
+            })
+                .then(rawJson => JSON.parse(rawJson))
                 .then(data => {
                     if (data.status === 'ok') {
                         setIsCompanionActive(true);
@@ -40,10 +45,11 @@ export function useScannerStopwatch(selectedDevice: string) {
     const clearScannerLaps = async () => {
         if (!selectedDevice) return;
         try {
-            await fetch('http://127.0.0.1:9876/stopwatch/scanner/action', {
+            await invoke('trigger_companion_action', {
+                port: 9876,
+                endpoint: '/stopwatch/scanner/action',
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'clearLaps' })
+                payload: JSON.stringify({ action: 'clearLaps' })
             });
             setScannerLaps([]);
         } catch (e) {

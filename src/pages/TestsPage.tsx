@@ -28,7 +28,7 @@ export function TestsPage({ onNavigate }: TestsPageProps) {
     const { settings, updateSetting } = useSettings();
     const { sessions, activeSessionId, setActiveSessionId, clearSession } = useTestSessions();
     const isExplorer = settings.usageMode === 'explorer';
-    const initialTab = isExplorer ? (sessions.length > 0 ? sessions[0].runId : '') : 'history';
+    const initialTab = isExplorer ? (sessions.length > 0 ? sessions[0].runId : 'reports') : 'history';
     const [subTab, setSubTab] = useState<'history' | string>(initialTab);
 
     useEffect(() => {
@@ -36,6 +36,9 @@ export function TestsPage({ onNavigate }: TestsPageProps) {
             const detail = (e as CustomEvent).detail;
             if (detail && detail === 'history') {
                 setSubTab('history');
+                setActiveSessionId('dashboard');
+            } else if (detail && detail === 'reports') {
+                setSubTab('reports');
                 setActiveSessionId('dashboard');
             }
         };
@@ -167,13 +170,13 @@ export function TestsPage({ onNavigate }: TestsPageProps) {
         if (activeSessionId !== 'dashboard') {
             setSubTab(activeSessionId);
         } else {
-            setSubTab(isExplorer ? (sessions.length > 0 ? sessions[0].runId : '') : 'history');
+            setSubTab(isExplorer ? (sessions.length > 0 ? sessions[0].runId : 'reports') : 'history');
         }
     }, [activeSessionId, isExplorer, sessions]);
 
     const handleTabChange = (id: string) => {
         setSubTab(id);
-        if (id !== 'history') {
+        if (id !== 'history' && id !== 'reports') {
             setActiveSessionId(id);
         } else {
             setActiveSessionId('dashboard');
@@ -205,12 +208,12 @@ export function TestsPage({ onNavigate }: TestsPageProps) {
                             label: t('tests_page.history', 'History'),
                             selected: isGridView ? false : undefined
                         },
-                        {
-                            id: 'reports',
-                            label: t('tests_page.reports', 'Reports'),
-                            selected: isGridView ? false : undefined
-                        }
                     ]),
+                    {
+                        id: 'reports',
+                        label: t('tests_page.reports', 'Reports'),
+                        selected: isGridView ? false : undefined
+                    },
                     ...sessions.map(s => {
                         const isSuccess = s.exitCode === "0";
                         const isFailed = s.status === 'finished' && !isSuccess;
@@ -412,7 +415,7 @@ export function TestsPage({ onNavigate }: TestsPageProps) {
                             <div className="flex-1 flex flex-col">
                                 <HistorySubTab onNavigate={onNavigate} />
                             </div>
-                        ) : subTab === 'reports' && !isExplorer ? (
+                        ) : subTab === 'reports' ? (
                             <div className="flex-1 flex flex-col">
                                 <ReportsSubTab />
                             </div>

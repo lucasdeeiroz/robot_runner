@@ -111,10 +111,11 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
     // Sync keywords to Companion App
     useEffect(() => {
         if (selectedDevice) {
-            fetch('http://127.0.0.1:9876/stopwatch/keywords', {
+            invoke('trigger_companion_action', {
+                port: 9876,
+                endpoint: '/stopwatch/keywords',
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ keywords })
+                payload: JSON.stringify({ keywords })
             }).catch(() => {
                 // Ignore errors if companion is not running
             });
@@ -125,8 +126,12 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
     useEffect(() => {
         if (!selectedDevice) return;
         const interval = setInterval(() => {
-            fetch('http://127.0.0.1:9876/stopwatch/logcat/laps')
-                .then(res => res.json())
+            invoke<string>('trigger_companion_action', {
+                port: 9876,
+                endpoint: '/stopwatch/logcat/laps',
+                method: 'GET'
+            })
+                .then(rawJson => JSON.parse(rawJson))
                 .then(data => {
                     if (data.status === 'ok') {
                         setIsCompanionActive(true);
@@ -145,10 +150,11 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
 
     const handleCompanionAction = async (action: string, payload: any = {}) => {
         try {
-            await fetch('http://127.0.0.1:9876/stopwatch/logcat/action', {
+            await invoke('trigger_companion_action', {
+                port: 9876,
+                endpoint: '/stopwatch/logcat/action',
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action, ...payload })
+                payload: JSON.stringify({ action, ...payload })
             });
         } catch (e) {
             console.error('Failed to send companion action', e);

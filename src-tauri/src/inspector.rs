@@ -149,8 +149,24 @@ async fn perform_web_capture(url: &str, browser: &str, app_handle: Option<&tauri
 
 async fn fallback_screencap(app_handle: &AppHandle, device_id: &str) -> Result<Vec<u8>, String> {
     let adb_program = get_adb_program(app_handle);
+
+    // Priority 1: Base64 piped screencap via shell (works on POS devices, rede.exe, and prevents Windows CRLF corruption)
+    let mut cmd_b64 = new_tokio_command(&adb_program);
+    cmd_b64.args(&["-s", device_id, "shell", "screencap -p | base64"]);
+    if let Ok(output_b64) = cmd_b64.output().await {
+        if output_b64.status.success() {
+            let raw = String::from_utf8_lossy(&output_b64.stdout);
+            let clean: String = raw.chars().filter(|c| !c.is_whitespace()).collect();
+            if clean.len() > 100 {
+                if let Ok(bytes) = general_purpose::STANDARD.decode(clean) {
+                    return Ok(bytes);
+                }
+            }
+        }
+    }
+
+    // Priority 2: Traditional file pull fallback
     let remote_path = "/data/local/tmp/screencap_fallback.png";
-    
     let mut cmd_cap = new_tokio_command(&adb_program);
     cmd_cap.args(&["-s", device_id, "shell", "screencap", "-p", remote_path]);
     let output_cap = cmd_cap.output().await

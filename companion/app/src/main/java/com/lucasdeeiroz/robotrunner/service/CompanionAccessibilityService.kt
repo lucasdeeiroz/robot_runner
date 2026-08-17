@@ -52,6 +52,18 @@ class CompanionAccessibilityService : AccessibilityService() {
                 android.accessibilityservice.AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
         serviceInfo = info
         Log.i("CompanionAccessibility", "Companion Accessibility Service connected with gesture support!")
+
+        // Ensure HTTP daemon service is running in background
+        try {
+            val serviceIntent = Intent(this, com.lucasdeeiroz.robotrunner.CompanionServerService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
+        } catch (e: Exception) {
+            Log.w("CompanionAccessibility", "Could not auto-start CompanionServerService", e)
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {

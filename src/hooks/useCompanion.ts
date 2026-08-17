@@ -80,6 +80,23 @@ interface CompanionDeviceCache {
 
 const companionCacheMap = new Map<string, CompanionDeviceCache>();
 const companionListeners = new Set<(device: string, cache: CompanionDeviceCache) => void>();
+const connectingDevicesSet = new Set<string>();
+
+function safeParseCompanionJson<T = any>(raw: string): T {
+    const trimmed = (raw || '').trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        return JSON.parse(trimmed);
+    }
+    const firstBrace = trimmed.indexOf('{');
+    const firstBracket = trimmed.indexOf('[');
+    const startIndex = (firstBrace !== -1 && firstBracket !== -1)
+        ? Math.min(firstBrace, firstBracket)
+        : (firstBrace !== -1 ? firstBrace : firstBracket);
+    if (startIndex !== -1) {
+        return JSON.parse(trimmed.slice(startIndex));
+    }
+    return JSON.parse(trimmed);
+}
 
 function updateCompanionCache(device: string, updates: Partial<CompanionDeviceCache>) {
     const current = companionCacheMap.get(device) || {
@@ -198,8 +215,8 @@ export function useCompanion(selectedDevice: string | null) {
 
     const fetchDeviceStats = useCallback(async (port: number) => {
         try {
-            const rawJson = await invoke<string>('fetch_companion_info', { port });
-            const data: CompanionDeviceInfo = JSON.parse(rawJson);
+            const rawJson = await invoke<string>('fetch_companion_info', { port, device: selectedDevice });
+            const data: CompanionDeviceInfo = safeParseCompanionJson<CompanionDeviceInfo>(rawJson);
             setDeviceInfo(data);
             setStatus('connected');
             return true;
@@ -208,12 +225,12 @@ export function useCompanion(selectedDevice: string | null) {
             setStatus('disconnected');
             return false;
         }
-    }, []);
+    }, [selectedDevice]);
 
     const fetchRecentEvents = useCallback(async (port = 9876) => {
         try {
-            const rawJson = await invoke<string>('fetch_companion_events', { port });
-            const parsed = JSON.parse(rawJson);
+            const rawJson = await invoke<string>('fetch_companion_events', { port, device: selectedDevice });
+            const parsed = safeParseCompanionJson(rawJson);
             if (parsed.status === 'ok' && Array.isArray(parsed.events)) {
                 setRecentEvents(parsed.events);
                 return parsed.events as CompanionEventItem[];
@@ -222,21 +239,21 @@ export function useCompanion(selectedDevice: string | null) {
             console.error("[useCompanion] Failed to fetch recent events:", e);
         }
         return [];
-    }, []);
+    }, [selectedDevice]);
 
     const fetchInstantUiTree = useCallback(async (port = 9876) => {
         try {
-            const rawJson = await invoke<string>('fetch_companion_ui_tree', { port });
-            return JSON.parse(rawJson);
+            const rawJson = await invoke<string>('fetch_companion_ui_tree', { port, device: selectedDevice });
+            return safeParseCompanionJson(rawJson);
         } catch (e) {
             console.error("[useCompanion] Failed to fetch instant UI tree:", e);
             throw e;
         }
-    }, []);
+    }, [selectedDevice]);
 
     const fetchPendingSnippet = useCallback(async (port = 9876) => {
         try {
-            const snippet = await invoke<string | null>('fetch_companion_pending_snippet', { port });
+            const snippet = await invoke<string | null>('fetch_companion_pending_snippet', { port, device: selectedDevice });
             if (snippet && selectedDevice) {
                 setGlobalIncomingSnippet({
                     deviceUdid: selectedDevice,
@@ -265,23 +282,23 @@ export function useCompanion(selectedDevice: string | null) {
 
     const generatePdfReport = useCallback(async (port = 9876) => {
         try {
-            const rawJson = await invoke<string>('generate_companion_pdf_report', { port });
-            return JSON.parse(rawJson);
+            const rawJson = await invoke<string>('generate_companion_pdf_report', { port, device: selectedDevice });
+            return safeParseCompanionJson(rawJson);
         } catch (e) {
             console.error("[useCompanion] Failed to generate PDF report:", e);
             throw e;
         }
-    }, []);
+    }, [selectedDevice]);
 
     const runStandaloneCheckup = useCallback(async (port = 9876) => {
         try {
-            const rawJson = await invoke<string>('run_companion_standalone_checkup', { port });
-            return JSON.parse(rawJson);
+            const rawJson = await invoke<string>('run_companion_standalone_checkup', { port, device: selectedDevice });
+            return safeParseCompanionJson(rawJson);
         } catch (e) {
             console.error("[useCompanion] Failed to run standalone checkup:", e);
             throw e;
         }
-    }, []);
+    }, [selectedDevice]);
 
     const performNodeAction = useCallback(async (opts: { resourceId?: string; text?: string; contentDescription?: string; action?: string; value?: string }, port = 9876) => {
         try {
@@ -291,14 +308,15 @@ export function useCompanion(selectedDevice: string | null) {
                 text: opts.text,
                 contentDescription: opts.contentDescription,
                 action: opts.action || 'click',
-                value: opts.value
+                value: opts.value,
+                device: selectedDevice
             });
-            return JSON.parse(rawJson);
+            return safeParseCompanionJson(rawJson);
         } catch (e) {
             console.error("[useCompanion] Failed to perform node action:", e);
             throw e;
         }
-    }, []);
+    }, [selectedDevice]);
 
     const syncTheme = useCallback(async (
         theme: string, 
@@ -321,17 +339,44 @@ export function useCompanion(selectedDevice: string | null) {
             const rawJson = await invoke<string>('trigger_companion_action', { 
                 port, 
                 endpoint: '/sync/theme',
-                payload: JSON.stringify(payload)
+                payload: JSON.stringify(payload),
+                device: selectedDevice
             });
-            return JSON.parse(rawJson);
+            return safeParseCompanionJson(rawJson);
         } catch (e) {
             console.error("[useCompanion] Failed to sync theme:", e);
             return null;
         }
-    }, []);
+    }, [selectedDevice]);
+
+    const syncHostInfo = useCallback(async (port = 9876) => {
+        try {
+            const hostData = await invoke<HostMetadata>('get_host_metadata');
+            const payload = {
+                hostname: hostData.hostname,
+                os_name: hostData.os_name,
+                os_version: version(),
+                appVersion: packageJson.version,
+                user_name: user?.displayName || user?.email || 'Unknown User'
+            };
+            const result = await invoke<string>('trigger_companion_action', {
+                port,
+                endpoint: '/sync/host',
+                payload: JSON.stringify(payload),
+                device: selectedDevice
+            });
+            return safeParseCompanionJson(result);
+        } catch (e) {
+            console.warn("[useCompanion] Failed to sync host info:", e);
+            return null;
+        }
+    }, [user, selectedDevice]);
 
     const connectCompanion = useCallback(async () => {
         if (!selectedDevice) return;
+        if (connectingDevicesSet.has(selectedDevice)) return;
+        connectingDevicesSet.add(selectedDevice);
+
         const isAlreadyConnected = companionCacheMap.get(selectedDevice)?.status === 'connected';
         if (!isAlreadyConnected) {
             setStatus('connecting');
@@ -357,7 +402,6 @@ export function useCompanion(selectedDevice: string | null) {
                     if (data) {
                         const uint8Array = new Uint8Array(data);
                         let binaryString = '';
-                        // Process in chunks to avoid maximum call stack size and string concat bottleneck
                         const chunkSize = 8192;
                         for (let i = 0; i < uint8Array.length; i += chunkSize) {
                             const chunk = uint8Array.subarray(i, i + chunkSize);
@@ -405,7 +449,6 @@ export function useCompanion(selectedDevice: string | null) {
             const success = await fetchDeviceStats(port);
             if (success) {
                 console.log("[useCompanion] Companion connected successfully!");
-                // Sync theme and user info on initial connection
                 syncTheme(
                     settings.theme, 
                     settings.primaryColor || '#6366F1', 
@@ -436,7 +479,7 @@ export function useCompanion(selectedDevice: string | null) {
                                 (user?.displayName || user?.email) ?? undefined, 
                                 user?.email ?? undefined, 
                                 user?.photoURL ?? undefined, 
-                                logoBase64,
+                                logoBase64, 
                                 port
                             );
                             syncHostInfo(port);
@@ -457,8 +500,10 @@ export function useCompanion(selectedDevice: string | null) {
         } catch (err) {
             console.error("[useCompanion] Connection error:", err);
             setStatus('disconnected');
+        } finally {
+            connectingDevicesSet.delete(selectedDevice);
         }
-    }, [selectedDevice, checkInstallation, fetchDeviceStats, fetchRecentEvents, syncTheme, settings.theme, settings.primaryColor, user]);
+    }, [selectedDevice, checkInstallation, fetchDeviceStats, fetchRecentEvents, fetchPendingSnippet, syncTheme, syncHostInfo, settings.theme, settings.primaryColor, settings.customLogoLight, settings.customLogoDark, user]);
 
     const launchCompanion = useCallback(async () => {
         if (!selectedDevice) return;
@@ -473,8 +518,15 @@ export function useCompanion(selectedDevice: string | null) {
         }
     }, [selectedDevice, connectCompanion]);
 
+    const lastSyncedThemeKeyRef = useRef<string | null>(null);
     useEffect(() => {
-        if (status === 'connected') {
+        if (status === 'connected' && selectedDevice) {
+            const themeKey = `${selectedDevice}_${settings.theme}_${settings.primaryColor}_${settings.customLogoLight}_${settings.customLogoDark}_${user?.displayName || user?.email}`;
+            if (lastSyncedThemeKeyRef.current === themeKey) {
+                return;
+            }
+            lastSyncedThemeKeyRef.current = themeKey;
+
             const logoPath = settings.theme === 'light' ? settings.customLogoLight : settings.customLogoDark;
             const syncThemeWithLogo = async () => {
                 let logoBase64: string | undefined = undefined;
@@ -518,100 +570,94 @@ export function useCompanion(selectedDevice: string | null) {
             };
             syncThemeWithLogo();
         }
-    }, [settings.theme, settings.primaryColor, settings.customLogoLight, settings.customLogoDark, user, status, syncTheme]);
+    }, [settings.theme, settings.primaryColor, settings.customLogoLight, settings.customLogoDark, user, status, selectedDevice, syncTheme]);
 
     const triggerAction = useCallback(async (endpoint: string, payload?: any) => {
         try {
             const result = await invoke<string>('trigger_companion_action', {
                 port: 9876,
                 endpoint,
-                payload: payload ? JSON.stringify(payload) : null
+                payload: payload ? JSON.stringify(payload) : null,
+                device: selectedDevice
             });
-            return JSON.parse(result);
+            return safeParseCompanionJson(result);
         } catch (e) {
             console.error(`[useCompanion] Failed to trigger action ${endpoint}:`, e);
             throw e;
         }
-    }, []);
+    }, [selectedDevice]);
 
     const performTap = useCallback(async (x: number, y: number) => {
         return triggerAction('/action/tap', { x, y });
     }, [triggerAction]);
 
+    const connectedDeviceTrackRef = useRef<string | null>(null);
+
     useEffect(() => {
         if (selectedDevice) {
-            checkInstallation().then(installed => {
-                if (installed) {
-                    connectCompanion();
-                }
-            });
+            const cached = companionCacheMap.get(selectedDevice);
+            if (cached?.status === 'connected') {
+                setStatus('connected');
+                setDeviceInfo(cached.deviceInfo);
+                setRecentEvents(cached.recentEvents);
+                setIsInstalled(cached.isInstalled);
+            }
+            if (connectedDeviceTrackRef.current !== selectedDevice) {
+                connectedDeviceTrackRef.current = selectedDevice;
+                checkInstallation().then(installed => {
+                    if (installed) {
+                        connectCompanion();
+                    }
+                });
+            }
         } else {
+            connectedDeviceTrackRef.current = null;
             setStatus('disconnected');
             setDeviceInfo(null);
             setRecentEvents([]);
             if (pollIntervalRef.current) {
                 clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
             }
         }
 
         return () => {
             if (pollIntervalRef.current) {
                 clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
             }
         };
-    }, [selectedDevice, checkInstallation, connectCompanion]);
+    }, [selectedDevice]);;
 
     const fetchArtifacts = useCallback(async (port = 9876) => {
         try {
-            const rawJson = await invoke<string>('fetch_companion_artifacts', { port });
-            return JSON.parse(rawJson);
+            const rawJson = await invoke<string>('fetch_companion_artifacts', { port, device: selectedDevice });
+            return safeParseCompanionJson(rawJson);
         } catch (e) {
             console.error("[useCompanion] Failed to fetch companion artifacts:", e);
             throw e;
         }
-    }, []);
+    }, [selectedDevice]);
 
     const fetchFleetPeers = useCallback(async (port = 9876) => {
         try {
-            const rawJson = await invoke<string>('fetch_companion_fleet_peers', { port });
-            return JSON.parse(rawJson);
+            const rawJson = await invoke<string>('fetch_companion_fleet_peers', { port, device: selectedDevice });
+            return safeParseCompanionJson(rawJson);
         } catch (e) {
             console.error("[useCompanion] Failed to fetch companion fleet peers:", e);
             throw e;
         }
-    }, []);
+    }, [selectedDevice]);
 
     const pushPayload = useCallback(async (payload: { artifactType: string; fileName: string; contentJson: string }, port = 9876) => {
         try {
-            const rawJson = await invoke<string>('push_companion_payload', { port, payload: JSON.stringify(payload) });
-            return JSON.parse(rawJson);
+            const rawJson = await invoke<string>('push_companion_payload', { port, payload: JSON.stringify(payload), device: selectedDevice });
+            return safeParseCompanionJson(rawJson);
         } catch (e) {
             console.error("[useCompanion] Failed to push companion payload:", e);
             throw e;
         }
-    }, []);
-
-    const syncHostInfo = useCallback(async (port = 9876) => {
-        try {
-            const hostData = await invoke<HostMetadata>('get_host_metadata');
-            const payload = {
-                hostname: hostData.hostname,
-                os_name: hostData.os_name,
-                os_version: version(),
-                appVersion: packageJson.version,
-                user_name: user?.displayName || user?.email || 'Unknown User'
-            };
-            const result = await invoke<string>('trigger_companion_action', {
-                port,
-                endpoint: '/sync/host',
-                payload: JSON.stringify(payload)
-            });
-            return JSON.parse(result);
-        } catch (e) {
-            console.warn("[useCompanion] Failed to sync host info:", e);
-            return null;
-        }
-    }, [user]);
+    }, [selectedDevice]);
 
     const pushActivityEvent = useCallback(async (status: string, testName: string, port = 9876) => {
         try {
@@ -624,14 +670,15 @@ export function useCompanion(selectedDevice: string | null) {
             const result = await invoke<string>('trigger_companion_action', {
                 port,
                 endpoint: '/sync/activity',
-                payload: JSON.stringify(payload)
+                payload: JSON.stringify(payload),
+                device: selectedDevice
             });
-            return JSON.parse(result);
+            return safeParseCompanionJson(result);
         } catch (e) {
             console.warn("[useCompanion] Failed to push activity event:", e);
             return null;
         }
-    }, []);
+    }, [selectedDevice]);
 
     return {
         status,

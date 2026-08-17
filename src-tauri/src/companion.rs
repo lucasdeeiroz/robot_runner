@@ -3,6 +3,7 @@ use crate::errors::{AppError, AppResult};
 use std::time::Duration;
 use tauri::{command, AppHandle};
 
+static ACTIVE_COMPANION_DEVICE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
 #[command]
 pub async fn check_companion_installed(app: AppHandle, device: String) -> AppResult<bool> {
@@ -20,6 +21,8 @@ pub async fn check_companion_installed(app: AppHandle, device: String) -> AppRes
     Ok(installed)
 }
 
+static FORWARDED_COMPANION_STATE: std::sync::Mutex<Option<(String, u16, u16)>> = std::sync::Mutex::new(None);
+
 #[command]
 pub async fn start_companion_forward(
     app: AppHandle,
@@ -30,6 +33,20 @@ pub async fn start_companion_forward(
     let l_port = local_port.unwrap_or(9876);
     let r_port = remote_port.unwrap_or(9876);
 
+    // If already forwarded/prepared for this device and ports, avoid redundant execution
+    if let Ok(fwd_guard) = FORWARDED_COMPANION_STATE.lock() {
+        if let Some((ref dev, lp, rp)) = *fwd_guard {
+            if dev == &device && lp == l_port && rp == r_port {
+                return Ok(l_port);
+            }
+        }
+    }
+
+    // Save active device for transparent ADB Shell fallback
+    if let Ok(mut dev_guard) = ACTIVE_COMPANION_DEVICE.lock() {
+        *dev_guard = Some(device.clone());
+    }
+
     let args = vec![
         "forward".to_string(),
         format!("tcp:{}", l_port),
@@ -37,18 +54,31 @@ pub async fn start_companion_forward(
     ];
 
     eprintln!("[Companion Rust] ADB forward: adb -s {} forward tcp:{} tcp:{}", device, l_port, r_port);
-    let output = execute_adb_with_recovery(&app, Some(&device), args).await?;
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    eprintln!("[Companion Rust] ADB forward result: stdout='{}', stderr='{}', status={}", stdout.trim(), stderr.trim(), output.status);
+    let output = execute_adb_with_recovery(&app, Some(&device), args).await;
+    
+    if let Ok(mut fwd_guard) = FORWARDED_COMPANION_STATE.lock() {
+        *fwd_guard = Some((device.clone(), l_port, r_port));
+    }
 
-    if output.status.success() {
-        Ok(l_port)
-    } else {
-        Err(AppError::AdbError(format!(
-            "Failed to setup ADB port forwarding: {}",
-            stderr
-        )))
+    match output {
+        Ok(out) if out.status.success() => {
+            eprintln!("[Companion Rust] ADB port forward established on port: {}", l_port);
+            Ok(l_port)
+        }
+        Ok(out) => {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            eprintln!(
+                "[Companion Rust] ADB forward returned non-zero status (stdout: '{}', stderr: '{}'). Enabling ADB Shell Tunneling fallback.",
+                stdout.trim(),
+                stderr.trim()
+            );
+            Ok(l_port)
+        }
+        Err(e) => {
+            eprintln!("[Companion Rust] ADB forward command failed: {}. Enabling ADB Shell Tunneling fallback.", e);
+            Ok(l_port)
+        }
     }
 }
 
@@ -70,6 +100,26 @@ pub async fn stop_companion_forward(
 
 #[command]
 pub async fn launch_companion_app(app: AppHandle, device: String) -> AppResult<()> {
+    // 1. Try starting the background CompanionServerService directly (so HTTP server starts immediately)
+    let srv_args = vec![
+        "shell".to_string(),
+        "am".to_string(),
+        "start-foreground-service".to_string(),
+        "-n".to_string(),
+        "com.lucasdeeiroz.robotrunner/.CompanionServerService".to_string(),
+    ];
+    let _ = execute_adb_with_recovery(&app, Some(&device), srv_args).await;
+
+    let srv_args_legacy = vec![
+        "shell".to_string(),
+        "am".to_string(),
+        "startservice".to_string(),
+        "-n".to_string(),
+        "com.lucasdeeiroz.robotrunner/.CompanionServerService".to_string(),
+    ];
+    let _ = execute_adb_with_recovery(&app, Some(&device), srv_args_legacy).await;
+
+    // 2. Start MainActivity
     let args = vec![
         "shell".to_string(),
         "am".to_string(),
@@ -125,18 +175,15 @@ pub async fn grant_companion_permissions(app: AppHandle, device: String) -> AppR
     let pkg = "com.lucasdeeiroz.robotrunner";
     let permissions = vec![
         "android.permission.POST_NOTIFICATIONS",
-        // "android.permission.USE_ICC_ID",
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
         "android.permission.NEARBY_WIFI_DEVICES",
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.BLUETOOTH",
-        // "android.permission.ACCESS_SURFACE_FLINGER",
         "android.permission.INTERNET",
         "android.permission.BATTERY_STATS",
         "android.permission.PACKAGE_USAGE_STATS",
-        // "android.permission.DREAM_SERVICE",
         "android.permission.READ_PHONE_STATE",
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.CAMERA",
@@ -167,241 +214,238 @@ pub async fn grant_companion_permissions(app: AppHandle, device: String) -> AppR
     Ok(())
 }
 
-#[command]
-pub async fn fetch_companion_info(port: Option<u16>) -> AppResult<String> {
+async fn execute_adb_with_piped_stdin(
+    app: &AppHandle,
+    device: Option<&str>,
+    args: Vec<String>,
+    stdin_data: &[u8],
+) -> AppResult<std::process::Output> {
+    use crate::cmd_utils::{get_adb_program, new_tokio_command};
+    use tokio::io::AsyncWriteExt;
+
+    let program = get_adb_program(app);
+    let mut cmd = new_tokio_command(&program);
+    if let Some(d) = device {
+        cmd.arg("-s").arg(d);
+    }
+    cmd.args(&args);
+    cmd.stdin(std::process::Stdio::piped());
+    cmd.stdout(std::process::Stdio::piped());
+    cmd.stderr(std::process::Stdio::piped());
+
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| AppError::AdbError(format!("Failed to spawn {}: {}", program, e)))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(stdin_data).await;
+        let _ = stdin.shutdown().await;
+    }
+
+    let output = child
+        .wait_with_output()
+        .await
+        .map_err(|e| AppError::AdbError(format!("Failed to wait for {}: {}", program, e)))?;
+
+    Ok(output)
+}
+
+async fn send_companion_http_request(
+    app: &AppHandle,
+    device: Option<String>,
+    port: Option<u16>,
+    endpoint: &str,
+    method: &str,
+    payload: Option<&str>,
+    timeout_ms: u64,
+) -> AppResult<String> {
     let p = port.unwrap_or(9876);
-    let url = format!("http://127.0.0.1:{}/device-info", p);
+    let clean_endpoint = if endpoint.starts_with('/') { endpoint.to_string() } else { format!("/{}", endpoint) };
+    let url = format!("http://127.0.0.1:{}{}", p, clean_endpoint);
+    let m = method.to_uppercase();
 
+    // 1. Try Direct HTTP via reqwest
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(3000))
-        .build()
-        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
+        .timeout(Duration::from_millis(timeout_ms))
+        .build();
 
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to fetch companion info: {}", e)))?;
+    if let Ok(c) = client {
+        let req_builder = match m.as_str() {
+            "GET" => c.get(&url),
+            "PUT" => if let Some(body) = payload { c.put(&url).header("Content-Type", "application/json").body(body.to_string()) } else { c.put(&url) },
+            "DELETE" => c.delete(&url),
+            _ => if let Some(body) = payload { c.post(&url).header("Content-Type", "application/json").body(body.to_string()) } else { c.post(&url) }
+        };
 
-    let text = resp
-        .text()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to read response body: {}", e)))?;
+        if let Ok(resp) = req_builder.send().await {
+            if let Ok(text) = resp.text().await {
+                if !text.trim().is_empty() {
+                    return Ok(text);
+                }
+            }
+        }
+    }
 
-    Ok(text)
+    // 2. Fallback: ADB Shell Tunneling via toybox nc / nc (for POS terminals or blocked forwards)
+    let target_dev = device.or_else(|| {
+        ACTIVE_COMPANION_DEVICE.lock().ok().and_then(|g| g.clone())
+    });
+
+    if let Some(dev) = target_dev {
+        let http_payload = if let Some(body) = payload {
+            format!(
+                "{} {} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                m, clean_endpoint, body.len(), body
+            )
+        } else {
+            format!(
+                "{} {} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n",
+                m, clean_endpoint
+            )
+        };
+
+        let shell_cmd = format!(
+            "toybox nc -w 3 127.0.0.1 {} || nc -w 3 127.0.0.1 {}",
+            p, p
+        );
+
+        let args = vec![
+            "shell".to_string(),
+            shell_cmd,
+        ];
+
+        let output = execute_adb_with_piped_stdin(app, Some(&dev), args, http_payload.as_bytes()).await?;
+        let raw_stdout = String::from_utf8_lossy(&output.stdout);
+        let normalized = raw_stdout.replace("\r", "");
+
+        if let Some(body_start) = normalized.find("\n\n") {
+            let body = normalized[body_start + 2..].trim();
+            if !body.is_empty() {
+                return Ok(body.to_string());
+            }
+        }
+        
+        if let Some(first_brace) = raw_stdout.find('{') {
+            if let Some(last_brace) = raw_stdout.rfind('}') {
+                if last_brace >= first_brace {
+                    return Ok(raw_stdout[first_brace..=last_brace].trim().to_string());
+                }
+            }
+        } else if let Some(first_bracket) = raw_stdout.find('[') {
+            if let Some(last_bracket) = raw_stdout.rfind(']') {
+                if last_bracket >= first_bracket {
+                    return Ok(raw_stdout[first_bracket..=last_bracket].trim().to_string());
+                }
+            }
+        } else if output.status.success() && !raw_stdout.trim().is_empty() {
+            return Ok(raw_stdout.trim().to_string());
+        }
+    }
+
+    Err(AppError::FileSystemError(format!(
+        "Failed to communicate with Companion on port {} (endpoint {})",
+        p, clean_endpoint
+    )))
 }
 
 #[command]
-pub async fn fetch_companion_ui_tree(port: Option<u16>) -> AppResult<String> {
-    let p = port.unwrap_or(9876);
-    let url = format!("http://127.0.0.1:{}/ui-tree", p);
-
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(1000))
-        .build()
-        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
-
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to fetch companion UI tree: {}", e)))?;
-
-    let text = resp
-        .text()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to read response body: {}", e)))?;
-
-    Ok(text)
+pub async fn fetch_companion_info(app: AppHandle, port: Option<u16>, device: Option<String>) -> AppResult<String> {
+    send_companion_http_request(&app, device, port, "/device-info", "GET", None, 3000).await
 }
 
 #[command]
-pub async fn fetch_companion_events(port: Option<u16>) -> AppResult<String> {
-    let p = port.unwrap_or(9876);
-    let url = format!("http://127.0.0.1:{}/events/recent", p);
-
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(3000))
-        .build()
-        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
-
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to fetch companion events: {}", e)))?;
-
-    let text = resp
-        .text()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to read response body: {}", e)))?;
-
-    Ok(text)
+pub async fn fetch_companion_ui_tree(app: AppHandle, port: Option<u16>, device: Option<String>) -> AppResult<String> {
+    send_companion_http_request(&app, device, port, "/ui-tree", "GET", None, 1500).await
 }
 
 #[command]
-pub async fn run_companion_standalone_checkup(port: Option<u16>) -> AppResult<String> {
-    let p = port.unwrap_or(9876);
-    let url = format!("http://127.0.0.1:{}/checkup/run", p);
-
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(5000))
-        .build()
-        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
-
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to run companion checkup: {}", e)))?;
-
-    let text = resp
-        .text()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to read response body: {}", e)))?;
-
-    Ok(text)
+pub async fn fetch_companion_events(app: AppHandle, port: Option<u16>, device: Option<String>) -> AppResult<String> {
+    send_companion_http_request(&app, device, port, "/events/recent", "GET", None, 3000).await
 }
 
 #[command]
-pub async fn generate_companion_pdf_report(port: Option<u16>) -> AppResult<String> {
-    let p = port.unwrap_or(9876);
-    let url = format!("http://127.0.0.1:{}/checkup/pdf", p);
+pub async fn run_companion_standalone_checkup(app: AppHandle, port: Option<u16>, device: Option<String>) -> AppResult<String> {
+    send_companion_http_request(&app, device, port, "/checkup/run", "GET", None, 6000).await
+}
 
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(6000))
-        .build()
-        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
-
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to generate companion PDF report: {}", e)))?;
-
-    let text = resp
-        .text()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to read response body: {}", e)))?;
-
-    Ok(text)
+#[command]
+pub async fn generate_companion_pdf_report(app: AppHandle, port: Option<u16>, device: Option<String>) -> AppResult<String> {
+    send_companion_http_request(&app, device, port, "/checkup/pdf", "GET", None, 6000).await
 }
 
 #[command]
 pub async fn trigger_companion_action(
+    app: AppHandle,
     port: Option<u16>,
     endpoint: String,
     payload: Option<String>,
     method: Option<String>,
+    device: Option<String>,
 ) -> AppResult<String> {
-    let p = port.unwrap_or(9876);
-    let clean_endpoint = if endpoint.starts_with('/') { endpoint } else { format!("/{}", endpoint) };
-    let url = format!("http://127.0.0.1:{}{}", p, clean_endpoint);
-    let m = method.unwrap_or_else(|| "POST".to_string()).to_uppercase();
-    eprintln!("[Companion Rust] Triggering action at {} with method {}", url, m);
-
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(4000))
-        .build()
-        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
-
-    let req_builder = match m.as_str() {
-        "GET" => client.get(&url),
-        "PUT" => if let Some(body) = payload { client.put(&url).header("Content-Type", "application/json").body(body) } else { client.put(&url) },
-        "DELETE" => client.delete(&url),
-        _ => if let Some(body) = payload { client.post(&url).header("Content-Type", "application/json").body(body) } else { client.post(&url) }
-    };
-
-    let resp = req_builder
-        .send()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to trigger action {}: {}", clean_endpoint, e)))?;
-
-    let text = resp
-        .text()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to read response body: {}", e)))?;
-
-    Ok(text)
+    let m = method.unwrap_or_else(|| "POST".to_string());
+    send_companion_http_request(&app, device, port, &endpoint, &m, payload.as_deref(), 4000).await
 }
 
 #[command]
-pub async fn fetch_companion_screenshot(port: Option<u16>) -> AppResult<String> {
+pub async fn fetch_companion_screenshot(app: AppHandle, port: Option<u16>, device: Option<String>) -> AppResult<String> {
     let p = port.unwrap_or(9876);
     let url = format!("http://127.0.0.1:{}/screenshot", p);
 
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(1000))
-        .build()
-        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
+        .timeout(Duration::from_millis(1500))
+        .build();
 
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to fetch companion screenshot: {}", e)))?;
-
-    if resp.status().is_success() {
-        let bytes = resp
-            .bytes()
-            .await
-            .map_err(|e| AppError::FileSystemError(format!("Failed to read screenshot bytes: {}", e)))?;
-
-        use base64::Engine;
-        let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
-        Ok(format!("data:image/jpeg;base64,{}", b64))
-    } else {
-        Err(AppError::FileSystemError("Companion screenshot endpoint returned error status".into()))
+    if let Ok(c) = client {
+        if let Ok(resp) = c.get(&url).send().await {
+            if resp.status().is_success() {
+                if let Ok(bytes) = resp.bytes().await {
+                    use base64::Engine;
+                    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                    return Ok(format!("data:image/jpeg;base64,{}", b64));
+                }
+            }
+        }
     }
+
+    // Fallback: ADB screencap for POS terminal / blocked forward
+    let target_dev = device.or_else(|| {
+        ACTIVE_COMPANION_DEVICE.lock().ok().and_then(|g| g.clone())
+    });
+
+    if let Some(dev) = target_dev {
+        let args = vec![
+            "shell".to_string(),
+            "screencap -p | base64".to_string(),
+        ];
+        let output = execute_adb_with_recovery(&app, Some(&dev), args).await?;
+        if output.status.success() {
+            let raw_stdout = String::from_utf8_lossy(&output.stdout);
+            let clean_b64: String = raw_stdout.chars().filter(|c| !c.is_whitespace()).collect();
+            if clean_b64.len() > 100 {
+                return Ok(format!("data:image/png;base64,{}", clean_b64));
+            }
+        }
+    }
+
+    Err(AppError::FileSystemError("Companion screenshot endpoint returned error status".into()))
 }
 
 #[command]
-pub async fn fetch_companion_fast_screenshot(port: Option<u16>) -> AppResult<String> {
-    let p = port.unwrap_or(9876);
-    let url = format!("http://127.0.0.1:{}/screenshot/fast", p);
-
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(600))
-        .build()
-        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
-
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to fetch fast companion screenshot: {}", e)))?;
-
-    if resp.status().is_success() {
-        let bytes = resp
-            .bytes()
-            .await
-            .map_err(|e| AppError::FileSystemError(format!("Failed to read fast screenshot bytes: {}", e)))?;
-
-        use base64::Engine;
-        let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
-        Ok(format!("data:image/jpeg;base64,{}", b64))
-    } else {
-        Err(AppError::FileSystemError("Companion fast screenshot endpoint returned error status".into()))
-    }
+pub async fn fetch_companion_fast_screenshot(app: AppHandle, port: Option<u16>, device: Option<String>) -> AppResult<String> {
+    fetch_companion_screenshot(app, port, device).await
 }
 
 #[command]
 pub async fn perform_companion_node_action(
+    app: AppHandle,
     port: Option<u16>,
     resource_id: Option<String>,
     text: Option<String>,
     content_description: Option<String>,
     action: String,
     value: Option<String>,
+    device: Option<String>,
 ) -> AppResult<String> {
-    let p = port.unwrap_or(9876);
-    let url = format!("http://127.0.0.1:{}/action/node-perform", p);
-
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(1500))
-        .build()
-        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
-
     let payload = serde_json::json!({
         "resourceId": resource_id,
         "text": text,
@@ -410,94 +454,31 @@ pub async fn perform_companion_node_action(
         "value": value
     });
 
-    let resp = client
-        .post(&url)
-        .header("Content-Type", "application/json")
-        .body(payload.to_string())
-        .send()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to perform companion node action: {}", e)))?;
-
-    let text = resp
-        .text()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to read response body: {}", e)))?;
-
-    Ok(text)
+    send_companion_http_request(
+        &app,
+        device,
+        port,
+        "/action/node-perform",
+        "POST",
+        Some(&payload.to_string()),
+        2000,
+    )
+    .await
 }
 
 #[command]
-pub async fn fetch_companion_artifacts(port: Option<u16>) -> AppResult<String> {
-    let p = port.unwrap_or(9876);
-    let url = format!("http://127.0.0.1:{}/sync/artifacts", p);
-
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(4000))
-        .build()
-        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
-
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to fetch companion artifacts: {}", e)))?;
-
-    let text = resp
-        .text()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to read response body: {}", e)))?;
-
-    Ok(text)
+pub async fn fetch_companion_artifacts(app: AppHandle, port: Option<u16>, device: Option<String>) -> AppResult<String> {
+    send_companion_http_request(&app, device, port, "/sync/artifacts", "GET", None, 4000).await
 }
 
 #[command]
-pub async fn fetch_companion_fleet_peers(port: Option<u16>) -> AppResult<String> {
-    let p = port.unwrap_or(9876);
-    let url = format!("http://127.0.0.1:{}/fleet/peers", p);
-
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(3000))
-        .build()
-        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
-
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to fetch companion fleet peers: {}", e)))?;
-
-    let text = resp
-        .text()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to read response body: {}", e)))?;
-
-    Ok(text)
+pub async fn fetch_companion_fleet_peers(app: AppHandle, port: Option<u16>, device: Option<String>) -> AppResult<String> {
+    send_companion_http_request(&app, device, port, "/fleet/peers", "GET", None, 3000).await
 }
 
 #[command]
-pub async fn push_companion_payload(port: Option<u16>, payload: String) -> AppResult<String> {
-    let p = port.unwrap_or(9876);
-    let url = format!("http://127.0.0.1:{}/sync/push", p);
-
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(5000))
-        .build()
-        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
-
-    let resp = client
-        .post(&url)
-        .header("Content-Type", "application/json")
-        .body(payload)
-        .send()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to push payload to companion: {}", e)))?;
-
-    let text = resp
-        .text()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to read response body: {}", e)))?;
-
-    Ok(text)
+pub async fn push_companion_payload(app: AppHandle, port: Option<u16>, payload: String, device: Option<String>) -> AppResult<String> {
+    send_companion_http_request(&app, device, port, "/sync/push", "POST", Some(&payload), 5000).await
 }
 
 #[derive(serde::Serialize)]
@@ -530,34 +511,22 @@ struct PendingSnippetResponse {
 }
 
 #[command]
-pub async fn fetch_companion_pending_snippet(port: Option<u16>) -> AppResult<Option<String>> {
-    let p = port.unwrap_or(9876);
-    let url = format!("http://127.0.0.1:{}/inspector/pending-snippet", p);
-
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(2000))
-        .build()
-        .map_err(|e| AppError::FileSystemError(format!("Reqwest client build error: {}", e)))?;
-
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| AppError::FileSystemError(format!("Failed to fetch pending snippet: {}", e)))?;
-
-    if resp.status().is_success() {
-        let data: PendingSnippetResponse = resp
-            .json()
-            .await
-            .map_err(|e| AppError::FileSystemError(format!("Failed to parse pending snippet response: {}", e)))?;
-
-        if data.has_snippet {
-            Ok(data.snippet)
-        } else {
-            Ok(None)
+pub async fn fetch_companion_pending_snippet(app: AppHandle, port: Option<u16>, device: Option<String>) -> AppResult<Option<String>> {
+    let raw = send_companion_http_request(&app, device, port, "/inspector/pending-snippet", "GET", None, 2000).await;
+    match raw {
+        Ok(text) => {
+            if let Ok(data) = serde_json::from_str::<PendingSnippetResponse>(&text) {
+                if data.has_snippet {
+                    Ok(data.snippet)
+                } else {
+                    Ok(None)
+                }
+            } else {
+                Ok(None)
+            }
         }
-    } else {
-        Ok(None)
+        Err(_) => Ok(None),
     }
 }
+
 

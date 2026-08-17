@@ -223,6 +223,35 @@ interface CheckupCacheEntry {
 
 const checkupCacheMap = new Map<string, CheckupCacheEntry>();
 
+async function callCompanionRest<T = any>(endpoint: string, method = 'GET', payload?: any): Promise<T | null> {
+    try {
+        const rawJson = await invoke<string>('trigger_companion_action', {
+            port: 9876,
+            endpoint,
+            method,
+            payload: payload ? JSON.stringify(payload) : undefined
+        });
+        return JSON.parse(rawJson) as T;
+    } catch (_) {
+        try {
+            const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+            const res = await fetch(`http://127.0.0.1:9876${cleanEndpoint}`, {
+                method,
+                headers: payload ? { 'Content-Type': 'application/json; charset=utf-8' } : undefined,
+                body: payload ? JSON.stringify(payload) : undefined
+            });
+            if (res.ok) return (await res.json()) as T;
+        } catch (_) {}
+        return null;
+    }
+}
+
+const normalizePropVal = (v: string | undefined | null): string => {
+    if (v === undefined || v === null) return '';
+    const trimmed = String(v).trim();
+    return (trimmed === '-' || trimmed === 'null' || trimmed === 'undefined') ? '' : trimmed;
+};
+
 interface CheckupSubTabProps {
     selectedDevice: string | null;
     isTestRunning?: boolean;
@@ -436,6 +465,16 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     const [uiCheckNameInput, setUiCheckNameInput] = useState('');
     const [uiCheckActivityInput, setUiCheckActivityInput] = useState('');
     const [uiCheckDelayInput, setUiCheckDelayInput] = useState('1500');
+    const [expandedUiCheckIds, setExpandedUiCheckIds] = useState<Set<string>>(new Set());
+
+    const toggleExpandUiCheck = (id: string) => {
+        setExpandedUiCheckIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
 
     useEffect(() => {
         localStorage.setItem('checkup_uiTextChecks', JSON.stringify(uiTextChecks.map(toPersistableUiTextCheck)));
@@ -460,23 +499,26 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         if (!selectedDevice) return;
         setIsLoadingCompanionTests(true);
         try {
-            if (companionStatus === 'connected') {
-                const resp = await fetch('http://127.0.0.1:9876/rrt/suites');
-                if (resp.ok) {
-                    const data = await resp.json();
-                    if (data.status === 'ok' && Array.isArray(data.suites)) {
-                        setCompanionBddSuites(data.suites);
-                        return;
-                    }
-                }
+            try {
+                await invoke('start_companion_forward', { device: selectedDevice, localPort: 9876, remotePort: 9876 });
+            } catch (_) {}
+
+            let data = await callCompanionRest<{ status: string; suites: any[] }>('/rrt/suites');
+            if (!data || data.status !== 'ok' || !Array.isArray(data.suites) || data.suites.length === 0) {
+                data = await callCompanionRest<{ status: string; suites: any[] }>('/bdd/suites');
             }
+            if (data && data.status === 'ok' && Array.isArray(data.suites) && data.suites.length > 0) {
+                setCompanionBddSuites(data.suites);
+                return;
+            }
+
             // Fallback via ADB to list files if REST is unavailable
             try {
                 const output: string = await invoke('run_adb_command', {
                     device: selectedDevice,
                     args: ['shell', 'ls', '/data/data/com.lucasdeeiroz.robotrunner/files/rrt_suites']
                 });
-                if (output && !output.includes('No such file') && !output.includes('not found')) {
+                if (output && !output.includes('No such file') && !output.includes('not found') && !output.includes('Permission denied')) {
                     const fileNames = output.split(/\s+/).filter(f => f.startsWith('suite_') || f.startsWith('report_'));
                     const suites: CompanionBddSuite[] = [];
                     for (const file of fileNames) {
@@ -503,7 +545,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         } finally {
             setIsLoadingCompanionTests(false);
         }
-    }, [selectedDevice, companionStatus]);
+    }, [selectedDevice]);
 
     // Initial load on device change
     useEffect(() => {
@@ -515,37 +557,48 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
 
     // Auto-sync Companion specs & tests
     useEffect(() => {
-        if (companionStatus === 'connected' && selectedDevice) {
+        if (selectedDevice) {
             const syncCompanionSpecs = async () => {
                 try {
-                    const resp = await fetch('http://127.0.0.1:9876/device/info');
-                    if (resp.ok) {
-                        const c = await resp.json();
-                        if (c.status === 'ok') {
-                            const newProps: Record<string, string> = {};
-                            if (c.manufacturer) newProps['ro.product.manufacturer'] = c.manufacturer;
-                            if (c.model) newProps['ro.product.model'] = c.model;
-                            if (c.brand) newProps['ro.product.brand'] = c.brand;
-                            if (c.androidVersion) newProps['ro.build.version.release'] = c.androidVersion;
-                            if (c.sdkInt) newProps['ro.build.version.sdk'] = String(c.sdkInt);
-                            if (c.serial) newProps['ro.serialno'] = c.serial;
-                            if (c.specs && typeof c.specs === 'object') {
-                                for (const [k, v] of Object.entries(c.specs)) {
-                                    if (v !== undefined && v !== null && String(v).trim() !== '') {
-                                        newProps[k] = String(v);
-                                    }
+                    try {
+                        await invoke('start_companion_forward', { device: selectedDevice, localPort: 9876, remotePort: 9876 });
+                    } catch (_) {}
+
+                    const c = await callCompanionRest<any>('/device/info');
+                    if (c && c.status === 'ok') {
+                        const newProps: Record<string, string> = {};
+                        if (c.manufacturer) newProps['ro.product.manufacturer'] = c.manufacturer;
+                        if (c.model) newProps['ro.product.model'] = c.model;
+                        if (c.brand) newProps['ro.product.brand'] = c.brand;
+                        if (c.androidVersion) newProps['ro.build.version.release'] = c.androidVersion;
+                        if (c.sdkInt) newProps['ro.build.version.sdk'] = String(c.sdkInt);
+                        if (c.serial) newProps['ro.serialno'] = c.serial;
+                        if (c.specs && typeof c.specs === 'object') {
+                            for (const [k, v] of Object.entries(c.specs)) {
+                                if (v !== undefined && v !== null && String(v).trim() !== '') {
+                                    newProps[k] = String(v);
                                 }
                             }
-                            setDevicePropsCache(prev => ({ ...prev, ...newProps }));
+                        }
+                        setDevicePropsCache(prev => ({ ...prev, ...newProps }));
+
+                        // Map battery & storage into additional check results if present
+                        if (c.battery && typeof c.battery === 'object' && c.battery.level !== undefined) {
+                            setAdditionalCheckResults(prev => ({
+                                ...prev,
+                                battery: {
+                                    status: 'done',
+                                    found: `${c.battery.level >= 0 ? `${c.battery.level}%` : 'N/A'} (${c.battery.isCharging ? 'Charging' : 'Discharging'}, ${c.battery.voltage || 0}V, ${c.battery.temperature || 0}°C, ${c.battery.health || 'Good'})`
+                                }
+                            }));
                         }
                     }
                 } catch (_) { }
 
                 try {
-                    const interactiveResp = await fetch('http://127.0.0.1:9876/hardware/interactive-tests');
-                    if (interactiveResp.ok) {
-                        const results = await interactiveResp.json();
-                        setInteractiveTestResults(results);
+                    const results = await callCompanionRest<Record<string, boolean | null>>('/hardware/interactive-tests');
+                    if (results && typeof results === 'object' && Object.keys(results).length > 0) {
+                        setInteractiveTestResults(prev => ({ ...prev, ...results }));
                     }
                 } catch (_) { }
             };
@@ -553,11 +606,11 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             const interval = setInterval(syncCompanionSpecs, 10000);
             return () => clearInterval(interval);
         }
-    }, [companionStatus, selectedDevice]);
+    }, [selectedDevice]);
 
     // Push additional specs to Companion
     useEffect(() => {
-        if (companionStatus === 'connected' && Object.keys(additionalCheckResults).length > 0) {
+        if (selectedDevice && Object.keys(additionalCheckResults).length > 0) {
             const payload: Record<string, string> = {};
             for (const [key, result] of Object.entries(additionalCheckResults)) {
                 if (result.status === 'done' && result.found && result.found !== t('toolbox.checkup.not_found', 'Not found')) {
@@ -565,14 +618,11 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 }
             }
             if (Object.keys(payload).length > 0) {
-                fetch('http://127.0.0.1:9876/hardware/additional-specs', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-                    body: JSON.stringify(payload)
-                }).catch(e => console.error("Failed to push specs to Companion", e));
+                callCompanionRest('/hardware/additional-specs', 'POST', payload)
+                    .catch((e: unknown) => console.error("Failed to push specs to Companion", e));
             }
         }
-    }, [additionalCheckResults, companionStatus, t]);
+    }, [additionalCheckResults, selectedDevice, t]);
 
     // Sync cache on change
     useEffect(() => {
@@ -613,17 +663,12 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             }
 
             let xmlContent = '';
-            if (companionStatus === 'connected') {
-                try {
-                    const treeRes = await fetch('http://127.0.0.1:9876/ui-tree');
-                    if (treeRes.ok) {
-                        const text = await treeRes.text();
-                        if (text.includes('nodes') || text.includes('text') || text.includes('status')) {
-                            xmlContent = text;
-                        }
-                    }
-                } catch (_) { }
-            }
+            try {
+                const text: string = await invoke('fetch_companion_ui_tree', { port: 9876 });
+                if (text && (text.includes('nodes') || text.includes('text') || text.includes('status'))) {
+                    xmlContent = text;
+                }
+            } catch (_) { }
 
             if (!xmlContent) {
                 const dumpPath = '/sdcard/window_dump.xml';
@@ -637,10 +682,13 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             let isGoldenMatch: boolean | undefined = undefined;
 
             if (check.expectedTexts && check.expectedTexts.length > 0) {
-                const expectedNormalized = check.expectedTexts.map(t => t.trim());
-                const foundNormalized = extractedTexts.map(t => t.trim());
-                isGoldenMatch = expectedNormalized.length === foundNormalized.length &&
+                const expectedNormalized = check.expectedTexts.map(t => t.replace(/\s+/g, ' ').trim());
+                const foundNormalized = extractedTexts.map(t => t.replace(/\s+/g, ' ').trim());
+                const exactOrderMatch = expectedNormalized.length === foundNormalized.length &&
                     expectedNormalized.every((val, idx) => val === foundNormalized[idx]);
+                const setMatch = expectedNormalized.length === foundNormalized.length &&
+                    [...expectedNormalized].sort().every((val, idx) => val === [...foundNormalized].sort()[idx]);
+                isGoldenMatch = exactOrderMatch || setMatch;
             }
 
             setUiTextChecks(prev => prev.map(c => c.id === check.id ? {
@@ -649,6 +697,9 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 isGoldenMatch,
                 status: 'done'
             } : c));
+
+            // Auto-expand this check card so user immediately sees results
+            setExpandedUiCheckIds(prev => new Set(prev).add(check.id));
         } catch (error) {
             console.error('Failed to run UI text check:', error);
             setUiTextChecks(prev => prev.map(c => c.id === check.id ? { ...c, status: 'idle' } : c));
@@ -774,15 +825,15 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         {
             id: 'root_access',
             name: t('toolbox.checkup.checks.root_access', 'Root Access (su binary)'),
-            command: ['shell', 'which', 'su'],
-            expected: (out: string) => !out.trim() || out.includes('not found') || out.includes('permission denied'),
-            foundDisplay: (out: string) => (!out.trim() || out.includes('not found') || out.includes('permission denied')) ? t('toolbox.checkup.not_found', 'Not found') : t('toolbox.checkup.found', 'Found')
+            command: ['shell', 'sh', '-c', 'which su 2>/dev/null || echo "not found"'],
+            expected: (out: string) => !out.trim() || out.includes('not found') || out.includes('permission denied') || out.toLowerCase().includes('no su'),
+            foundDisplay: (out: string) => (!out.trim() || out.includes('not found') || out.includes('permission denied') || out.toLowerCase().includes('no su')) ? t('toolbox.checkup.not_found', 'Not found') : t('toolbox.checkup.found', 'Found')
         },
         {
             id: 'developer_options',
             name: t('toolbox.checkup.checks.developer_options', 'Developer Options'),
             command: ['shell', 'settings', 'get', 'global', 'development_settings_enabled'],
-            expected: (out: string) => out.trim() === '0',
+            expected: (out: string) => out.trim() === '0' || out.trim() === 'null' || !out.trim(),
             foundDisplay: (out: string) => out.trim() === '1' ? t('toolbox.checkup.active', '1 (Active)') : t('toolbox.checkup.inactive', '0 (Inactive)')
         },
         {
@@ -883,18 +934,37 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             name: t('toolbox.checkup.additional.device_owner', 'Device Owner'),
             command: ['shell', 'dumpsys', 'device_policy'],
             foundDisplay: (out: string) => {
+                if (out.includes('SecurityException') || out.includes('Permission Denial')) {
+                    return t('toolbox.checkup.additional.imei_blocked', 'Blocked by OS (Shell Restriction)');
+                }
                 const lines = out.split('\n');
-                for (const line of lines) {
-                    if (line.includes('Device Owner:') || line.includes('admin=')) {
-                        if (line.includes('null') || line.includes('None')) {
+                let inDoSection = false;
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (line.startsWith('Device Owner:') || line.startsWith('Device Owner (')) {
+                        inDoSection = true;
+                        const inlineVal = line.replace(/^Device Owner:?\s*/i, '').trim();
+                        if (inlineVal && inlineVal !== 'null' && inlineVal !== 'None' && inlineVal !== '(none)') {
+                            return inlineVal;
+                        }
+                        continue;
+                    }
+                    if (inDoSection) {
+                        if (!line || line.startsWith('Profile Owner') || line.startsWith('User ') || line.startsWith('Current User')) {
+                            break;
+                        }
+                        if (line.toLowerCase() === 'null' || line.toLowerCase() === 'none' || line.toLowerCase() === '(none)') {
                             return t('toolbox.checkup.not_configured', 'Not configured');
                         }
-                        if (line.includes('SecurityException') || line.includes('Permission Denial')) {
-                            return t('toolbox.checkup.additional.imei_blocked', 'Blocked by OS (Shell Restriction)');
+                        if (line.includes('admin=') || line.includes('package=')) {
+                            const adminMatch = line.match(/admin=ComponentInfo\{([^}]+)\}/i) || line.match(/package=([a-zA-Z0-9._]+)/i) || line.match(/admin=([^\s]+)/i);
+                            return adminMatch ? adminMatch[1] : line;
                         }
-                        return line.trim();
                     }
                 }
+                const matchAdmin = out.match(/Device Owner:[\s\S]*?admin=ComponentInfo\{([^}]+)\}/i);
+                if (matchAdmin) return matchAdmin[1];
+
                 return t('toolbox.checkup.not_configured', 'Not configured');
             }
         }
@@ -940,29 +1010,24 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
 
     const fetchDeviceProperties = useCallback(async (targetDevice: string): Promise<Record<string, string>> => {
         const companionProps: Record<string, string> = {};
-        if (companionStatus === 'connected') {
-            try {
-                const resp = await fetch('http://127.0.0.1:9876/device/info');
-                if (resp.ok) {
-                    const c = await resp.json();
-                    if (c.status === 'ok') {
-                        if (c.manufacturer) companionProps['ro.product.manufacturer'] = c.manufacturer;
-                        if (c.model) companionProps['ro.product.model'] = c.model;
-                        if (c.brand) companionProps['ro.product.brand'] = c.brand;
-                        if (c.androidVersion) companionProps['ro.build.version.release'] = c.androidVersion;
-                        if (c.sdkInt) companionProps['ro.build.version.sdk'] = String(c.sdkInt);
-                        if (c.serial) companionProps['ro.serialno'] = c.serial;
-                        if (c.specs && typeof c.specs === 'object') {
-                            for (const [k, v] of Object.entries(c.specs)) {
-                                if (v !== undefined && v !== null && String(v).trim() !== '') {
-                                    companionProps[k] = String(v);
-                                }
-                            }
+        try {
+            const c = await callCompanionRest<any>('/device/info');
+            if (c && c.status === 'ok') {
+                if (c.manufacturer) companionProps['ro.product.manufacturer'] = c.manufacturer;
+                if (c.model) companionProps['ro.product.model'] = c.model;
+                if (c.brand) companionProps['ro.product.brand'] = c.brand;
+                if (c.androidVersion) companionProps['ro.build.version.release'] = c.androidVersion;
+                if (c.sdkInt) companionProps['ro.build.version.sdk'] = String(c.sdkInt);
+                if (c.serial) companionProps['ro.serialno'] = c.serial;
+                if (c.specs && typeof c.specs === 'object') {
+                    for (const [k, v] of Object.entries(c.specs)) {
+                        if (v !== undefined && v !== null && String(v).trim() !== '') {
+                            companionProps[k] = String(v);
                         }
                     }
                 }
-            } catch (_) { }
-        }
+            }
+        } catch (_) { }
 
         try {
             const deviceOutput: string = await invoke('run_adb_command', {
@@ -1007,8 +1072,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 const newComparisons: PropComparison[] = allKeys.map(key => {
                     const expected = expectedMap.get(key) || '';
                     const found = filteredBaseProps[key] || '';
-                    const isMatch = Boolean(expected && found && expected === found);
-                    const isExtra = !expected && Boolean(found);
+                    const normExp = normalizePropVal(expected);
+                    const normFnd = normalizePropVal(found);
+                    const isMatch = normExp === normFnd;
+                    const isExtra = !normExp && Boolean(normFnd);
                     return {
                         key,
                         expected: expected || '-',
@@ -1064,8 +1131,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     const newComparisons: PropComparison[] = allKeys.map(key => {
                         const expected = expectedProps[key] || '';
                         const found = relevantDeviceProps[key] || '';
-                        const isMatch = Boolean(expected && found && expected === found);
-                        const isExtra = !expected && Boolean(found);
+                        const normExp = normalizePropVal(expected);
+                        const normFnd = normalizePropVal(found);
+                        const isMatch = normExp === normFnd;
+                        const isExtra = !normExp && Boolean(normFnd);
                         return {
                             key,
                             expected: expected || '-',
@@ -1097,12 +1166,22 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                     isGoldenMatch: goldenCheck.found === foundDisplay
                                 };
                             } catch (error) {
-                                newStandardResults[check.id] = {
-                                    status: 'incorrect',
-                                    found: t('toolbox.checkup.error_exec', 'Execution error'),
-                                    goldenExpected: goldenCheck.found,
-                                    isGoldenMatch: false
-                                };
+                                if (check.id === 'root_access') {
+                                    const notFoundDisplay = t('toolbox.checkup.not_found', 'Not found');
+                                    newStandardResults[check.id] = {
+                                        status: 'correct',
+                                        found: notFoundDisplay,
+                                        goldenExpected: goldenCheck.found,
+                                        isGoldenMatch: goldenCheck.found === notFoundDisplay
+                                    };
+                                } else {
+                                    newStandardResults[check.id] = {
+                                        status: 'incorrect',
+                                        found: t('toolbox.checkup.error_exec', 'Execution error'),
+                                        goldenExpected: goldenCheck.found,
+                                        isGoldenMatch: false
+                                    };
+                                }
                             }
                         }
                     }));
@@ -1240,10 +1319,17 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     found: check.foundDisplay(output)
                 };
             } catch (error) {
-                newResults[check.id] = {
-                    status: 'incorrect',
-                    found: t('toolbox.checkup.error_exec', 'Execution error')
-                };
+                if (check.id === 'root_access') {
+                    newResults[check.id] = {
+                        status: 'correct',
+                        found: t('toolbox.checkup.not_found', 'Not found')
+                    };
+                } else {
+                    newResults[check.id] = {
+                        status: 'incorrect',
+                        found: t('toolbox.checkup.error_exec', 'Execution error')
+                    };
+                }
             }
         }));
 
@@ -1881,8 +1967,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     `;
                     uiTextChecksToRender.forEach(c => {
                         const isMatch = c.isGoldenMatch;
-                        const statusText = isMatch !== undefined ? (isMatch ? t('toolbox.checkup.status_match', 'Match') : t('toolbox.checkup.status_mismatch', 'Mismatch')) : (c.status === 'done' ? t('common.done', 'Done') : t('common.pending', 'Pending'));
-                        const statusClass = isMatch !== undefined ? (isMatch ? 'success' : 'error') : 'info';
+                        const statusText = isMatch !== undefined
+                            ? (isMatch ? t('toolbox.checkup.status_match', 'Match') : t('toolbox.checkup.status_mismatch', 'Mismatch'))
+                            : (c.foundTexts && c.foundTexts.length > 0 ? `${c.foundTexts.length} ${t('toolbox.checkup.captured_texts_count', 'captured texts', { count: c.foundTexts.length })}` : (c.status === 'done' ? t('common.done', 'Done') : t('common.pending', 'Pending')));
+                        const statusClass = isMatch !== undefined ? (isMatch ? 'success' : 'error') : (c.foundTexts && c.foundTexts.length > 0 ? 'info' : 'warning');
                         const maxLen = Math.max(c.expectedTexts?.length || 0, c.foundTexts?.length || 0);
                         let textsHtml = '';
 
@@ -2096,6 +2184,18 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             }));
             setPackageComparisons(newPkgComps);
 
+            const updatedUiChecks = uiTextChecks.map(c => {
+                const texts = (c.expectedTexts && c.expectedTexts.length > 0)
+                    ? c.expectedTexts
+                    : (c.foundTexts && c.foundTexts.length > 0 ? c.foundTexts : []);
+                return {
+                    ...c,
+                    expectedTexts: texts,
+                    isGoldenMatch: texts.length > 0 ? true : undefined
+                };
+            });
+            setUiTextChecks(updatedUiChecks);
+
             const goldenData = {
                 device: selectedDevice,
                 timestamp: new Date().toISOString(),
@@ -2122,12 +2222,12 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     version: p.version,
                     is_system: p.is_system
                 })),
-                ui_text_checks: uiTextChecks.filter(c => c.enabled).map(c => ({
+                ui_text_checks: updatedUiChecks.filter(c => c.enabled).map(c => ({
                     id: c.id,
                     name: c.name,
                     activity: c.activity,
                     delayMs: c.delayMs || 1500,
-                    expectedTexts: c.expectedTexts || c.foundTexts || [],
+                    expectedTexts: c.expectedTexts || [],
                     enabled: c.enabled
                 }))
             };
@@ -2488,7 +2588,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 data-position="left"
             >
                 <CheckCircle2 size={14} className={isVerified ? "text-success" : "text-on-surface-variant/40"} />
-                <span>{isVerified ? t('toolbox.checkup.verified', 'Conferido') : t('toolbox.checkup.not_verified', 'Não Conferido')}</span>
+                <span>{isVerified ? t('toolbox.checkup.verified', 'Verified') : t('toolbox.checkup.unverified', 'Unverified')}</span>
             </Button>
         );
     };
@@ -3126,66 +3226,171 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         </div>
                     }
                 >
-                    {uiTextChecks.map(check => (
-                        <div key={check.id} className="p-3 rounded-xl bg-surface/50 border border-outline-variant/30 flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        checked={check.enabled}
-                                        onChange={(e) => {
-                                            const enabled = e.target.checked;
-                                            setUiTextChecks(prev => prev.map(c => c.id === check.id ? { ...c, enabled } : c));
-                                        }}
-                                        className="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4"
-                                    />
-                                    <div>
-                                        <h4 className="text-xs font-semibold text-on-surface">{check.name}</h4>
-                                        <code className="text-[10px] text-on-surface-variant/70">{check.activity || 'Current Screen'}</code>
+                    {uiTextChecks.map(check => {
+                        const isExpanded = expandedUiCheckIds.has(check.id);
+                        const hasFoundTexts = check.foundTexts && check.foundTexts.length > 0;
+                        const hasExpectedTexts = check.expectedTexts && check.expectedTexts.length > 0;
+                        const isGoldenConfigured = Boolean(hasExpectedTexts);
+
+                        return (
+                            <div key={check.id} className="p-3 rounded-xl bg-surface/50 border border-outline-variant/30 flex flex-col gap-2 transition-all">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <input
+                                            type="checkbox"
+                                            checked={check.enabled}
+                                            onChange={(e) => {
+                                                const enabled = e.target.checked;
+                                                setUiTextChecks(prev => prev.map(c => c.id === check.id ? { ...c, enabled } : c));
+                                            }}
+                                            className="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4 shrink-0"
+                                        />
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <h4 className="text-xs font-semibold text-on-surface truncate">{check.name}</h4>
+                                                {check.status === 'running' ? (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-full font-medium">
+                                                        <ExpressiveLoading variant="circular" size="xsm" />
+                                                        {t('common.running', 'Running...')}
+                                                    </span>
+                                                ) : check.isGoldenMatch === true ? (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-success/10 text-success border border-success/20 rounded-full font-semibold">
+                                                        <CheckCircle2 size={10} />
+                                                        {t('toolbox.checkup.conforme', 'CONFORME')}
+                                                    </span>
+                                                ) : check.isGoldenMatch === false ? (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-error/10 text-error border border-error/20 rounded-full font-semibold">
+                                                        <XCircle size={10} />
+                                                        {t('toolbox.checkup.nao_conforme', 'NÃO CONFORME')}
+                                                    </span>
+                                                ) : hasFoundTexts ? (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-info/10 text-info border border-info/20 rounded-full font-medium">
+                                                        {t('toolbox.checkup.captured_texts_count', '{{count}} captured texts', { count: check.foundTexts?.length || 0 })}
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-surface-variant/30 text-on-surface-variant/70 rounded-full font-medium">
+                                                        {t('common.pending', 'Pending')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <code className="text-[10px] text-on-surface-variant/70 block truncate">{check.activity || 'Current Screen'}</code>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => runSingleUiTextCheck(check)}
+                                            disabled={disabled || check.status === 'running'}
+                                            className="h-7 px-2 text-xs"
+                                            title={t('common.run', 'Run')}
+                                            data-position="left"
+                                        >
+                                            <Play size={12} className={clsx(check.status === 'running' && "animate-spin")} />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                setEditingUiCheck(check);
+                                                setUiCheckNameInput(check.name);
+                                                setUiCheckActivityInput(check.activity);
+                                                setUiCheckDelayInput(String(check.delayMs || 1500));
+                                                setIsUiCheckModalOpen(true);
+                                            }}
+                                            className="h-7 w-7 p-0 flex items-center justify-center rounded"
+                                            title={t('common.edit', 'Edit')}
+                                            data-position="left"
+                                        >
+                                            <Edit3 size={12} />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setUiTextChecks(prev => prev.filter(c => c.id !== check.id))}
+                                            className="h-7 w-7 p-0 flex items-center justify-center rounded hover:text-error"
+                                            title={t('common.delete', 'Delete')}
+                                            data-position="left"
+                                        >
+                                            <Trash2 size={12} />
+                                        </Button>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => runSingleUiTextCheck(check)}
-                                        disabled={disabled || check.status === 'running'}
-                                        className="h-7 px-2 text-xs"
-                                        title={t('common.run', 'Run')}
-                                        data-position="left"
+
+                                {/* Quick Summary & Expand Accordion */}
+                                <div className="flex items-center justify-between pt-1 border-t border-outline-variant/15 text-[11px] text-on-surface-variant">
+                                    <div className="flex items-center gap-2">
+                                        <span>
+                                            <strong>{check.foundTexts?.length || 0}</strong> {t('toolbox.checkup.captured_texts_count', 'captured texts', { count: check.foundTexts?.length || 0 })}
+                                            {isGoldenConfigured && (
+                                                <span className="text-on-surface-variant/70 ml-1">
+                                                    ({t('toolbox.checkup.expected_texts_count', '{{count}} expected', { count: check.expectedTexts?.length || 0 })})
+                                                </span>
+                                            )}
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleExpandUiCheck(check.id)}
+                                        className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
                                     >
-                                        <Play size={12} className={clsx(check.status === 'running' && "animate-spin")} />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                            setEditingUiCheck(check);
-                                            setUiCheckNameInput(check.name);
-                                            setUiCheckActivityInput(check.activity);
-                                            setUiCheckDelayInput(String(check.delayMs || 1500));
-                                            setIsUiCheckModalOpen(true);
-                                        }}
-                                        className="h-7 w-7 p-0 flex items-center justify-center rounded"
-                                        title={t('common.edit', 'Edit')}
-                                        data-position="left"
-                                    >
-                                        <Edit3 size={12} />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setUiTextChecks(prev => prev.filter(c => c.id !== check.id))}
-                                        className="h-7 w-7 p-0 flex items-center justify-center rounded hover:text-error"
-                                        title={t('common.delete', 'Delete')}
-                                        data-position="left"
-                                    >
-                                        <Trash2 size={12} />
-                                    </Button>
+                                        <span>{isExpanded ? t('toolbox.checkup.hide_captured_texts', 'Hide texts') : t('toolbox.checkup.view_captured_texts', 'View captured texts')}</span>
+                                        <ChevronDown size={14} className={clsx("transition-transform duration-200", isExpanded && "rotate-180")} />
+                                    </button>
                                 </div>
+
+                                {/* Expanded UI Texts List */}
+                                {isExpanded && (
+                                    <div className="mt-1 bg-surface-variant/20 rounded-lg p-2 border border-outline-variant/20 max-h-[220px] overflow-y-auto">
+                                        {isGoldenConfigured ? (
+                                            <table className="w-full text-left text-[11px] table-fixed">
+                                                <thead>
+                                                    <tr className="border-b border-outline-variant/20 text-on-surface-variant text-[10px]">
+                                                        <th className="p-1 w-1/2 font-semibold">{t('toolbox.checkup.expected', 'Expected')}</th>
+                                                        <th className="p-1 w-1/2 font-semibold">{t('toolbox.checkup.found', 'Found')}</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {Array.from({ length: Math.max(check.expectedTexts?.length || 0, check.foundTexts?.length || 0) }).map((_, idx) => {
+                                                        const exp = check.expectedTexts?.[idx] || '-';
+                                                        const fnd = check.foundTexts?.[idx] || '-';
+                                                        const isItemMatch = exp.trim() === fnd.trim();
+                                                        return (
+                                                            <tr key={idx} className="border-b border-outline-variant/10">
+                                                                <td className="p-1 text-on-surface-variant truncate font-mono text-[10px]">{exp}</td>
+                                                                <td className={clsx(
+                                                                    "p-1 truncate font-mono text-[10px] font-medium",
+                                                                    isItemMatch ? "text-success" : "text-error"
+                                                                )}>
+                                                                    {fnd}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        ) : hasFoundTexts ? (
+                                            <div className="flex flex-wrap gap-1">
+                                                {check.foundTexts!.map((txt, idx) => (
+                                                    <span
+                                                        key={idx}
+                                                        className="px-2 py-0.5 rounded bg-surface border border-outline-variant/30 text-[10px] font-mono text-on-surface select-all"
+                                                        title={txt}
+                                                    >
+                                                        {txt}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-[11px] text-on-surface-variant/60 italic text-center py-2">
+                                                {t('toolbox.checkup.no_texts_captured_yet', 'No texts captured yet. Click Run to inspect the screen.')}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </Section>
             </div>
 

@@ -661,12 +661,7 @@ fun ScannerStopwatchContent() {
     val laps by ScannerStopwatchEngine.lapsFlow.collectAsState()
 
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            cameraExecutor.shutdown()
-        }
-    }
+    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -681,7 +676,16 @@ fun ScannerStopwatchContent() {
         hasCameraPermission = granted
     }
 
-    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                cameraExecutor.shutdown()
+                if (cameraProviderFuture.isDone) {
+                    cameraProviderFuture.get().unbindAll()
+                }
+            } catch (_: Throwable) {}
+        }
+    }
 
     // Pre-warm MLKit client and native libs as soon as this tab is composed
     LaunchedEffect(Unit) {
