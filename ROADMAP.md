@@ -150,12 +150,12 @@ Este documento contém o roadmap de funcionalidades e melhorias a serem implemen
   - [x] Assegurar sub-10ms na leitura de árvore hierárquica e envio do payload para o Desktop (aliases `/tree`, `/ui/tree`, `/ui-tree`).
 
 ## Fase: Revisão da Aba Explorer (Run)
-  - [ ] Internacionalizar todos os textos.
-  - [ ] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop.
-  - [ ] Equiparar funcionalidades com a respectiva aba no RR Desktop.
-  - [ ] Garantir paridade visual e UX com o projeto (Mobile/Desktop).
-  - [ ] Certificar que todas as funcionalidades estão implementadas e funcionais.
-  - [ ] Revisar a lógica de busca heurística e exploração (DFS Grafo) do aplicativo.
+  - [x] Internacionalizar todos os textos (EN, PT, ES).
+  - [x] Reorganizar a árvore dos módulos no código e padronizar nomes com o Desktop (`ui/components/tabs/run/ExplorerSubTab.kt`).
+  - [x] Equiparar funcionalidades com a respectiva aba no RR Desktop (DFS Graph State Machine, Live HUD Overlay, Discovery Map JSON, Telemetria e Action Ticker).
+  - [x] Garantir paridade visual e UX com o projeto (Design tokens Material3, dark mode, glassmorphism, sem cores hardcoded e padding de 100dp para a PillTabBar).
+  - [x] Certificar que todas as funcionalidades estão implementadas e funcionais.
+  - [x] Revisar a lógica de busca heurística e exploração (DFS Grafo) do aplicativo (`AutonomousExplorerEngine.kt`).
 
 ## Fase: Implementação da Aba Scenarios (Run)
   - [ ] Internacionalizar todos os textos.

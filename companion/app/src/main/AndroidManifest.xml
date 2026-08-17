@@ -133,6 +133,12 @@
             android:enabled="true"
             android:exported="false" />
 
+        <!-- Explorer Overlay Service -->
+        <service
+            android:name=".overlay.ExplorerOverlayService"
+            android:enabled="true"
+            android:exported="false" />
+
     </application>
 
 </manifest>
