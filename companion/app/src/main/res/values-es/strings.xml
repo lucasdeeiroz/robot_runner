@@ -399,6 +399,36 @@
     <string name="msg_no_logcat_laps">Aún no hay laps de logcat grabados. Toca Iniciar Sesión.</string>
     <string name="label_scanner_laps">Laps del Lector (%1$d)</string>
     <string name="msg_no_scanner_laps">Aún no se han escaneado códigos.</string>
+    <string name="scanner_mode_hot">Hot Start</string>
+    <string name="scanner_mode_cold">Cold Start</string>
+    <string name="scanner_mode_hot_desc">La cámara permanece activa y lista entre lecturas. Mide puramente la velocidad de enfoque y decodificación (0ms init).</string>
+    <string name="scanner_mode_cold_desc">La cámara se inicializa completamente dentro del benchmark. Mide el tiempo de arranque del sensor hasta la lectura del código.</string>
+    <string name="scanner_torch_toggle">Flash / Linterna</string>
+    <string name="scanner_torch_on">Flash ENCENDIDO</string>
+    <string name="scanner_torch_off">Flash APAGADO</string>
+    <string name="scanner_distance_label">Distancia</string>
+    <string name="scanner_distance_optimal">Óptimo (%1$d cm)</string>
+    <string name="scanner_distance_close">Cerca (%1$d cm)</string>
+    <string name="scanner_distance_far">Lejos (%1$d cm)</string>
+    <string name="scanner_distance_calibrating">Calculando distancia...</string>
+    <string name="scanner_staging_title">Área de Preparación y Enfoque</string>
+    <string name="scanner_staging_desc">Encuadre el código, verifique la distancia ideal y ajuste el flash antes de iniciar la lectura.</string>
+    <string name="btn_start_scan_round">Escanear Round</string>
+    <string name="btn_ready_to_scan">⚡ Iniciar Lectura</string>
+    <string name="btn_start_cold_test">🚀 Iniciar Benchmark Cold</string>
+    <string name="btn_cancel_round">Cancelar Lectura</string>
+    <string name="btn_export_scanner_benchmark">Exportar Informe del Escáner</string>
+    <string name="msg_scanner_exported">Informe del escáner guardado en Descargas: %1$s</string>
+    <string name="scanner_stat_init">Boot Cámara</string>
+    <string name="scanner_stat_search">Mira &amp; Enfoque</string>
+    <string name="scanner_stat_decode">Decodificación ML</string>
+    <string name="scanner_stat_total">Latencia Total</string>
+    <string name="scanner_mode_hot_sub">0ms de arranque de cámara</string>
+    <string name="scanner_mode_cold_sub">Latencia total de arranque</string>
+    <string name="scanner_cold_idle_desc">El arranque del sensor, enfoque y decodificación se medirán al tocar</string>
+    <string name="scanner_mode_hot_tag">HOT START</string>
+    <string name="scanner_mode_cold_tag">COLD START</string>
+    <string name="btn_clear">Limpiar</string>
     
     <!-- Stopwatch Overlay -->
     <string name="title_stopwatch_hud">HUD del Cronómetro</string>

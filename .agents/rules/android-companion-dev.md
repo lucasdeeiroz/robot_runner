@@ -148,3 +148,16 @@ et/ or sync/ if they are UI representations). Keep business logic in their respe
 1. **No Hardcoded UI Strings**: Ensure that any string exposed to the UI (titles, descriptions, placeholders) uses stringResource(id = R.string.key). Avoid hardcoded English or Portuguese text in Compose files.
 2. **Resource Duplication Prevention**: Always check for existing keys before adding new strings to `strings.xml` in multiple languages (`values`, `values-pt`, `values-es`) to avoid Gradle build failures from resource merging.
 3. **Strings outside Composable Context**: For strings that need to be accessed outside of the Compose hierarchy (e.g., inside `onClick` lambdas for `Toast.makeText` or `Intent.createChooser`), do NOT use `@Composable` `stringResource`. Retrieve the `Context` beforehand (e.g. `val context = LocalContext.current`) and use `context.getString(R.string.key)`.
+
+---
+
+## 15. CameraX & MLKit Barcode Scanner Benchmarking Rules
+
+1. **Hot Start vs Cold Start Lifecycle Management**:
+   - **Hot Start**: Camera stays pre-warmed and running in the staging viewfinder. `cameraInitMs` is recorded as 0ms, measuring pure target acquisition (`searchMs`) and neural decoding (`decodeMs`). The camera preview MUST stay alive after saving/discarding a lap to allow consecutive rounds without hardware re-initialization overhead.
+   - **Cold Start**: Camera provider is unbound while idle and strictly bound upon tapping Start. `cameraInitMs` measures the full hardware sensor startup delay (`firstFrameTimestamp - sessionStartTime`).
+2. **Dual-Tier Distance Estimation**:
+   - **Tier 1 (Hardware Autofocus)**: Intercept Camera2 `CaptureResult.LENS_FOCUS_DISTANCE` via `Camera2Interop.Extender` capture callback ($d = \frac{100}{\text{diopters}}\text{ cm}$).
+   - **Tier 2 (Optical Geometry)**: When autofocus is fixed or unavailable (e.g. basic POS terminals), calculate estimated distance using MLKit barcode bounding box pixel width ratio against sensor resolution ($d = \frac{W_{\text{real}} \cdot W_{\text{img}}}{w_{\text{px}}}$).
+3. **Safe Torch & Hardware Guarding**:
+   - Always verify `cameraInfo.hasFlashUnit()` and guard with try-catch blocks when modifying `cameraControl.enableTorch()` to prevent crashes on specialized Android POS devices lacking flashlight hardware.

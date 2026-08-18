@@ -3,18 +3,29 @@ package com.lucasdeeiroz.robotrunner.ui.components.tabs.toolbox
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.hardware.camera2.CameraCaptureSession
+import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.CaptureResult
+import android.hardware.camera2.TotalCaptureResult
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.util.Size
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
+import androidx.camera.core.AspectRatio
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -23,6 +34,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FlashOff
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -652,16 +670,29 @@ fun LogcatStopwatchContent() {
     }
 }
 
+@androidx.annotation.OptIn(ExperimentalCamera2Interop::class)
 @Composable
 fun ScannerStopwatchContent() {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val coroutineScope = rememberCoroutineScope()
+
+    val startMode by ScannerStopwatchEngine.startModeFlow.collectAsState()
+    val isTorchEnabled by ScannerStopwatchEngine.isTorchEnabledFlow.collectAsState()
     val isScanning by ScannerStopwatchEngine.isScanningFlow.collectAsState()
     val pendingLap by ScannerStopwatchEngine.pendingLapFlow.collectAsState()
     val laps by ScannerStopwatchEngine.lapsFlow.collectAsState()
+    val estimatedDistance by ScannerStopwatchEngine.estimatedDistanceCmFlow.collectAsState()
 
-    val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+    val cameraExecutor = remember {
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "ScannerFastExecutor").apply {
+                priority = Thread.MAX_PRIORITY
+            }
+        }
+    }
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+    var activeCamera by remember { mutableStateOf<Camera?>(null) }
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -692,10 +723,20 @@ fun ScannerStopwatchContent() {
         ScannerStopwatchEngine.warmUp()
     }
 
+    // Reactively toggle torch when state changes on the active camera
+    LaunchedEffect(isTorchEnabled, activeCamera) {
+        try {
+            if (activeCamera?.cameraInfo?.hasFlashUnit() == true) {
+                activeCamera?.cameraControl?.enableTorch(isTorchEnabled)
+            }
+        } catch (_: Throwable) {}
+    }
+
     Column(
         modifier = Modifier.verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Mode & Flash Controls Card (Available BEFORE test starts)
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -704,24 +745,140 @@ fun ScannerStopwatchContent() {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(id = R.string.header_scanner_stopwatch),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(id = R.string.desc_scanner_stopwatch),
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // Torch Toggle Button (Always accessible before & during test)
+                    Surface(
+                        color = if (isTorchEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .clickable {
+                                val next = !isTorchEnabled
+                                ScannerStopwatchEngine.setTorchEnabled(next)
+                                try {
+                                    activeCamera?.cameraControl?.enableTorch(next)
+                                } catch (_: Throwable) {}
+                            }
+                            .padding(4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isTorchEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = if (isTorchEnabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = if (isTorchEnabled) stringResource(id = R.string.scanner_torch_on) else stringResource(id = R.string.scanner_torch_off),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isTorchEnabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // Start Mode Selector (Hot Start vs Cold Start)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        color = if (startMode == ScannerStartMode.HOT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable(enabled = !isScanning) {
+                                ScannerStopwatchEngine.setStartMode(ScannerStartMode.HOT)
+                            }
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = stringResource(id = R.string.scanner_mode_hot),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (startMode == ScannerStartMode.HOT) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringResource(id = R.string.scanner_mode_hot_sub),
+                                fontSize = 9.sp,
+                                color = if (startMode == ScannerStartMode.HOT) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Surface(
+                        color = if (startMode == ScannerStartMode.COLD) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable(enabled = !isScanning) {
+                                ScannerStopwatchEngine.setStartMode(ScannerStartMode.COLD)
+                            }
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = stringResource(id = R.string.scanner_mode_cold),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (startMode == ScannerStartMode.COLD) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringResource(id = R.string.scanner_mode_cold_sub),
+                                fontSize = 9.sp,
+                                color = if (startMode == ScannerStartMode.COLD) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // Mode Explanation Banner
                 Text(
-                    text = stringResource(id = R.string.header_scanner_stopwatch),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = stringResource(id = R.string.desc_scanner_stopwatch),
+                    text = if (startMode == ScannerStartMode.HOT) stringResource(id = R.string.scanner_mode_hot_desc) else stringResource(id = R.string.scanner_mode_cold_desc),
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
+        // Active Benchmarking / Staging / Pending Lap Section
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 if (pendingLap != null) {
+                    // Pending Lap Result Card (shows saved/discarded state and returns to Hot Staging smoothly)
                     val lap = pendingLap!!
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
@@ -732,41 +889,79 @@ fun ScannerStopwatchContent() {
                             modifier = Modifier.padding(16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    color = if (lap.startMode == "HOT") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = if (lap.startMode == "HOT") stringResource(id = R.string.scanner_mode_hot_tag) else stringResource(id = R.string.scanner_mode_cold_tag),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (lap.startMode == "HOT") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+
+                                if (lap.estimatedDistanceCm != null) {
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "🎯 ${lap.estimatedDistanceCm} cm",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (lap.startMode == "HOT") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(text = lap.barcodeValue, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             Text(
-                                text = stringResource(id = R.string.label_format, lap.format),
-                                fontSize = 12.sp,
+                                text = "${lap.formatName} (${lap.format})",
+                                fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+
                             Spacer(modifier = Modifier.height(10.dp))
                             Text(
                                 text = "${lap.totalLatencyMs} ms",
-                                fontSize = 32.sp,
+                                fontSize = 36.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
                                 color = if (lap.totalLatencyMs < 200) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
                             )
+
                             Spacer(modifier = Modifier.height(12.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
                                 StatCard(
-                                    label = "Camera Init",
+                                    label = stringResource(id = R.string.scanner_stat_init),
                                     value = "${lap.cameraInitMs}ms",
                                     color = MaterialTheme.colorScheme.secondary
                                 )
                                 StatCard(
-                                    label = "Search & Aim",
+                                    label = stringResource(id = R.string.scanner_stat_search),
                                     value = "${lap.searchMs}ms",
                                     color = MaterialTheme.colorScheme.secondary
                                 )
                                 StatCard(
-                                    label = "ML Decode",
+                                    label = stringResource(id = R.string.scanner_stat_decode),
                                     value = "${lap.decodeMs}ms",
                                     color = MaterialTheme.colorScheme.secondary
                                 )
                             }
+
                             Spacer(modifier = Modifier.height(16.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -794,72 +989,192 @@ fun ScannerStopwatchContent() {
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
                 } else if (hasCameraPermission) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(1.2f)
-                            .clip(RoundedCornerShape(12.dp))
-                    ) {
-                        AndroidView(
-                            factory = { ctx ->
-                                val previewView = PreviewView(ctx).apply {
-                                    scaleType = PreviewView.ScaleType.FILL_CENTER
-                                }
-                                cameraProviderFuture.addListener({
-                                    val cameraProvider = cameraProviderFuture.get()
+                    // Check if camera should be rendered:
+                    // Hot Start: always rendered (Staging + Live Scanning)
+                    // Cold Start: rendered only while isScanning == true
+                    val shouldShowCamera = (startMode == ScannerStartMode.HOT) || isScanning
 
-                                    val preview = Preview.Builder()
-                                        .build().also {
-                                            it.setSurfaceProvider(previewView.surfaceProvider)
-                                        }
-                                    val imageAnalysis = ImageAnalysis.Builder()
-                                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                                        .build()
-
-                                    imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
-                                        ScannerStopwatchEngine.processImageProxy(imageProxy)
-                                    }
-
-                                    val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-                                    try {
-                                        cameraProvider.unbindAll()
-                                        cameraProvider.bindToLifecycle(
-                                            lifecycleOwner, cameraSelector, preview, imageAnalysis
-                                        )
-                                    } catch (exc: Exception) {
-                                        Toast.makeText(
-                                            ctx,
-                                            context.getString(R.string.msg_camera_error),
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
-                                }, ContextCompat.getMainExecutor(ctx))
-                                previewView
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
-
-                        // Status Badge on Camera View
-                        Surface(
-                            color = if (isScanning) MaterialTheme.colorScheme.primary.copy(alpha = 0.85f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
-                            shape = RoundedCornerShape(8.dp),
+                    if (shouldShowCamera) {
+                        Box(
                             modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = 12.dp)
+                                .fillMaxWidth()
+                                .aspectRatio(1.2f)
+                                .clip(RoundedCornerShape(12.dp))
+                        ) {
+                            AndroidView(
+                                factory = { ctx ->
+                                    val pv = PreviewView(ctx).apply {
+                                        implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                                        scaleType = PreviewView.ScaleType.FILL_CENTER
+                                    }
+                                    cameraProviderFuture.addListener({
+                                        try {
+                                            val cameraProvider = cameraProviderFuture.get()
+                                            val preview = Preview.Builder().build().also {
+                                                it.setSurfaceProvider(pv.surfaceProvider)
+                                            }
+
+                                            val imageAnalysis = ImageAnalysis.Builder()
+                                                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                                .build()
+
+                                            imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
+                                                ScannerStopwatchEngine.processImageProxy(imageProxy)
+                                            }
+
+                                            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                                            cameraProvider.unbindAll()
+                                            val cam = cameraProvider.bindToLifecycle(
+                                                lifecycleOwner, cameraSelector, preview, imageAnalysis
+                                            )
+                                            activeCamera = cam
+                                            if (cam.cameraInfo.hasFlashUnit()) {
+                                                cam.cameraControl.enableTorch(isTorchEnabled)
+                                            }
+                                        } catch (exc: Exception) {
+                                            android.util.Log.e("ScannerStopwatch", "Camera bind error", exc)
+                                        }
+                                    }, ContextCompat.getMainExecutor(ctx))
+                                    pv
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+
+                            // Reticle / Alignment Target Overlay
+                            ScannerReticleOverlay(
+                                distanceCm = estimatedDistance,
+                                isScanning = isScanning,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+
+                            // Distance Badge (Top Left)
+                            Surface(
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .padding(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = if (estimatedDistance != null) {
+                                            when {
+                                                estimatedDistance!! in 15..30 -> stringResource(id = R.string.scanner_distance_optimal, estimatedDistance!!)
+                                                estimatedDistance!! < 15 -> stringResource(id = R.string.scanner_distance_close, estimatedDistance!!)
+                                                else -> stringResource(id = R.string.scanner_distance_far, estimatedDistance!!)
+                                            }
+                                        } else {
+                                            stringResource(id = R.string.scanner_distance_calibrating)
+                                        },
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (estimatedDistance != null && estimatedDistance!! in 15..30) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        }
+                                    )
+                                }
+                            }
+
+                            // Status Badge (Top Right)
+                            Surface(
+                                color = if (isScanning) MaterialTheme.colorScheme.primary.copy(alpha = 0.9f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(12.dp)
+                            ) {
+                                Text(
+                                    text = if (isScanning) stringResource(id = R.string.status_measuring) else stringResource(id = R.string.status_camera_ready),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isScanning) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        // Cold Start Idle Staging Card (Camera is off until Start Cold is clicked)
+                        Surface(
+                            color = MaterialTheme.colorScheme.surface,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Speed,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(36.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = stringResource(id = R.string.scanner_mode_cold),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = stringResource(id = R.string.scanner_cold_idle_desc),
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Scan Action Buttons
+                    if (isScanning) {
+                        Button(
+                            onClick = { ScannerStopwatchEngine.stopSession() },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                            shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
-                                text = if (isScanning) stringResource(id = R.string.status_measuring) else stringResource(id = R.string.status_camera_ready),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isScanning) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                text = stringResource(id = R.string.btn_cancel_round),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        Button(
+                            onClick = {
+                                ScannerStopwatchEngine.startRound(startMode, isTorchEnabled)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (startMode == ScannerStartMode.HOT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = if (startMode == ScannerStartMode.HOT) {
+                                    stringResource(id = R.string.btn_ready_to_scan)
+                                } else {
+                                    stringResource(id = R.string.btn_start_cold_test)
+                                },
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
                 } else {
+                    // Camera Permission Missing Card
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
                         shape = RoundedCornerShape(12.dp),
@@ -891,50 +1206,103 @@ fun ScannerStopwatchContent() {
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
-                if (pendingLap == null && hasCameraPermission) {
-                    Button(
-                        onClick = {
-                            if (isScanning) {
-                                ScannerStopwatchEngine.stopSession()
-                            } else {
-                                ScannerStopwatchEngine.startSession()
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isScanning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = if (isScanning) stringResource(id = R.string.btn_stop_benchmark) else stringResource(
-                                id = R.string.btn_start_scanner_session
-                            ),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
                 }
             }
         }
 
+        // Session Summary Statistics Cards (Min, Avg, Max, P95)
+        val summary = remember(laps) { ScannerStopwatchEngine.getSessionSummary() }
+        summary?.let { sess ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                StatCard(
+                    label = stringResource(id = R.string.label_min_delta),
+                    value = "${sess.minLatencyMs} ms",
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                StatCard(
+                    label = stringResource(id = R.string.label_avg_delta),
+                    value = "${sess.avgLatencyMs} ms",
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.weight(1f)
+                )
+                StatCard(
+                    label = stringResource(id = R.string.label_max_delta),
+                    value = "${sess.maxLatencyMs} ms",
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.weight(1f)
+                )
+                StatCard(
+                    label = stringResource(id = R.string.label_p95_delta),
+                    value = "${sess.p95LatencyMs} ms",
+                    color = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        // Laps History Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(14.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = stringResource(id = R.string.label_scanner_laps, laps.size),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(id = R.string.label_scanner_laps, laps.size),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                    if (laps.isNotEmpty()) {
+                        TextButton(
+                            onClick = { ScannerStopwatchEngine.clearLaps() }
+                        ) {
+                            Text(
+                                text = stringResource(id = R.string.btn_clear),
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+
+                if (laps.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                val file = ScannerStopwatchEngine.exportSessionJson(context)
+                                if (file != null) {
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.msg_scanner_exported, file.name),
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = stringResource(id = R.string.btn_export_scanner_benchmark),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
 
                 if (laps.isEmpty()) {
                     Text(
@@ -952,6 +1320,26 @@ fun ScannerStopwatchContent() {
             }
         }
     }
+}
+
+@Composable
+fun ScannerReticleOverlay(distanceCm: Int?, isScanning: Boolean, modifier: Modifier = Modifier) {
+    val reticleColor = when {
+        isScanning -> MaterialTheme.colorScheme.primary
+        distanceCm != null && distanceCm in 15..30 -> MaterialTheme.colorScheme.primary
+        distanceCm != null && distanceCm < 15 -> MaterialTheme.colorScheme.error
+        distanceCm != null -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+    }
+
+    Box(
+        modifier = modifier
+            .size(180.dp)
+            .border(
+                border = BorderStroke(2.dp, reticleColor.copy(alpha = if (isScanning) 0.9f else 0.5f)),
+                shape = RoundedCornerShape(16.dp)
+            )
+    )
 }
 
 @Composable
@@ -1067,18 +1455,40 @@ fun ScannerLapItemRow(lap: ScannerLap) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = lap.barcodeValue,
+                        text = "#${lap.lapNumber}",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.primary
                     )
-                    Text(
-                        text = stringResource(id = R.string.label_format, lap.format),
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Surface(
+                        color = if (lap.startMode == "HOT") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = lap.startMode,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (lap.startMode == "HOT") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                    if (lap.torchEnabled) {
+                        Text(
+                            text = "⚡ Flash",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
+                    if (lap.estimatedDistanceCm != null) {
+                        Text(
+                            text = "🎯 ${lap.estimatedDistanceCm}cm",
+                            fontSize = 9.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
                 Text(
                     text = "${lap.totalLatencyMs} ms",
@@ -1088,12 +1498,20 @@ fun ScannerLapItemRow(lap: ScannerLap) {
                     color = if (lap.totalLatencyMs < 200) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
                 )
             }
+
+            Text(
+                text = "${lap.barcodeValue} (${lap.formatName})",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Init: ${lap.cameraInitMs}ms",
+                    text = "Boot: ${lap.cameraInitMs}ms",
                     fontSize = 9.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontFamily = FontFamily.Monospace
