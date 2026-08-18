@@ -560,4 +560,14 @@
     <string name="desc_expand">Expand</string>
     <string name="inspector_msg_snippet_sent_to_desktop">Test sent to Desktop!</string>
     <string name="inspector_msg_snippet_saved_downloads">Test saved to Downloads: %1$s</string>
+    <string name="spec_pos_firmware">POS Firmware</string>
+    <string name="header_firmware_recipe">Custom POS Firmware Recipe</string>
+    <string name="desc_firmware_recipe">Configure dynamic templates, system properties, and reflection rules to resolve vendor-specific POS firmware versions.</string>
+    <string name="btn_configure_firmware">Configure Firmware Recipe</string>
+    <string name="dialog_title_firmware_recipe">POS Firmware Recipe</string>
+    <string name="btn_test_recipe">Test &amp; Evaluate</string>
+    <string name="btn_load_template">Load Template</string>
+    <string name="label_recipe_json">Recipe JSON (Template &amp; Property Mappings)</string>
+    <string name="label_evaluation_result">Resolved Version: %1$s</string>
+    <string name="msg_recipe_saved">Firmware recipe saved successfully.</string>
 </resources>

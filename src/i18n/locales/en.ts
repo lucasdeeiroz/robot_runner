@@ -2210,7 +2210,18 @@ export const en = {
                     storage: "Data Storage (/data)",
                     network_mode: "Preferred Network Mode",
                     device_owner: "Device Owner"
-                }
+                },
+                firmware_recipe_btn: "Firmware Recipe",
+                firmware_recipe_title: "POS Firmware Recipe",
+                recipe_modal_title: "POS Firmware Recipe Configuration",
+                recipe_modal_desc: "Configure the JSON formula with properties, regex rules, and dynamic Java reflection to resolve the exact firmware version of any POS device. Click Sync to push it directly to the connected Companion.",
+                recipe_json_label: "Recipe JSON",
+                load_template: "Load Template",
+                last_resolved_version: "Last Resolved Version:",
+                sync_to_companion: "Sync to Companion",
+                recipe_synced_success: "Recipe synced to Companion! Resolved version: {{version}}",
+                recipe_synced_adb: "Recipe synced to device storage via ADB!",
+                recipe_sync_error: "Could not reach Companion to sync recipe. Ensure Companion is running."
             },
             actions: {
                 screenshot: "Take Screenshot",

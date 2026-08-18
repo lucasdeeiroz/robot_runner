@@ -85,6 +85,9 @@ class PdfReportGenerator(private val context: Context) {
         drawRow("Model Name", result.model)
         drawRow("Serial Number", result.serial)
         drawRow("Android OS Version", "Android ${result.androidVersion} (API ${result.sdkInt})")
+        if (!result.customFirmwareVersion.isNullOrBlank()) {
+            drawRow("POS Firmware Version", result.customFirmwareVersion)
+        }
         y += 15f
 
         // Section 2: Battery & Power Metrics

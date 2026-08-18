@@ -101,17 +101,26 @@ object HardwareSpecsProvider {
         val categories = mutableListOf<HardwareSpecCategory>()
 
         // 1. Device Identity & OS
+        val identityItems = mutableListOf(
+            HardwareSpecItem(context.getString(R.string.spec_manufacturer), Build.MANUFACTURER.replaceFirstChar { it.uppercase() }),
+            HardwareSpecItem(context.getString(R.string.spec_model), Build.MODEL),
+            HardwareSpecItem(context.getString(R.string.spec_device_name), Build.DEVICE),
+            HardwareSpecItem(context.getString(R.string.spec_android_version), "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"),
+            HardwareSpecItem(context.getString(R.string.spec_build_fingerprint), Build.FINGERPRINT),
+            HardwareSpecItem(context.getString(R.string.spec_security_patch), Build.VERSION.SECURITY_PATCH)
+        )
+
+        val customFw = CustomFirmwareEngine.resolveFirmwareVersion(context)
+        if (!customFw.isNullOrBlank()) {
+            identityItems.add(
+                HardwareSpecItem(context.getString(R.string.spec_pos_firmware), customFw)
+            )
+        }
+
         categories.add(
             HardwareSpecCategory(
                 categoryName = context.getString(R.string.category_device_os),
-                items = listOf(
-                    HardwareSpecItem(context.getString(R.string.spec_manufacturer), Build.MANUFACTURER.replaceFirstChar { it.uppercase() }),
-                    HardwareSpecItem(context.getString(R.string.spec_model), Build.MODEL),
-                    HardwareSpecItem(context.getString(R.string.spec_device_name), Build.DEVICE),
-                    HardwareSpecItem(context.getString(R.string.spec_android_version), "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"),
-                    HardwareSpecItem(context.getString(R.string.spec_build_fingerprint), Build.FINGERPRINT),
-                    HardwareSpecItem(context.getString(R.string.spec_security_patch), Build.VERSION.SECURITY_PATCH)
-                )
+                items = identityItems
             )
         )
 

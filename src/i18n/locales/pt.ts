@@ -2211,7 +2211,18 @@ export const pt = {
                     storage: "Armazenamento (/data)",
                     network_mode: "Modo de Rede Preferido",
                     device_owner: "Device Owner"
-                }
+                },
+                firmware_recipe_btn: "Fórmula de Firmware",
+                firmware_recipe_title: "Receita de Firmware do POS",
+                recipe_modal_title: "Configuração da Fórmula de Firmware POS",
+                recipe_modal_desc: "Configure a fórmula JSON com propriedades, regras regex e reflexão Java dinâmica para resolver a versão exata do firmware de qualquer terminal POS. Clique em Sincronizar para enviar diretamente ao Companion conectado.",
+                recipe_json_label: "JSON da Receita",
+                load_template: "Carregar Template",
+                last_resolved_version: "Última Versão Resolvida:",
+                sync_to_companion: "Sincronizar com o Companion",
+                recipe_synced_success: "Receita sincronizada com o Companion! Versão resolvida: {{version}}",
+                recipe_synced_adb: "Receita sincronizada no armazenamento do dispositivo via ADB!",
+                recipe_sync_error: "Não foi possível alcançar o Companion para sincronizar a receita. Certifique-se de que o Companion está em execução."
             },
             actions: {
                 screenshot: "Capturar Tela",

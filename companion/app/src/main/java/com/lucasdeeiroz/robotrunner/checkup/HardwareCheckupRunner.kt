@@ -72,6 +72,8 @@ class HardwareCheckupRunner(private val context: Context) {
         val nfcAdapter = NfcAdapter.getDefaultAdapter(context)
         val printerStatus = printerHelper.getPrinterStatus()
 
+        val customFirmware = com.lucasdeeiroz.robotrunner.hardware.CustomFirmwareEngine.resolveFirmwareVersion(context)
+
         return LocalCheckupResult(
             timestamp = System.currentTimeMillis(),
             manufacturer = Build.MANUFACTURER,
@@ -80,6 +82,7 @@ class HardwareCheckupRunner(private val context: Context) {
             androidVersion = Build.VERSION.RELEASE,
             sdkInt = Build.VERSION.SDK_INT,
             serial = try { Build.getSerial() } catch (e: Throwable) { Build.SERIAL },
+            customFirmwareVersion = customFirmware,
             batteryLevel = if (level != -1 && scale != -1) (level * 100 / scale) else -1,
             batteryHealth = healthStr,
             batteryVoltage = if (voltage != -1) voltage / 1000.0 else 0.0,
@@ -117,7 +120,7 @@ class HardwareCheckupRunner(private val context: Context) {
                 )
             }
 
-            val properties = mapOf(
+            val properties = mutableMapOf(
                 "ro.product.manufacturer" to result.manufacturer,
                 "ro.product.model" to result.model,
                 "ro.product.brand" to result.brand,
@@ -125,6 +128,10 @@ class HardwareCheckupRunner(private val context: Context) {
                 "ro.build.version.sdk" to result.sdkInt.toString(),
                 "ro.serialno" to result.serial
             )
+
+            if (!result.customFirmwareVersion.isNullOrBlank()) {
+                properties["ro.pos.firmware.version"] = result.customFirmwareVersion
+            }
 
             val timestampStr = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
                 timeZone = java.util.TimeZone.getTimeZone("UTC")
@@ -169,6 +176,7 @@ data class LocalCheckupResult(
     val androidVersion: String,
     val sdkInt: Int,
     val serial: String,
+    val customFirmwareVersion: String? = null,
     val batteryLevel: Int,
     val batteryHealth: String,
     val batteryVoltage: Double,

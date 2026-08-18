@@ -36,7 +36,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import com.lucasdeeiroz.robotrunner.R
+import com.lucasdeeiroz.robotrunner.hardware.CustomFirmwareEngine
 import com.lucasdeeiroz.robotrunner.model.HardwareSpecCategory
 
 @Composable
@@ -46,6 +52,10 @@ fun CheckupSubTab(
 ) {
     val context = LocalContext.current
     var generatedPdfFile by remember { mutableStateOf<java.io.File?>(null) }
+    var showRecipeDialog by remember { mutableStateOf(false) }
+    var recipeJsonState by remember { mutableStateOf(CustomFirmwareEngine.getStoredRecipeJson(context)) }
+    var evaluatedFwVersion by remember { mutableStateOf(CustomFirmwareEngine.resolveFirmwareVersion(context)) }
+    var evaluationResultText by remember { mutableStateOf<String?>(null) }
 
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -54,6 +64,72 @@ fun CheckupSubTab(
         // Interactive Hardware Tests Card
         item {
             InteractiveTestsCard(context, onLaunchDisplayTest)
+        }
+
+        // Custom POS Firmware Recipe Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        stringResource(id = R.string.header_firmware_recipe),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        stringResource(id = R.string.desc_firmware_recipe),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    if (!evaluatedFwVersion.isNullOrBlank()) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = stringResource(id = R.string.spec_pos_firmware),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Text(
+                                    text = evaluatedFwVersion ?: "",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+
+                    Button(
+                        onClick = {
+                            recipeJsonState = CustomFirmwareEngine.getStoredRecipeJson(context)
+                            evaluationResultText = null
+                            showRecipeDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(stringResource(id = R.string.btn_configure_firmware), fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
         }
 
         // Technical Audit PDF Report Card
@@ -236,5 +312,109 @@ fun CheckupSubTab(
                 }
             }
         }
+    }
+
+    if (showRecipeDialog) {
+        AlertDialog(
+            onDismissRequest = { showRecipeDialog = false },
+            title = {
+                Text(
+                    text = stringResource(id = R.string.dialog_title_firmware_recipe),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = stringResource(id = R.string.label_recipe_json),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedTextField(
+                        value = recipeJsonState,
+                        onValueChange = { recipeJsonState = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(240.dp),
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            fontSize = 11.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                recipeJsonState = CustomFirmwareEngine.getDefaultSampleRecipeJson()
+                                evaluationResultText = null
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(stringResource(id = R.string.btn_load_template), fontSize = 11.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                val resolved = CustomFirmwareEngine.evaluateRecipe(recipeJsonState)
+                                evaluationResultText = resolved ?: "N/A"
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(stringResource(id = R.string.btn_test_recipe), fontSize = 11.sp)
+                        }
+                    }
+
+                    evaluationResultText?.let { result ->
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = stringResource(id = R.string.label_evaluation_result, result),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        CustomFirmwareEngine.saveStoredRecipeJson(context, recipeJsonState)
+                        evaluatedFwVersion = CustomFirmwareEngine.resolveFirmwareVersion(context)
+                        showRecipeDialog = false
+                        Toast.makeText(context, context.getString(R.string.msg_recipe_saved), Toast.LENGTH_SHORT).show()
+                    },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(stringResource(id = R.string.inspector_btn_confirm))
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showRecipeDialog = false },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(stringResource(id = R.string.inspector_btn_cancel))
+                }
+            }
+        )
     }
 }

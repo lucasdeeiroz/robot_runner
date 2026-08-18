@@ -547,4 +547,14 @@
     <string name="desc_expand">Expandir</string>
     <string name="inspector_msg_snippet_sent_to_desktop">¡Teste enviado al Desktop!</string>
     <string name="inspector_msg_snippet_saved_downloads">Teste guardado en Descargas: %1$s</string>
+    <string name="spec_pos_firmware">Firmware del POS</string>
+    <string name="header_firmware_recipe">Fórmula de Firmware POS</string>
+    <string name="desc_firmware_recipe">Configure plantillas dinámicas, propiedades del sistema y reglas de reflexión para obtener la versión de firmware de cualquier POS.</string>
+    <string name="btn_configure_firmware">Configurar Fórmula</string>
+    <string name="dialog_title_firmware_recipe">Fórmula de Firmware POS</string>
+    <string name="btn_test_recipe">Probar Fórmula</string>
+    <string name="btn_load_template">Cargar Plantilla</string>
+    <string name="label_recipe_json">JSON de la Fórmula (Plantilla y Mapeo de Propiedades)</string>
+    <string name="label_evaluation_result">Versión Resuelta: %1$s</string>
+    <string name="msg_recipe_saved">Fórmula de firmware guardada con éxito.</string>
 </resources>

@@ -407,6 +407,41 @@ class CompanionHttpServer(
 
 
 
+            "/firmware/recipe", "/device/firmware-recipe" -> {
+                if (session.method == Method.POST) {
+                    try {
+                        val postData = safeGetPostBody(session)
+                        if (!postData.isNullOrBlank()) {
+                            com.lucasdeeiroz.robotrunner.hardware.CustomFirmwareEngine.saveStoredRecipeJson(context, postData)
+                            val resolved = com.lucasdeeiroz.robotrunner.hardware.CustomFirmwareEngine.resolveFirmwareVersion(context)
+                            JsonObject().apply {
+                                addProperty("status", "ok")
+                                addProperty("saved", true)
+                                addProperty("resolvedVersion", resolved ?: "N/A")
+                            }
+                        } else {
+                            JsonObject().apply {
+                                addProperty("status", "error")
+                                addProperty("message", "Empty recipe JSON body")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        JsonObject().apply {
+                            addProperty("status", "error")
+                            addProperty("message", e.message ?: "Failed to save recipe")
+                        }
+                    }
+                } else {
+                    val recipe = com.lucasdeeiroz.robotrunner.hardware.CustomFirmwareEngine.getStoredRecipeJson(context)
+                    val resolved = com.lucasdeeiroz.robotrunner.hardware.CustomFirmwareEngine.resolveFirmwareVersion(context)
+                    JsonObject().apply {
+                        addProperty("status", "ok")
+                        addProperty("recipe", recipe)
+                        addProperty("resolvedVersion", resolved ?: "N/A")
+                    }
+                }
+            }
+
             "/stopwatch/start" -> {
                 com.lucasdeeiroz.robotrunner.stopwatch.RedrawStopwatchEngine.startSession()
                 JsonObject().apply {
@@ -867,7 +902,15 @@ class CompanionHttpServer(
             addProperty("serial", serial)
             addProperty("isAccessibilityEnabled", CompanionAccessibilityService.isRunning)
 
+            val customFw = com.lucasdeeiroz.robotrunner.hardware.CustomFirmwareEngine.resolveFirmwareVersion(context)
+            if (!customFw.isNullOrBlank()) {
+                addProperty("posFirmwareVersion", customFw)
+            }
+
             val specsObj = JsonObject()
+            if (!customFw.isNullOrBlank()) {
+                specsObj.addProperty("ro.pos.firmware.version", customFw)
+            }
             com.lucasdeeiroz.robotrunner.hardware.HardwareSpecsProvider.getDetailedSpecs(context).forEach { category ->
                 category.items.forEach { item ->
                     specsObj.addProperty(item.label, item.value)

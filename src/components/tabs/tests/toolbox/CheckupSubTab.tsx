@@ -11,7 +11,7 @@ import {
     ListPlus, Info, Download, Filter, FilterX, Play, Plus, Trash2,
     Edit3, Tv, Smartphone, Image as ImageIcon, RefreshCw,
     Layers, CheckSquare, ChevronRight, ChevronDown,
-    SlidersHorizontal, Eye, AlertTriangle, FileCheck, Clock, RotateCcw
+    SlidersHorizontal, Eye, AlertTriangle, FileCheck, Clock, RotateCcw, Cpu
 } from 'lucide-react';
 import { Section } from '@/components/organisms/Section';
 import { Modal } from '@/components/organisms/Modal';
@@ -241,7 +241,7 @@ async function callCompanionRest<T = any>(endpoint: string, method = 'GET', payl
                 body: payload ? JSON.stringify(payload) : undefined
             });
             if (res.ok) return (await res.json()) as T;
-        } catch (_) {}
+        } catch (_) { }
         return null;
     }
 }
@@ -251,6 +251,45 @@ const normalizePropVal = (v: string | undefined | null): string => {
     const trimmed = String(v).trim();
     return (trimmed === '-' || trimmed === 'null' || trimmed === 'undefined') ? '' : trimmed;
 };
+
+const defaultDesktopSampleRecipe = JSON.stringify({
+    enabled: true,
+    label: "",
+    template: "",
+    fields: {
+        security_version: {
+            type: "prop",
+            keys: [""],
+            defaultValue: ""
+        },
+        api_version: {
+            type: "prop",
+            keys: [""],
+            defaultValue: ""
+        },
+        ap_version: {
+            type: "prop",
+            keys: [""],
+            defaultValue: ""
+        },
+        mp_version: {
+            type: "prop",
+            keys: [""],
+            regex: "V?(\\d{3})",
+            defaultValue: ""
+        },
+        sp_version: {
+            type: "reflection",
+            className: "",
+            getterMethod: "",
+            invokeMethod: "",
+            methodArgs: [],
+            fallbackProps: [""],
+            regex: "",
+            defaultValue: ""
+        }
+    }
+}, null, 2);
 
 interface CheckupSubTabProps {
     selectedDevice: string | null;
@@ -263,6 +302,14 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     const { settings } = useSettings();
     const { status: companionStatus } = useCompanion(selectedDevice);
     const cachedCheckup = selectedDevice ? checkupCacheMap.get(selectedDevice) : undefined;
+
+    // Firmware Recipe state
+    const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
+    const [desktopRecipeJson, setDesktopRecipeJson] = useState(() => {
+        return localStorage.getItem('checkup_customFirmwareRecipe') || defaultDesktopSampleRecipe;
+    });
+    const [isSyncingRecipe, setIsSyncingRecipe] = useState(false);
+    const [recipeResolvedPreview, setRecipeResolvedPreview] = useState<string | null>(null);
 
     const [isLoading, setIsLoading] = useState(false);
     const [comparisons, setComparisons] = useState<PropComparison[]>(() => cachedCheckup?.comparisons ?? []);
@@ -318,6 +365,57 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     useEffect(() => {
         localStorage.setItem('checkup_manualChecks', JSON.stringify(manualChecks));
     }, [manualChecks]);
+
+    const syncRecipeToCompanion = async () => {
+        setIsSyncingRecipe(true);
+        try {
+            localStorage.setItem('checkup_customFirmwareRecipe', desktopRecipeJson);
+
+            // 1. Try REST call to Companion
+            let res = await callCompanionRest<{ status: string; saved: boolean; resolvedVersion?: string }>(
+                '/firmware/recipe',
+                'POST',
+                desktopRecipeJson
+            );
+
+            // 2. Fallback via ADB to write file if REST is unavailable
+            if (!res || res.status !== 'ok') {
+                if (selectedDevice) {
+                    try {
+                        const safeJson = desktopRecipeJson.replace(/'/g, "'\\''");
+                        await invoke('run_adb_command', {
+                            device: selectedDevice,
+                            args: ['shell', `mkdir -p /sdcard/Android/data/com.lucasdeeiroz.robotrunner/files && echo '${safeJson}' > /sdcard/Android/data/com.lucasdeeiroz.robotrunner/files/firmware_recipe.json`]
+                        });
+                        toast.success(t('toolbox.checkup.recipe_synced_adb', 'Recipe synced to device storage via ADB!'));
+                        setIsRecipeModalOpen(false);
+                        return;
+                    } catch (_) { }
+                }
+                toast.error(t('toolbox.checkup.recipe_sync_error', 'Could not reach Companion to sync recipe. Ensure Companion is running.'));
+                return;
+            }
+
+            toast.success(
+                t('toolbox.checkup.recipe_synced_success', 'Recipe synced to Companion! Resolved version: {{version}}', {
+                    version: res.resolvedVersion || 'OK'
+                })
+            );
+            if (res.resolvedVersion) {
+                setRecipeResolvedPreview(res.resolvedVersion);
+                setDevicePropsCache(prev => ({
+                    ...prev,
+                    'ro.pos.firmware.version': res.resolvedVersion!,
+                    'POS Firmware': res.resolvedVersion!
+                }));
+            }
+            setIsRecipeModalOpen(false);
+        } catch (e: any) {
+            toast.error(e?.message || 'Error syncing recipe');
+        } finally {
+            setIsSyncingRecipe(false);
+        }
+    };
 
     // Companion BDD Tests state
     const [companionBddSuites, setCompanionBddSuites] = useState<CompanionBddSuite[]>(() => cachedCheckup?.companionBddSuites ?? []);
@@ -501,7 +599,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         try {
             try {
                 await invoke('start_companion_forward', { device: selectedDevice, localPort: 9876, remotePort: 9876 });
-            } catch (_) {}
+            } catch (_) { }
 
             let data = await callCompanionRest<{ status: string; suites: any[] }>('/rrt/suites');
             if (!data || data.status !== 'ok' || !Array.isArray(data.suites) || data.suites.length === 0) {
@@ -562,7 +660,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 try {
                     try {
                         await invoke('start_companion_forward', { device: selectedDevice, localPort: 9876, remotePort: 9876 });
-                    } catch (_) {}
+                    } catch (_) { }
 
                     const c = await callCompanionRest<any>('/device/info');
                     if (c && c.status === 'ok') {
@@ -573,6 +671,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         if (c.androidVersion) newProps['ro.build.version.release'] = c.androidVersion;
                         if (c.sdkInt) newProps['ro.build.version.sdk'] = String(c.sdkInt);
                         if (c.serial) newProps['ro.serialno'] = c.serial;
+                        if (c.posFirmwareVersion) {
+                            newProps['ro.pos.firmware.version'] = String(c.posFirmwareVersion);
+                            newProps['POS Firmware'] = String(c.posFirmwareVersion);
+                        }
                         if (c.specs && typeof c.specs === 'object') {
                             for (const [k, v] of Object.entries(c.specs)) {
                                 if (v !== undefined && v !== null && String(v).trim() !== '') {
@@ -3502,6 +3604,20 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     actions={
                         <div className="flex items-center gap-2">
                             {renderVerifiedButton('interactiveTests')}
+
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setIsRecipeModalOpen(true)}
+                                aria-label={t('toolbox.checkup.firmware_recipe_title', 'POS Firmware Recipe')}
+                                title={t('toolbox.checkup.firmware_recipe_title', 'POS Firmware Recipe')}
+                                data-position="left"
+                                disabled={disabled}
+                                className="h-8 px-2.5 text-xs flex items-center gap-1.5 text-secondary hover:bg-secondary/10 border border-secondary/20"
+                            >
+                                <Cpu size={14} />
+                                <span>{t('toolbox.checkup.firmware_recipe_btn', 'Firmware Recipe')}</span>
+                            </Button>
                             <div className="text-xs text-on-surface-variant flex items-center gap-1.5">
                                 {companionStatus === 'connected' ? (
                                     <><span className="w-2 h-2 rounded-full bg-success animate-pulse"></span> {t('toolbox.checkup.live_sync', 'Live Sync')}</>
@@ -4118,6 +4234,76 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         data-position="top"
                     >
                         {t('common.save', 'Save')}
+                    </Button>
+                </div>
+            </Modal>
+
+            {/* POS Firmware Recipe Modal */}
+            <Modal
+                isOpen={isRecipeModalOpen}
+                onClose={() => setIsRecipeModalOpen(false)}
+                title={t('toolbox.checkup.recipe_modal_title', 'POS Firmware Recipe Configuration')}
+                className="max-w-2xl"
+            >
+                <div className="flex flex-col gap-4">
+                    <p className="text-xs text-on-surface-variant leading-relaxed">
+                        {t('toolbox.checkup.recipe_modal_desc', 'Configure the JSON formula with properties, regex rules, and dynamic Java reflection to resolve the exact firmware version of any POS device. Click Sync to push it directly to the connected Companion.')}
+                    </p>
+
+                    <div>
+                        <div className="flex items-center justify-between mb-1">
+                            <label className="text-xs font-semibold text-on-surface">
+                                {t('toolbox.checkup.recipe_json_label', 'Recipe JSON')}
+                            </label>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDesktopRecipeJson(defaultDesktopSampleRecipe)}
+                                className="h-6 text-[11px] px-2 text-primary hover:bg-primary/10"
+                                title={t('toolbox.checkup.load_template', 'Load Template')}
+                            >
+                                {t('toolbox.checkup.load_template', 'Load Template')}
+                            </Button>
+                        </div>
+                        <Textarea
+                            value={desktopRecipeJson}
+                            onChange={(e) => setDesktopRecipeJson(e.target.value)}
+                            rows={12}
+                            className="font-mono text-xs leading-tight bg-surface-variant/30 border-outline-variant/40"
+                            placeholder="{ ... }"
+                        />
+                    </div>
+
+                    {recipeResolvedPreview && (
+                        <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-between">
+                            <span className="text-xs font-medium text-on-surface">
+                                {t('toolbox.checkup.last_resolved_version', 'Last Resolved Version:')}
+                            </span>
+                            <span className="text-xs font-mono font-bold text-primary">
+                                {recipeResolvedPreview}
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-outline-variant/30">
+                    <Button
+                        variant="ghost"
+                        onClick={() => setIsRecipeModalOpen(false)}
+                        disabled={isSyncingRecipe}
+                        title={t('common.cancel', 'Cancel')}
+                    >
+                        {t('common.cancel', 'Cancel')}
+                    </Button>
+                    <Button
+                        variant="primary"
+                        onClick={syncRecipeToCompanion}
+                        disabled={isSyncingRecipe || !desktopRecipeJson.trim()}
+                        title={t('toolbox.checkup.sync_to_companion', 'Sync to Companion')}
+                        className="flex items-center gap-1.5"
+                    >
+                        {isSyncingRecipe ? <ExpressiveLoading size="sm" /> : <Cpu size={14} />}
+                        <span>{t('toolbox.checkup.sync_to_companion', 'Sync to Companion')}</span>
                     </Button>
                 </div>
             </Modal>
