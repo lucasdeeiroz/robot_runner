@@ -4884,7 +4884,10 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         secondaryActions={[
                             {
                                 label: t('toolbox.checkup.report.verify_with_ai', 'Verify with AI'),
-                                onClick: () => setIsAiVerifyModalOpen(true)
+                                onClick: () => {
+                                    setIsReportModalOpen(false);
+                                    setIsAiVerifyModalOpen(true);
+                                }
                             }
                         ]}
                     />
@@ -5000,7 +5003,11 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             {/* AI Verify Modal */}
             <Modal
                 isOpen={isAiVerifyModalOpen}
-                onClose={() => setIsAiVerifyModalOpen(false)}
+                onClose={() => {
+                    setIsAiVerifyModalOpen(false);
+                    setIsReportModalOpen(true);
+                }}
+                zIndex={150100}
                 title={t('toolbox.checkup.report.ai_verify_title', 'Verify with AI')}
                 className="max-w-3xl w-[90vw]"
             >
@@ -5017,7 +5024,13 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     />
                 </div>
                 <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-outline-variant/30">
-                    <Button variant="ghost" onClick={() => setIsAiVerifyModalOpen(false)} disabled={isAiVerifying}
+                    <Button
+                        variant="ghost"
+                        onClick={() => {
+                            setIsAiVerifyModalOpen(false);
+                            setIsReportModalOpen(true);
+                        }}
+                        disabled={isAiVerifying}
                         title={t('toolbox.checkup.report.cancel', 'Cancel')}
                         data-position="top"
                     >
