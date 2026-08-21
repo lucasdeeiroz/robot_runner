@@ -170,9 +170,9 @@ export function TestsPage({ onNavigate }: TestsPageProps) {
         if (activeSessionId !== 'dashboard') {
             setSubTab(activeSessionId);
         } else {
-            setSubTab(isExplorer ? (sessions.length > 0 ? sessions[0].runId : 'reports') : 'history');
+            setSubTab(prev => (prev === 'history' || prev === 'reports') ? prev : (isExplorer ? 'reports' : 'history'));
         }
-    }, [activeSessionId, isExplorer, sessions]);
+    }, [activeSessionId, isExplorer]);
 
     const handleTabChange = (id: string) => {
         setSubTab(id);
