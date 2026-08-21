@@ -250,6 +250,18 @@ async fn execute_adb_with_piped_stdin(
     Ok(output)
 }
 
+static COMPANION_HTTP_CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+
+fn get_companion_client() -> &'static reqwest::Client {
+    COMPANION_HTTP_CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .pool_idle_timeout(Duration::from_secs(30))
+            .tcp_keepalive(Some(Duration::from_secs(15)))
+            .build()
+            .unwrap_or_default()
+    })
+}
+
 async fn send_companion_http_request(
     app: &AppHandle,
     device: Option<String>,
@@ -264,29 +276,27 @@ async fn send_companion_http_request(
     let url = format!("http://127.0.0.1:{}{}", p, clean_endpoint);
     let m = method.to_uppercase();
 
-    // 1. Try Direct HTTP via reqwest
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(timeout_ms))
-        .build();
+    // 1. Try Direct HTTP via shared pooled reqwest client
+    let client = get_companion_client();
+    let req_builder = match m.as_str() {
+        "GET" => client.get(&url),
+        "PUT" => if let Some(body) = payload { client.put(&url).header("Content-Type", "application/json").body(body.to_string()) } else { client.put(&url) },
+        "DELETE" => client.delete(&url),
+        _ => if let Some(body) = payload { client.post(&url).header("Content-Type", "application/json").body(body.to_string()) } else { client.post(&url) }
+    };
 
-    if let Ok(c) = client {
-        let req_builder = match m.as_str() {
-            "GET" => c.get(&url),
-            "PUT" => if let Some(body) = payload { c.put(&url).header("Content-Type", "application/json").body(body.to_string()) } else { c.put(&url) },
-            "DELETE" => c.delete(&url),
-            _ => if let Some(body) = payload { c.post(&url).header("Content-Type", "application/json").body(body.to_string()) } else { c.post(&url) }
-        };
-
-        if let Ok(resp) = req_builder.send().await {
+    if let Ok(resp) = req_builder.timeout(Duration::from_millis(timeout_ms)).send().await {
+        if resp.status().is_success() {
             if let Ok(text) = resp.text().await {
-                if !text.trim().is_empty() {
-                    return Ok(text);
+                let trimmed = text.trim();
+                if !trimmed.is_empty() {
+                    return Ok(trimmed.to_string());
                 }
             }
         }
     }
 
-    // 2. Fallback: ADB Shell Tunneling via toybox nc / nc (for POS terminals or blocked forwards)
+    // 2. Fallback: ADB Shell Tunneling (for POS terminals or blocked forwards)
     let target_dev = device.or_else(|| {
         ACTIVE_COMPANION_DEVICE.lock().ok().and_then(|g| g.clone())
     });
@@ -321,24 +331,30 @@ async fn send_companion_http_request(
         if let Some(body_start) = normalized.find("\n\n") {
             let body = normalized[body_start + 2..].trim();
             if !body.is_empty() {
-                return Ok(body.to_string());
+                if serde_json::from_str::<serde_json::Value>(body).is_ok() {
+                    return Ok(body.to_string());
+                }
             }
         }
         
         if let Some(first_brace) = raw_stdout.find('{') {
             if let Some(last_brace) = raw_stdout.rfind('}') {
                 if last_brace >= first_brace {
-                    return Ok(raw_stdout[first_brace..=last_brace].trim().to_string());
+                    let candidate = raw_stdout[first_brace..=last_brace].trim();
+                    if serde_json::from_str::<serde_json::Value>(candidate).is_ok() {
+                        return Ok(candidate.to_string());
+                    }
                 }
             }
         } else if let Some(first_bracket) = raw_stdout.find('[') {
             if let Some(last_bracket) = raw_stdout.rfind(']') {
                 if last_bracket >= first_bracket {
-                    return Ok(raw_stdout[first_bracket..=last_bracket].trim().to_string());
+                    let candidate = raw_stdout[first_bracket..=last_bracket].trim();
+                    if serde_json::from_str::<serde_json::Value>(candidate).is_ok() {
+                        return Ok(candidate.to_string());
+                    }
                 }
             }
-        } else if output.status.success() && !raw_stdout.trim().is_empty() {
-            return Ok(raw_stdout.trim().to_string());
         }
     }
 

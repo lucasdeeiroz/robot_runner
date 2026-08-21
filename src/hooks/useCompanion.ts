@@ -81,21 +81,28 @@ interface CompanionDeviceCache {
 const companionCacheMap = new Map<string, CompanionDeviceCache>();
 const companionListeners = new Set<(device: string, cache: CompanionDeviceCache) => void>();
 const connectingDevicesSet = new Set<string>();
+const companionPollIntervals = new Map<string, NodeJS.Timeout>();
+const companionActiveHooksCount = new Map<string, number>();
 
 function safeParseCompanionJson<T = any>(raw: string): T {
     const trimmed = (raw || '').trim();
-    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    if (!trimmed) return {} as T;
+    try {
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+            return JSON.parse(trimmed);
+        }
+        const firstBrace = trimmed.indexOf('{');
+        const firstBracket = trimmed.indexOf('[');
+        const startIndex = (firstBrace !== -1 && firstBracket !== -1)
+            ? Math.min(firstBrace, firstBracket)
+            : (firstBrace !== -1 ? firstBrace : firstBracket);
+        if (startIndex !== -1) {
+            return JSON.parse(trimmed.slice(startIndex));
+        }
         return JSON.parse(trimmed);
+    } catch (_) {
+        return { status: 'error', message: 'Malformed JSON payload' } as unknown as T;
     }
-    const firstBrace = trimmed.indexOf('{');
-    const firstBracket = trimmed.indexOf('[');
-    const startIndex = (firstBrace !== -1 && firstBracket !== -1)
-        ? Math.min(firstBrace, firstBracket)
-        : (firstBrace !== -1 ? firstBrace : firstBracket);
-    if (startIndex !== -1) {
-        return JSON.parse(trimmed.slice(startIndex));
-    }
-    return JSON.parse(trimmed);
 }
 
 function updateCompanionCache(device: string, updates: Partial<CompanionDeviceCache>) {
@@ -110,13 +117,52 @@ function updateCompanionCache(device: string, updates: Partial<CompanionDeviceCa
     companionListeners.forEach(listener => listener(device, updated));
 }
 
+function startCompanionPolling(device: string, port: number) {
+    if (companionPollIntervals.has(device)) {
+        clearInterval(companionPollIntervals.get(device)!);
+    }
+    const interval = setInterval(async () => {
+        try {
+            // 1. Stats
+            const rawInfo = await invoke<string>('fetch_companion_info', { port, device });
+            const data = safeParseCompanionJson<CompanionDeviceInfo>(rawInfo);
+            if (data && data.status !== 'error') {
+                updateCompanionCache(device, { deviceInfo: data, status: 'connected', lastConnectedAt: Date.now() });
+            }
+            // 2. Events
+            const rawEvents = await invoke<string>('fetch_companion_events', { port, device });
+            const parsedEvents = safeParseCompanionJson(rawEvents);
+            if (parsedEvents?.status === 'ok' && Array.isArray(parsedEvents.events)) {
+                updateCompanionCache(device, { recentEvents: parsedEvents.events });
+            }
+            // 3. Snippet
+            const snippet = await invoke<string | null>('fetch_companion_pending_snippet', { port, device });
+            if (snippet) {
+                setGlobalIncomingSnippet({
+                    deviceUdid: device,
+                    content: snippet,
+                    timestamp: Date.now()
+                });
+            }
+        } catch (_) {}
+    }, 3000);
+    companionPollIntervals.set(device, interval);
+}
+
+function stopCompanionPolling(device: string) {
+    const timer = companionPollIntervals.get(device);
+    if (timer) {
+        clearInterval(timer);
+        companionPollIntervals.delete(device);
+    }
+}
+
 export function useCompanion(selectedDevice: string | null) {
     const initialCache = selectedDevice ? companionCacheMap.get(selectedDevice) : null;
     const [status, setStatusState] = useState<CompanionStatus>(initialCache?.status ?? 'disconnected');
     const [isInstalled, setIsInstalledState] = useState<boolean | null>(initialCache?.isInstalled ?? null);
     const [deviceInfo, setDeviceInfoState] = useState<CompanionDeviceInfo | null>(initialCache?.deviceInfo ?? null);
     const [recentEvents, setRecentEventsState] = useState<CompanionEventItem[]>(initialCache?.recentEvents ?? []);
-    const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const { settings } = useSettings();
     const { user } = useAuth();
     const [incomingSnippet, setIncomingSnippet] = useState<IncomingSnippetData | null>(globalIncomingSnippet);
@@ -230,13 +276,14 @@ export function useCompanion(selectedDevice: string | null) {
     const fetchRecentEvents = useCallback(async (port = 9876) => {
         try {
             const rawJson = await invoke<string>('fetch_companion_events', { port, device: selectedDevice });
+            if (!rawJson) return [];
             const parsed = safeParseCompanionJson(rawJson);
-            if (parsed.status === 'ok' && Array.isArray(parsed.events)) {
+            if (parsed?.status === 'ok' && Array.isArray(parsed.events)) {
                 setRecentEvents(parsed.events);
                 return parsed.events as CompanionEventItem[];
             }
-        } catch (e) {
-            console.error("[useCompanion] Failed to fetch recent events:", e);
+        } catch (_) {
+            // Silently swallow transient polling errors
         }
         return [];
     }, [selectedDevice]);
@@ -371,13 +418,16 @@ export function useCompanion(selectedDevice: string | null) {
             return null;
         }
     }, [user, selectedDevice]);
-
-    const connectCompanion = useCallback(async () => {
+    const connectCompanion = useCallback(async (force = false) => {
         if (!selectedDevice) return;
+        const currentCache = companionCacheMap.get(selectedDevice);
+        if (!force && currentCache?.status === 'connected' && companionPollIntervals.has(selectedDevice)) {
+            return;
+        }
         if (connectingDevicesSet.has(selectedDevice)) return;
         connectingDevicesSet.add(selectedDevice);
 
-        const isAlreadyConnected = companionCacheMap.get(selectedDevice)?.status === 'connected';
+        const isAlreadyConnected = currentCache?.status === 'connected';
         if (!isAlreadyConnected) {
             setStatus('connecting');
         }
@@ -459,12 +509,7 @@ export function useCompanion(selectedDevice: string | null) {
                     port
                 );
                 syncHostInfo(port);
-                if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-                pollIntervalRef.current = setInterval(() => {
-                    fetchDeviceStats(port);
-                    fetchRecentEvents(port);
-                    fetchPendingSnippet(port);
-                }, 3000);
+                startCompanionPolling(selectedDevice, port);
             } else {
                 console.warn("[useCompanion] Initial HTTP fetch failed. Attempting silent launch of Companion app...");
                 try {
@@ -483,12 +528,7 @@ export function useCompanion(selectedDevice: string | null) {
                                 port
                             );
                             syncHostInfo(port);
-                            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-                            pollIntervalRef.current = setInterval(() => {
-                                fetchDeviceStats(port);
-                                fetchRecentEvents(port);
-                                fetchPendingSnippet(port);
-                            }, 3000);
+                            startCompanionPolling(selectedDevice, port);
                         } else {
                             setStatus('disconnected');
                         }
@@ -503,7 +543,7 @@ export function useCompanion(selectedDevice: string | null) {
         } finally {
             connectingDevicesSet.delete(selectedDevice);
         }
-    }, [selectedDevice, checkInstallation, fetchDeviceStats, fetchRecentEvents, fetchPendingSnippet, syncTheme, syncHostInfo, settings.theme, settings.primaryColor, settings.customLogoLight, settings.customLogoDark, user]);
+    }, [selectedDevice, checkInstallation, fetchDeviceStats, syncTheme, syncHostInfo, settings.theme, settings.primaryColor, settings.customLogoLight, settings.customLogoDark, user]);
 
     const launchCompanion = useCallback(async () => {
         if (!selectedDevice) return;
@@ -511,7 +551,7 @@ export function useCompanion(selectedDevice: string | null) {
             console.log("[useCompanion] Launching Companion App...");
             await invoke('launch_companion_app', { device: selectedDevice });
             setTimeout(() => {
-                connectCompanion();
+                connectCompanion(true);
             }, 1200);
         } catch (e) {
             console.error("[useCompanion] Failed to launch companion app:", e);
@@ -564,7 +604,7 @@ export function useCompanion(selectedDevice: string | null) {
                     settings.primaryColor || '#6366F1', 
                     (user?.displayName || user?.email) ?? undefined, 
                     user?.email ?? undefined, 
-                    user?.photoURL ?? undefined,
+                    user?.photoURL ?? undefined, 
                     logoBase64
                 );
             };
@@ -591,43 +631,44 @@ export function useCompanion(selectedDevice: string | null) {
         return triggerAction('/action/tap', { x, y });
     }, [triggerAction]);
 
-    const connectedDeviceTrackRef = useRef<string | null>(null);
-
     useEffect(() => {
         if (selectedDevice) {
+            const count = (companionActiveHooksCount.get(selectedDevice) || 0) + 1;
+            companionActiveHooksCount.set(selectedDevice, count);
+
             const cached = companionCacheMap.get(selectedDevice);
-            if (cached?.status === 'connected') {
-                setStatus('connected');
-                setDeviceInfo(cached.deviceInfo);
-                setRecentEvents(cached.recentEvents);
-                setIsInstalled(cached.isInstalled);
+            if (cached) {
+                setStatusState(cached.status);
+                setDeviceInfoState(cached.deviceInfo);
+                setRecentEventsState(cached.recentEvents);
+                setIsInstalledState(cached.isInstalled);
             }
-            if (connectedDeviceTrackRef.current !== selectedDevice) {
-                connectedDeviceTrackRef.current = selectedDevice;
+
+            if (cached?.status !== 'connected' || !companionPollIntervals.has(selectedDevice)) {
                 checkInstallation().then(installed => {
                     if (installed) {
-                        connectCompanion();
+                        connectCompanion(false);
                     }
                 });
             }
         } else {
-            connectedDeviceTrackRef.current = null;
-            setStatus('disconnected');
-            setDeviceInfo(null);
-            setRecentEvents([]);
-            if (pollIntervalRef.current) {
-                clearInterval(pollIntervalRef.current);
-                pollIntervalRef.current = null;
-            }
+            setStatusState('disconnected');
+            setDeviceInfoState(null);
+            setRecentEventsState([]);
         }
 
         return () => {
-            if (pollIntervalRef.current) {
-                clearInterval(pollIntervalRef.current);
-                pollIntervalRef.current = null;
+            if (selectedDevice) {
+                const count = (companionActiveHooksCount.get(selectedDevice) || 1) - 1;
+                if (count <= 0) {
+                    companionActiveHooksCount.delete(selectedDevice);
+                    stopCompanionPolling(selectedDevice);
+                } else {
+                    companionActiveHooksCount.set(selectedDevice, count);
+                }
             }
         };
-    }, [selectedDevice]);;
+    }, [selectedDevice, checkInstallation, connectCompanion]);
 
     const fetchArtifacts = useCallback(async (port = 9876) => {
         try {
@@ -703,6 +744,7 @@ export function useCompanion(selectedDevice: string | null) {
         syncHostInfo,
         pushActivityEvent,
         incomingSnippet,
-        clearIncomingSnippet
+        clearIncomingSnippet,
+        fetchPendingSnippet
     };
 }

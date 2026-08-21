@@ -183,11 +183,13 @@ class CompanionHttpServer(
 
             "/events/recent" -> {
                 val array = JsonArray()
-                CompanionAccessibilityService.recentEvents.forEach { evt ->
+                val snapshot = CompanionAccessibilityService.recentEvents.toList()
+                snapshot.takeLast(25).forEach { evt ->
                     val obj = JsonObject().apply {
                         addProperty("type", evt.type)
                         addProperty("packageName", evt.packageName)
-                        addProperty("message", evt.message)
+                        val msg = if (evt.message.length > 300) evt.message.take(300) + "..." else evt.message
+                        addProperty("message", msg)
                         addProperty("timestamp", evt.timestamp)
                     }
                     array.add(obj)
@@ -1230,23 +1232,23 @@ class CompanionHttpServer(
     private fun getInstalledAppsPayload(): JsonObject {
         return try {
             val pm = context.packageManager
-            val apps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+            val packages = pm.getInstalledPackages(0)
             val array = JsonArray()
 
-            for (app in apps) {
+            for (pkg in packages) {
+                val app = pkg.applicationInfo ?: continue
                 val obj = JsonObject().apply {
-                    addProperty("name", app.packageName)
-                    addProperty("label", app.loadLabel(pm).toString())
+                    addProperty("name", pkg.packageName)
+                    val label = try {
+                        app.loadLabel(pm)?.toString()?.takeIf { it.isNotBlank() } ?: pkg.packageName
+                    } catch (_: Throwable) {
+                        pkg.packageName
+                    }
+                    addProperty("label", label)
                     addProperty("path", app.sourceDir ?: "")
                     addProperty("is_system", (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0)
                     addProperty("is_disabled", !app.enabled)
-
-                    var version = ""
-                    try {
-                        val pkgInfo = pm.getPackageInfo(app.packageName, 0)
-                        version = pkgInfo.versionName ?: ""
-                    } catch (_: Exception) {}
-                    addProperty("version", version)
+                    addProperty("version", pkg.versionName ?: "")
                 }
                 array.add(obj)
             }
