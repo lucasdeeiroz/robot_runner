@@ -48,7 +48,7 @@ export function matchesFilterPattern(text: string, pattern: string): boolean {
             return text.toLowerCase().includes(trimmed.toLowerCase());
         }
     }
-    return text.startsWith(trimmed) || text.includes(trimmed);
+    return text.toLowerCase().startsWith(trimmed.toLowerCase());
 }
 
 export function extractTextsFromXml(xmlOrJsonString: string): string[] {
@@ -2833,11 +2833,9 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             // Extra Props (if enabled)
             if (comparisons.length > 0 && reportShowPropsBase) {
                 let extraProps = comparisons.filter(c => c.isExtra);
-                if (propsFilterPrefixes.length > 0) {
+                if (basePropsPrefixes.length > 0) {
                     extraProps = extraProps.filter(c => {
-                        const matchesPrefix = propsFilterPrefixes.some(prefix => matchesFilterPattern(c.key, prefix));
-                        if (propsFilterMode === 'include') return matchesPrefix;
-                        return !matchesPrefix;
+                        return basePropsPrefixes.some(prefix => matchesFilterPattern(c.key, prefix));
                     });
                 }
                 if (extraProps.length > 0) {
