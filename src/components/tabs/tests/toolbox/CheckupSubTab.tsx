@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
-import { useSettings } from '@/lib/settings';
+import { useSettings, AppSettings } from '@/lib/settings';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readTextFile, writeTextFile, readFile } from '@tauri-apps/plugin-fs';
 import { tempDir, join } from '@tauri-apps/api/path';
@@ -11,7 +11,7 @@ import {
     ListPlus, Info, Download, Filter, FilterX, Play, Plus, Trash2,
     Edit3, Tv, Smartphone, Image as ImageIcon, RefreshCw,
     Layers, CheckSquare, ChevronRight, ChevronDown,
-    SlidersHorizontal, Eye, AlertTriangle, FileCheck, Clock, RotateCcw, Cpu
+    SlidersHorizontal, Eye, AlertTriangle, FileCheck, Clock, RotateCcw, Cpu, Sparkles
 } from 'lucide-react';
 import { Section } from '@/components/organisms/Section';
 import { Modal } from '@/components/organisms/Modal';
@@ -21,6 +21,11 @@ import { Textarea } from '@/components/atoms/Textarea';
 import { SplitButton } from '@/components/molecules/SplitButton';
 import { askAgent } from '@/lib/ai/agentService';
 import { getReportVerificationPrompt } from '@/lib/dashboard/prompts';
+import { askAntigravityCli } from '@/lib/dashboard/antigravityCode';
+import { askClaudeCode } from '@/lib/dashboard/claudeCode';
+import * as gemini from '@/lib/dashboard/gemini';
+import * as claude from '@/lib/dashboard/claude';
+import * as openai from '@/lib/dashboard/openai';
 import clsx from 'clsx';
 import { ExpressiveLoading } from '@/components/atoms/ExpressiveLoading';
 import { toast } from 'sonner';
@@ -175,6 +180,9 @@ export interface ManualCheckItem {
     valueImageBase64?: string;
     status: 'pass' | 'fail' | 'na';
     notes?: string;
+    extractedTexts?: string[];
+    expectedTexts?: string[];
+    isGoldenMatch?: boolean;
 }
 
 export interface CompanionBddSuite {
@@ -251,6 +259,457 @@ const normalizePropVal = (v: string | undefined | null): string => {
     const trimmed = String(v).trim();
     return (trimmed === '-' || trimmed === 'null' || trimmed === 'undefined') ? '' : trimmed;
 };
+
+export interface ManualCheckDiffItem {
+    expected?: string;
+    found?: string;
+    status: 'match' | 'missing' | 'extra';
+}
+
+export function computeManualCheckDivergenceDetails(extractedTexts?: string[], expectedTexts?: string[]): {
+    items: ManualCheckDiffItem[];
+    matchCount: number;
+    missingCount: number;
+    extraCount: number;
+    isMatch: boolean;
+} {
+    const normalize = (s: string) => s.trim().toLowerCase().replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ');
+    const stripPunctuation = (s: string) => normalize(s).replace(/[^\p{L}\p{N}\s]/gu, '');
+    const getWords = (s: string) => stripPunctuation(s).split(/\s+/).filter(w => w.length > 0);
+
+    const isMatchPair = (a: string, b: string): boolean => {
+        const normA = normalize(a);
+        const normB = normalize(b);
+        if (!normA || !normB) return false;
+        if (normA === normB) return true;
+
+        const strippedA = stripPunctuation(a);
+        const strippedB = stripPunctuation(b);
+        if (strippedA.length > 0 && strippedB.length > 0 && strippedA === strippedB) return true;
+
+        // Substring match if sufficiently long
+        if (normA.length >= 3 && normB.length >= 3) {
+            if (normA.includes(normB) || normB.includes(normA)) return true;
+        }
+
+        // Word overlap match
+        const wordsA = getWords(a);
+        const wordsB = getWords(b);
+        if (wordsA.length > 1 && wordsB.length > 1) {
+            const allAInB = wordsA.every(w => wordsB.includes(w));
+            const allBInA = wordsB.every(w => wordsA.includes(w));
+            if (allAInB || allBInA) return true;
+        }
+        return false;
+    };
+
+    const expList = (expectedTexts || []).map(t => String(t).trim()).filter(t => t.length > 0);
+    const extList = (extractedTexts || []).map(t => String(t).trim()).filter(t => t.length > 0);
+
+    const matchedExpIndices = new Set<number>();
+    const matchedExtIndices = new Set<number>();
+    const diffItems: ManualCheckDiffItem[] = [];
+
+    // Pass 1: 1-to-1 exact & high-confidence matches
+    for (let i = 0; i < expList.length; i++) {
+        if (matchedExpIndices.has(i)) continue;
+        const normExp = normalize(expList[i]);
+        const strippedExp = stripPunctuation(expList[i]);
+
+        let foundIdx = -1;
+        // Check exact match
+        for (let j = 0; j < extList.length; j++) {
+            if (matchedExtIndices.has(j)) continue;
+            if (normalize(extList[j]) === normExp) {
+                foundIdx = j;
+                break;
+            }
+        }
+        // Check stripped match
+        if (foundIdx === -1 && strippedExp.length > 0) {
+            for (let j = 0; j < extList.length; j++) {
+                if (matchedExtIndices.has(j)) continue;
+                if (stripPunctuation(extList[j]) === strippedExp) {
+                    foundIdx = j;
+                    break;
+                }
+            }
+        }
+
+        if (foundIdx >= 0) {
+            matchedExpIndices.add(i);
+            matchedExtIndices.add(foundIdx);
+            diffItems.push({
+                expected: expList[i],
+                found: extList[foundIdx],
+                status: 'match'
+            });
+        }
+    }
+
+    // Pass 2: Sequential concatenation of EXTRACTED/FOUND texts to match a single EXPECTED text
+    // (Handles case when AI split an expected text across multiple sequential items)
+    for (let i = 0; i < expList.length; i++) {
+        if (matchedExpIndices.has(i)) continue;
+        const exp = expList[i];
+        const normExp = normalize(exp);
+        const strippedExp = stripPunctuation(exp);
+
+        let bestStart = -1;
+        let bestCount = 0;
+        let bestFoundStr = '';
+
+        for (let j = 0; j < extList.length; j++) {
+            if (matchedExtIndices.has(j)) continue;
+            // Check if extList[j] is a prefix or contained in exp
+            const normJ = normalize(extList[j]);
+            const strippedJ = stripPunctuation(extList[j]);
+            if (!normExp.includes(normJ) && !(strippedExp.length > 0 && strippedJ.length > 0 && strippedExp.includes(strippedJ))) {
+                continue;
+            }
+
+            // Build contiguous sequence of available unmatched extracted items
+            let accumulatedWithSpace = extList[j];
+            let accumulatedWithoutSpace = extList[j];
+            const currentIndices = [j];
+
+            for (let k = j + 1; k < extList.length; k++) {
+                if (matchedExtIndices.has(k)) break;
+                accumulatedWithSpace += ' ' + extList[k];
+                accumulatedWithoutSpace += extList[k];
+                currentIndices.push(k);
+
+                if (isMatchPair(accumulatedWithSpace, exp) || isMatchPair(accumulatedWithoutSpace, exp)) {
+                    bestStart = j;
+                    bestCount = currentIndices.length;
+                    bestFoundStr = accumulatedWithSpace;
+                    break;
+                }
+                // Stop expanding if concatenation has grown significantly longer than expected
+                if (normalize(accumulatedWithSpace).length > normExp.length + 15) break;
+            }
+
+            if (bestStart >= 0) break;
+        }
+
+        if (bestStart >= 0 && bestCount > 0) {
+            matchedExpIndices.add(i);
+            for (let k = 0; k < bestCount; k++) {
+                matchedExtIndices.add(bestStart + k);
+            }
+            diffItems.push({
+                expected: exp,
+                found: bestFoundStr,
+                status: 'match'
+            });
+        }
+    }
+
+    // Pass 3: Sequential concatenation of EXPECTED texts to match a single EXTRACTED/FOUND text
+    // (Handles case when AI merged multiple sequential expected items into one extracted item)
+    for (let j = 0; j < extList.length; j++) {
+        if (matchedExtIndices.has(j)) continue;
+        const ext = extList[j];
+        const normExt = normalize(ext);
+        const strippedExt = stripPunctuation(ext);
+
+        let bestStart = -1;
+        let bestCount = 0;
+        let bestExpStr = '';
+
+        for (let i = 0; i < expList.length; i++) {
+            if (matchedExpIndices.has(i)) continue;
+            // Check if expList[i] is a prefix or contained in ext
+            const normI = normalize(expList[i]);
+            const strippedI = stripPunctuation(expList[i]);
+            if (!normExt.includes(normI) && !(strippedExt.length > 0 && strippedI.length > 0 && strippedExt.includes(strippedI))) {
+                continue;
+            }
+
+            // Build contiguous sequence of available unmatched expected items
+            let accumulatedWithSpace = expList[i];
+            let accumulatedWithoutSpace = expList[i];
+            const currentIndices = [i];
+
+            for (let k = i + 1; k < expList.length; k++) {
+                if (matchedExpIndices.has(k)) break;
+                accumulatedWithSpace += ' ' + expList[k];
+                accumulatedWithoutSpace += expList[k];
+                currentIndices.push(k);
+
+                if (isMatchPair(accumulatedWithSpace, ext) || isMatchPair(accumulatedWithoutSpace, ext)) {
+                    bestStart = i;
+                    bestCount = currentIndices.length;
+                    bestExpStr = accumulatedWithSpace;
+                    break;
+                }
+                // Stop expanding if concatenation has grown significantly longer than extracted
+                if (normalize(accumulatedWithSpace).length > normExt.length + 15) break;
+            }
+
+            if (bestStart >= 0) break;
+        }
+
+        if (bestStart >= 0 && bestCount > 0) {
+            matchedExtIndices.add(j);
+            for (let k = 0; k < bestCount; k++) {
+                matchedExpIndices.add(bestStart + k);
+            }
+            diffItems.push({
+                expected: bestExpStr,
+                found: ext,
+                status: 'match'
+            });
+        }
+    }
+
+    // Pass 4: Substring / Word Overlap 1-to-1 matches for remaining unmatched pairs
+    for (let i = 0; i < expList.length; i++) {
+        if (matchedExpIndices.has(i)) continue;
+        for (let j = 0; j < extList.length; j++) {
+            if (matchedExtIndices.has(j)) continue;
+            if (isMatchPair(expList[i], extList[j])) {
+                matchedExpIndices.add(i);
+                matchedExtIndices.add(j);
+                diffItems.push({
+                    expected: expList[i],
+                    found: extList[j],
+                    status: 'match'
+                });
+                break;
+            }
+        }
+    }
+
+    // Pass 5: Unmatched Expected (Missing)
+    for (let i = 0; i < expList.length; i++) {
+        if (!matchedExpIndices.has(i)) {
+            diffItems.push({
+                expected: expList[i],
+                found: undefined,
+                status: 'missing'
+            });
+        }
+    }
+
+    // Pass 6: Unmatched Extracted (Extra)
+    for (let j = 0; j < extList.length; j++) {
+        if (!matchedExtIndices.has(j)) {
+            diffItems.push({
+                expected: undefined,
+                found: extList[j],
+                status: 'extra'
+            });
+        }
+    }
+
+    const matchCount = diffItems.filter(d => d.status === 'match').length;
+    const missingCount = diffItems.filter(d => d.status === 'missing').length;
+    const extraCount = diffItems.filter(d => d.status === 'extra').length;
+
+    return {
+        items: diffItems,
+        matchCount,
+        missingCount,
+        extraCount,
+        isMatch: expList.length > 0 && missingCount === 0
+    };
+}
+
+export function computeManualCheckGoldenMatch(extractedTexts?: string[], expectedTexts?: string[]): boolean | undefined {
+    if (!expectedTexts || expectedTexts.length === 0) return undefined;
+    if (!extractedTexts || extractedTexts.length === 0) return false;
+    const diff = computeManualCheckDivergenceDetails(extractedTexts, expectedTexts);
+    return diff.isMatch;
+}
+
+export function computeUiTextCheckGoldenMatch(foundTexts?: string[], expectedTexts?: string[]): boolean | undefined {
+    if (!expectedTexts || expectedTexts.length === 0) return undefined;
+    if (!foundTexts || foundTexts.length === 0) return false;
+    const expectedNormalized = expectedTexts.map(t => t.replace(/\s+/g, ' ').trim());
+    const foundNormalized = foundTexts.map(t => t.replace(/\s+/g, ' ').trim());
+    const exactOrderMatch = expectedNormalized.length === foundNormalized.length &&
+        expectedNormalized.every((val, idx) => val === foundNormalized[idx]);
+    const setMatch = expectedNormalized.length === foundNormalized.length &&
+        [...expectedNormalized].sort().every((val, idx) => val === [...foundNormalized].sort()[idx]);
+    if (exactOrderMatch || setMatch) return true;
+
+    const diff = computeManualCheckDivergenceDetails(foundTexts, expectedTexts);
+    return diff.isMatch;
+}
+
+export const optimizeImageDataUrl = (dataUrl: string, maxDimension = 1600, quality = 0.85): Promise<string> => {
+    return new Promise((resolve) => {
+        if (!dataUrl || !dataUrl.startsWith('data:image')) {
+            resolve(dataUrl);
+            return;
+        }
+        const img = new Image();
+        img.onload = () => {
+            let { width, height } = img;
+            if (width <= maxDimension && height <= maxDimension && dataUrl.length < 400000) {
+                resolve(dataUrl);
+                return;
+            }
+            if (width > height) {
+                if (width > maxDimension) {
+                    height = Math.round((height * maxDimension) / width);
+                    width = maxDimension;
+                }
+            } else {
+                if (height > maxDimension) {
+                    width = Math.round((width * maxDimension) / height);
+                    height = maxDimension;
+                }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                resolve(dataUrl);
+                return;
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+            const optimized = canvas.toDataURL('image/jpeg', quality);
+            resolve(optimized);
+        };
+        img.onerror = () => resolve(dataUrl);
+        img.src = dataUrl;
+    });
+};
+
+export async function extractTextsFromImageWithAI(
+    imageBase64: string,
+    settings: AppSettings,
+    language?: string
+): Promise<string[]> {
+    const provider = settings.aiProvider;
+    const projectRoot = settings.paths?.automationRoot || '';
+    const optimizedImage = await optimizeImageDataUrl(imageBase64);
+    const cleanBase64 = optimizedImage.includes('base64,')
+        ? optimizedImage.split('base64,')[1]
+        : optimizedImage;
+
+    const systemInstruction = `You are an expert OCR and QA visual inspection specialist.
+Analyze the provided image (photo, screen capture, hardware label, product tag, or UI) and extract all visible, legible texts, labels, model numbers, serials, and values in their logical reading order.
+
+Return ONLY a valid JSON object matching this structure:
+{
+  "texts": ["extracted text 1", "extracted text 2", ...]
+}
+Do NOT include markdown backticks, explanations, or any other content outside the JSON object.`;
+
+    const prompt = `Extract all visible and legible texts from this image for automated QA hardware and UI checkup validation. The user interface language context is "${language || 'en'}". Return ONLY a valid JSON object with the 'texts' array.`;
+
+    const jsonSchema = {
+        type: "object",
+        properties: {
+            texts: {
+                type: "array",
+                items: { type: "string" }
+            }
+        },
+        required: ["texts"]
+    };
+
+    let rawResult: any = "";
+
+    if (provider === 'antigravity-cli') {
+        const apiKey = settings.antigravityApiKey || settings.geminiApiKey || undefined;
+        rawResult = await askAntigravityCli(
+            prompt,
+            projectRoot,
+            apiKey,
+            systemInstruction,
+            {
+                imageBase64: cleanBase64,
+                jsonSchema
+            }
+        );
+    } else if (provider === 'claude-code') {
+        const token = settings.claudeCodeToken || settings.claudeApiKey || undefined;
+        rawResult = await askClaudeCode(
+            prompt,
+            projectRoot,
+            systemInstruction,
+            token,
+            {
+                imageBase64: cleanBase64,
+                jsonSchema
+            }
+        );
+    } else if (provider === 'gemini') {
+        rawResult = await gemini.askGemini(
+            prompt,
+            settings.geminiApiKey || '',
+            settings.geminiModel,
+            systemInstruction,
+            cleanBase64
+        );
+    } else if (provider === 'claude') {
+        rawResult = await claude.askClaude(
+            prompt,
+            settings.claudeApiKey || '',
+            settings.claudeModel,
+            systemInstruction,
+            cleanBase64
+        );
+    } else if (provider === 'openai') {
+        rawResult = await openai.askOpenAI(
+            prompt,
+            settings.openaiApiKey || '',
+            settings.openaiModel,
+            systemInstruction,
+            cleanBase64
+        );
+    } else {
+        throw new Error("No AI provider configured in settings");
+    }
+
+    let parsedTexts: string[] = [];
+
+    if (rawResult && typeof rawResult === 'object') {
+        if (Array.isArray(rawResult.texts)) {
+            parsedTexts = rawResult.texts;
+        } else if (rawResult.structured_output && Array.isArray(rawResult.structured_output.texts)) {
+            parsedTexts = rawResult.structured_output.texts;
+        } else if (typeof rawResult.result === 'string') {
+            rawResult = rawResult.result;
+        } else if (typeof rawResult.response === 'string') {
+            rawResult = rawResult.response;
+        }
+    }
+
+    if (parsedTexts.length === 0 && typeof rawResult === 'string') {
+        let cleaned = rawResult.trim();
+        if (cleaned.startsWith('```json')) cleaned = cleaned.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim();
+        else if (cleaned.startsWith('```')) cleaned = cleaned.replace(/^```\s*/i, '').replace(/\s*```$/, '').trim();
+        try {
+            let jsonStr = cleaned;
+            const firstBrace = cleaned.indexOf('{');
+            const lastBrace = cleaned.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace > firstBrace) {
+                jsonStr = cleaned.substring(firstBrace, lastBrace + 1);
+            }
+            const parsed = JSON.parse(jsonStr);
+            if (Array.isArray(parsed.texts)) {
+                parsedTexts = parsed.texts;
+            } else if (Array.isArray(parsed)) {
+                parsedTexts = parsed;
+            }
+        } catch (_) {
+            parsedTexts = cleaned
+                .split('\n')
+                .map(line => line.replace(/^[-*•\d.]+\s*/, '').trim())
+                .filter(line => line.length > 0 && !line.startsWith('{') && !line.startsWith('}') && !line.startsWith('```'));
+        }
+    }
+
+    return parsedTexts
+        .map(t => String(t).trim())
+        .filter(t => t.length > 0);
+}
 
 const defaultDesktopSampleRecipe = JSON.stringify({
     enabled: true,
@@ -358,9 +817,22 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     const [manualCheckType, setManualCheckType] = useState<'text' | 'image'>('text');
     const [manualCheckValueText, setManualCheckValueText] = useState('');
     const [manualCheckValueImage, setManualCheckValueImage] = useState<string | undefined>(undefined);
+    const [manualCheckExtractedTexts, setManualCheckExtractedTexts] = useState<string[]>([]);
+    const [isAnalyzingManualModalImage, setIsAnalyzingManualModalImage] = useState(false);
+    const [analyzingManualCheckId, setAnalyzingManualCheckId] = useState<string | null>(null);
+    const [expandedManualCheckIds, setExpandedManualCheckIds] = useState<Set<string>>(new Set());
     const [manualCheckStatus, setManualCheckStatus] = useState<'pass' | 'fail' | 'na'>('pass');
     const [manualCheckNotes, setManualCheckNotes] = useState('');
     const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
+
+    const toggleExpandManualCheck = (id: string) => {
+        setExpandedManualCheckIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
 
     useEffect(() => {
         localStorage.setItem('checkup_manualChecks', JSON.stringify(manualChecks));
@@ -781,17 +1253,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             }
 
             const extractedTexts = extractTextsFromXml(xmlContent);
-            let isGoldenMatch: boolean | undefined = undefined;
-
-            if (check.expectedTexts && check.expectedTexts.length > 0) {
-                const expectedNormalized = check.expectedTexts.map(t => t.replace(/\s+/g, ' ').trim());
-                const foundNormalized = extractedTexts.map(t => t.replace(/\s+/g, ' ').trim());
-                const exactOrderMatch = expectedNormalized.length === foundNormalized.length &&
-                    expectedNormalized.every((val, idx) => val === foundNormalized[idx]);
-                const setMatch = expectedNormalized.length === foundNormalized.length &&
-                    [...expectedNormalized].sort().every((val, idx) => val === [...foundNormalized].sort()[idx]);
-                isGoldenMatch = exactOrderMatch || setMatch;
-            }
+            const isGoldenMatch = computeUiTextCheckGoldenMatch(extractedTexts, check.expectedTexts);
 
             setUiTextChecks(prev => prev.map(c => c.id === check.id ? {
                 ...c,
@@ -823,8 +1285,9 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             packageComparisons.some(p => p.goldenVersion !== undefined) ||
             Object.values(checkResults).some(r => r.goldenExpected !== undefined) ||
             Object.values(additionalCheckResults).some(r => r.goldenExpected !== undefined) ||
-            uiTextChecks.some(c => c.expectedTexts && c.expectedTexts.length > 0);
-    }, [comparisons, packageComparisons, checkResults, additionalCheckResults, uiTextChecks]);
+            uiTextChecks.some(c => c.expectedTexts && c.expectedTexts.length > 0) ||
+            manualChecks.some(m => m.expectedTexts && m.expectedTexts.length > 0);
+    }, [comparisons, packageComparisons, checkResults, additionalCheckResults, uiTextChecks, manualChecks]);
 
     const handleClearGolden = () => {
         setComparisons([]);
@@ -851,6 +1314,11 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         });
         setUiTextChecks(prev => prev.map(c => ({
             ...c,
+            expectedTexts: [],
+            isGoldenMatch: undefined
+        })));
+        setManualChecks(prev => prev.map(m => ({
+            ...m,
             expectedTexts: [],
             isGoldenMatch: undefined
         })));
@@ -1099,6 +1567,29 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             return false;
         });
     }, [additionalChecks, additionalCheckResults, filterDivergent]);
+
+    const displayedManualChecks = useMemo(() => {
+        if (!filterDivergent) return manualChecks;
+        return manualChecks.filter(m => {
+            if (m.isGoldenMatch !== undefined) {
+                return !m.isGoldenMatch;
+            }
+            return m.status === 'fail';
+        });
+    }, [manualChecks, filterDivergent]);
+
+    const displayedUiTextChecks = useMemo(() => {
+        if (!filterDivergent) return uiTextChecks;
+        return uiTextChecks.filter(c => {
+            if (c.isGoldenMatch !== undefined) {
+                return !c.isGoldenMatch;
+            }
+            if (c.expectedTexts && c.expectedTexts.length > 0) {
+                return true;
+            }
+            return false;
+        });
+    }, [uiTextChecks, filterDivergent]);
 
     const parseDeviceProps = (output: string): Record<string, string> => {
         const props: Record<string, string> = {};
@@ -1364,12 +1855,15 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         const mergedChecks = [...prev];
                         goldenUiChecks.forEach(goldenCheck => {
                             const existingIndex = mergedChecks.findIndex(c => c.id === goldenCheck.id || c.name === goldenCheck.name);
+                            const expectedTexts = goldenCheck.expectedTexts || [];
                             if (existingIndex >= 0) {
+                                const current = mergedChecks[existingIndex];
+                                const isGoldenMatch = computeUiTextCheckGoldenMatch(current.foundTexts, expectedTexts);
                                 mergedChecks[existingIndex] = {
-                                    ...mergedChecks[existingIndex],
-                                    expectedTexts: goldenCheck.expectedTexts || [],
-                                    isGoldenMatch: undefined,
-                                    status: 'idle'
+                                    ...current,
+                                    expectedTexts,
+                                    isGoldenMatch,
+                                    status: current.status || 'idle'
                                 };
                             } else {
                                 mergedChecks.push({
@@ -1378,13 +1872,48 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                     activity: goldenCheck.activity,
                                     delayMs: goldenCheck.delayMs || 1500,
                                     enabled: goldenCheck.enabled !== undefined ? goldenCheck.enabled : true,
-                                    expectedTexts: goldenCheck.expectedTexts || [],
+                                    expectedTexts,
                                     foundTexts: [],
+                                    isGoldenMatch: expectedTexts.length > 0 ? false : undefined,
                                     status: 'idle'
                                 });
                             }
                         });
                         return mergedChecks;
+                    });
+                }
+
+                // Manual Checks Compare
+                if (goldenData.manual_checks && Array.isArray(goldenData.manual_checks)) {
+                    const goldenManualChecks: any[] = goldenData.manual_checks;
+                    setManualChecks(prev => {
+                        const merged = [...prev];
+                        goldenManualChecks.forEach(goldenItem => {
+                            const existingIndex = merged.findIndex(m => m.id === goldenItem.id || m.name === goldenItem.name);
+                            const expectedTexts = goldenItem.expectedTexts || goldenItem.extractedTexts || [];
+                            if (existingIndex >= 0) {
+                                const current = merged[existingIndex];
+                                const isGoldenMatch = computeManualCheckGoldenMatch(current.extractedTexts, expectedTexts);
+                                merged[existingIndex] = {
+                                    ...current,
+                                    expectedTexts,
+                                    isGoldenMatch
+                                };
+                            } else {
+                                merged.push({
+                                    id: goldenItem.id || `manual_check_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+                                    name: goldenItem.name,
+                                    type: goldenItem.type || 'text',
+                                    valueText: goldenItem.valueText,
+                                    status: goldenItem.status || 'pass',
+                                    notes: goldenItem.notes,
+                                    expectedTexts,
+                                    extractedTexts: [],
+                                    isGoldenMatch: expectedTexts.length > 0 ? false : undefined
+                                });
+                            }
+                        });
+                        return merged;
                     });
                 }
 
@@ -1487,12 +2016,63 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 const base64 = btoa(binary);
                 const ext = selected.split('.').pop()?.toLowerCase() || 'png';
                 const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : (ext === 'webp' ? 'image/webp' : 'image/png');
-                const dataUrl = `data:${mime};base64,${base64}`;
+                const rawDataUrl = `data:${mime};base64,${base64}`;
+                const dataUrl = await optimizeImageDataUrl(rawDataUrl);
                 setManualCheckValueImage(dataUrl);
+                setManualCheckExtractedTexts([]);
             }
         } catch (e) {
             console.error("Failed to load image file:", e);
             toast.error(t('toolbox.checkup.image_load_error', 'Failed to load image file'));
+        }
+    };
+
+    const handleAnalyzeModalImageWithAi = async () => {
+        if (!manualCheckValueImage) {
+            toast.error(t('toolbox.checkup.no_image_to_analyze', 'Please select an image first'));
+            return;
+        }
+        setIsAnalyzingManualModalImage(true);
+        const toastId = toast.loading(t('toolbox.checkup.analyzing_image_ai', 'Analyzing image with AI...'));
+        try {
+            const texts = await extractTextsFromImageWithAI(manualCheckValueImage, settings, settings.language);
+            setManualCheckExtractedTexts(texts);
+            if (texts.length > 0) {
+                toast.success(t('toolbox.checkup.texts_extracted_count', 'Extracted {{count}} texts from image', { count: texts.length }), { id: toastId });
+            } else {
+                toast.warning(t('toolbox.checkup.no_texts_found_in_image', 'No text could be extracted from the image'), { id: toastId });
+            }
+        } catch (err: any) {
+            console.error('AI Text Extraction failed:', err);
+            toast.error(t('toolbox.checkup.ai_extraction_error', 'AI Extraction failed: {{error}}', { error: err.message || String(err) }), { id: toastId });
+        } finally {
+            setIsAnalyzingManualModalImage(false);
+        }
+    };
+
+    const handleAnalyzeItemImageWithAi = async (item: ManualCheckItem) => {
+        if (!item.valueImageBase64) return;
+        setAnalyzingManualCheckId(item.id);
+        const toastId = toast.loading(t('toolbox.checkup.analyzing_image_ai', 'Analyzing image with AI...'));
+        try {
+            const texts = await extractTextsFromImageWithAI(item.valueImageBase64, settings, settings.language);
+            const isMatch = computeManualCheckGoldenMatch(texts, item.expectedTexts);
+            setManualChecks(prev => prev.map(c => c.id === item.id ? {
+                ...c,
+                extractedTexts: texts,
+                isGoldenMatch: isMatch
+            } : c));
+            setExpandedManualCheckIds(prev => new Set(prev).add(item.id));
+            if (texts.length > 0) {
+                toast.success(t('toolbox.checkup.texts_extracted_count', 'Extracted {{count}} texts from image', { count: texts.length }), { id: toastId });
+            } else {
+                toast.warning(t('toolbox.checkup.no_texts_found_in_image', 'No text could be extracted from the image'), { id: toastId });
+            }
+        } catch (err: any) {
+            console.error('AI Text Extraction failed:', err);
+            toast.error(t('toolbox.checkup.ai_extraction_error', 'AI Extraction failed: {{error}}', { error: err.message || String(err) }), { id: toastId });
+        } finally {
+            setAnalyzingManualCheckId(null);
         }
     };
 
@@ -1502,6 +2082,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         setManualCheckType('text');
         setManualCheckValueText('');
         setManualCheckValueImage(undefined);
+        setManualCheckExtractedTexts([]);
         setManualCheckStatus('pass');
         setManualCheckNotes('');
         setIsManualCheckModalOpen(true);
@@ -1513,6 +2094,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         setManualCheckType(item.type);
         setManualCheckValueText(item.valueText || '');
         setManualCheckValueImage(item.valueImageBase64);
+        setManualCheckExtractedTexts(item.extractedTexts || []);
         setManualCheckStatus(item.status);
         setManualCheckNotes(item.notes || '');
         setIsManualCheckModalOpen(true);
@@ -1524,12 +2106,18 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             return;
         }
         if (editingManualCheck) {
+            const isGoldenMatch = computeManualCheckGoldenMatch(
+                manualCheckType === 'image' ? manualCheckExtractedTexts : undefined,
+                editingManualCheck.expectedTexts
+            );
             setManualChecks(prev => prev.map(c => c.id === editingManualCheck.id ? {
                 ...c,
                 name: manualCheckName.trim(),
                 type: manualCheckType,
                 valueText: manualCheckType === 'text' ? manualCheckValueText.trim() : undefined,
                 valueImageBase64: manualCheckType === 'image' ? manualCheckValueImage : undefined,
+                extractedTexts: manualCheckType === 'image' && manualCheckExtractedTexts.length > 0 ? manualCheckExtractedTexts : undefined,
+                isGoldenMatch,
                 status: manualCheckStatus,
                 notes: manualCheckNotes.trim() || undefined
             } : c));
@@ -1540,6 +2128,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 type: manualCheckType,
                 valueText: manualCheckType === 'text' ? manualCheckValueText.trim() : undefined,
                 valueImageBase64: manualCheckType === 'image' ? manualCheckValueImage : undefined,
+                extractedTexts: manualCheckType === 'image' && manualCheckExtractedTexts.length > 0 ? manualCheckExtractedTexts : undefined,
                 status: manualCheckStatus,
                 notes: manualCheckNotes.trim() || undefined
             };
@@ -1581,17 +2170,20 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 });
             }
 
-            const resultLabel = reportResult === 'approved'
-                ? t('toolbox.checkup.report.approved', 'Approved')
-                : reportResult === 'rejected'
-                    ? t('toolbox.checkup.report.rejected', 'Rejected')
-                    : t('toolbox.checkup.report.pending', 'Pending');
+            const effectiveReportResult = aiMode ? 'pending' : reportResult;
+            const resultLabel = aiMode
+                ? t('toolbox.checkup.report.ai_evaluating', 'Under AI Evaluation')
+                : (effectiveReportResult === 'approved'
+                    ? t('toolbox.checkup.report.approved', 'Approved')
+                    : effectiveReportResult === 'rejected'
+                        ? t('toolbox.checkup.report.rejected', 'Rejected')
+                        : t('toolbox.checkup.report.pending', 'Pending'));
 
             let html = `<!DOCTYPE html>
 <html lang="${t('language', 'en')}">
 <head>
     <meta charset="UTF-8">
-    <meta name="report-result" content="${reportResult}">
+    <meta name="report-result" content="${effectiveReportResult}">
     <meta name="report-analyst" content="${reportAnalystName}">
     <meta name="report-comments" content="${reportComments.trim().replace(/"/g, '&quot;')}">
     <title>${t('toolbox.checkup.report_title', 'Device Checkup Report')} - ${deviceName} - ${selectedDevice}</title>
@@ -1630,7 +2222,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             <div style="display: flex; gap: 1.5rem; align-items: flex-start; margin-top: 8px; padding: 10px 14px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
                 <div style="flex-shrink: 0;">
                     <strong style="display: block; font-size: 0.72rem; text-transform: uppercase; color: #64748b; margin-bottom: 3px;">${t('toolbox.checkup.report.result', 'Final Result')}</strong>
-                    <span class="badge-result badge-result-${reportResult}">${resultLabel}</span>
+                    <span class="badge-result badge-result-${effectiveReportResult}">${resultLabel}</span>
                 </div>
                 <div style="flex: 1; min-width: 0;">
                     <strong style="display: block; font-size: 0.72rem; text-transform: uppercase; color: #64748b; margin-bottom: 3px;">${t('toolbox.checkup.report.comments', 'Comments / Observations')}</strong>
@@ -1991,10 +2583,20 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             // 6. Manual Checks (if enabled)
             if (reportShowManualChecks !== 'none' && manualChecks.length > 0) {
                 let manualChecksToRender = manualChecks;
-                const compliantManualCount = manualChecks.filter(m => m.status === 'pass').length;
+                const compliantManualCount = manualChecks.filter(m => {
+                    if (m.isGoldenMatch !== undefined) {
+                        return m.isGoldenMatch === true;
+                    }
+                    return m.status === 'pass';
+                }).length;
 
                 if (reportShowManualChecks === 'divergent' || aiMode) {
-                    manualChecksToRender = manualChecks.filter(m => m.status === 'fail');
+                    manualChecksToRender = manualChecks.filter(m => {
+                        if (m.isGoldenMatch !== undefined) {
+                            return !m.isGoldenMatch;
+                        }
+                        return m.status === 'fail';
+                    });
                 }
 
                 if (manualChecksToRender.length > 0) {
@@ -2019,16 +2621,56 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                             <tbody>
                     `;
                     manualChecksToRender.forEach(m => {
-                        const statusClass = m.status === 'pass' ? 'success' : (m.status === 'fail' ? 'error' : 'info');
-                        const statusLabel = m.status === 'pass' ? t('toolbox.checkup.conforme', 'CONFORME') : (m.status === 'fail' ? t('toolbox.checkup.nao_conforme', 'NÃO CONFORME') : 'N/A');
+                        const isPass = m.isGoldenMatch !== undefined ? m.isGoldenMatch === true : m.status === 'pass';
+                        const isFail = m.isGoldenMatch !== undefined ? m.isGoldenMatch === false : m.status === 'fail';
+                        const statusClass = isPass ? 'success' : (isFail ? 'error' : 'info');
+                        const statusLabel = isPass ? t('toolbox.checkup.conforme', 'CONFORME') : (isFail ? t('toolbox.checkup.nao_conforme', 'NÃO CONFORME') : 'N/A');
+
+                        let valueHtml = '';
+                        if (m.type === 'image' && m.valueImageBase64) {
+                            valueHtml = `<img src="${m.valueImageBase64}" class="manual-img" alt="${m.name}" />`;
+                            const hasExtracted = m.extractedTexts && m.extractedTexts.length > 0;
+                            const hasExpected = m.expectedTexts && m.expectedTexts.length > 0;
+                            if (hasExtracted || hasExpected) {
+                                if (hasExpected) {
+                                    const diff = computeManualCheckDivergenceDetails(m.extractedTexts, m.expectedTexts);
+                                    valueHtml += `<div style="margin-top: 8px; max-height: 200px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 4px;">
+                                        <table style="width: 100%; margin: 0; border: none; font-size: 0.8em;">
+                                            <thead style="background: #f8fafc; position: sticky; top: 0;">
+                                                <tr>
+                                                    <th style="padding: 4px 6px; border-bottom: 1px solid #cbd5e1;">${t('toolbox.checkup.expected', 'Expected')}</th>
+                                                    <th style="padding: 4px 6px; border-bottom: 1px solid #cbd5e1;">${t('toolbox.checkup.found', 'Found')}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>`;
+                                    diff.items.forEach(d => {
+                                        const exp = d.expected || '-';
+                                        const fnd = d.found || '-';
+                                        const statusClass = d.status === 'match' ? 'success' : (d.status === 'extra' ? 'info' : 'error');
+                                        valueHtml += `
+                                            <tr>
+                                                <td style="padding: 3px 6px; border-bottom: 1px solid #f1f5f9; word-break: break-all; color: #64748b;">${exp}</td>
+                                                <td style="padding: 3px 6px; border-bottom: 1px solid #f1f5f9; word-break: break-all;" class="${statusClass}">${fnd}</td>
+                                            </tr>`;
+                                    });
+                                    valueHtml += `</tbody></table></div>`;
+                                } else if (hasExtracted) {
+                                    valueHtml += `<div style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px;">`;
+                                    m.extractedTexts!.forEach(t => {
+                                        valueHtml += `<span style="display: inline-block; background: #e0e7ff; color: #3730a3; padding: 2px 6px; border-radius: 4px; font-size: 0.75em;">${t}</span>`;
+                                    });
+                                    valueHtml += `</div>`;
+                                }
+                            }
+                        } else {
+                            valueHtml = `<code>${m.valueText || '-'}</code>`;
+                        }
 
                         html += `
                             <tr>
                                 <td><strong>${m.name}</strong></td>
                                 <td class="${statusClass}"><strong>${statusLabel}</strong></td>
-                                <td>
-                                    ${m.type === 'image' && m.valueImageBase64 ? `<img src="${m.valueImageBase64}" class="manual-img" alt="${m.name}" />` : `<code>${m.valueText || '-'}</code>`}
-                                </td>
+                                <td>${valueHtml}</td>
                                 <td>${m.notes || '-'}</td>
                             </tr>
                         `;
@@ -2040,10 +2682,24 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
             // 7. UI Text Checks (if enabled)
             if (reportShowUiTexts !== 'none' && uiTextChecks.length > 0 && uiTextChecks.some(c => c.enabled)) {
                 let uiTextChecksToRender = uiTextChecks.filter(c => c.enabled);
-                const compliantUiTextCount = uiTextChecks.filter(c => c.enabled && c.isGoldenMatch === true).length;
+                const compliantUiTextCount = uiTextChecks.filter(c => {
+                    if (!c.enabled) return false;
+                    if (c.isGoldenMatch !== undefined) {
+                        return c.isGoldenMatch === true;
+                    }
+                    return Boolean(c.foundTexts && c.foundTexts.length > 0 && (!c.expectedTexts || c.expectedTexts.length === 0));
+                }).length;
 
                 if (reportShowUiTexts === 'divergent' || aiMode) {
-                    uiTextChecksToRender = uiTextChecksToRender.filter(c => c.isGoldenMatch === false);
+                    uiTextChecksToRender = uiTextChecksToRender.filter(c => {
+                        if (c.isGoldenMatch !== undefined) {
+                            return !c.isGoldenMatch;
+                        }
+                        if (c.expectedTexts && c.expectedTexts.length > 0) {
+                            return true;
+                        }
+                        return false;
+                    });
                 }
 
                 if (uiTextChecksToRender.length > 0) {
@@ -2071,12 +2727,15 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         const isMatch = c.isGoldenMatch;
                         const statusText = isMatch !== undefined
                             ? (isMatch ? t('toolbox.checkup.status_match', 'Match') : t('toolbox.checkup.status_mismatch', 'Mismatch'))
-                            : (c.foundTexts && c.foundTexts.length > 0 ? `${c.foundTexts.length} ${t('toolbox.checkup.captured_texts_count', 'captured texts', { count: c.foundTexts.length })}` : (c.status === 'done' ? t('common.done', 'Done') : t('common.pending', 'Pending')));
-                        const statusClass = isMatch !== undefined ? (isMatch ? 'success' : 'error') : (c.foundTexts && c.foundTexts.length > 0 ? 'info' : 'warning');
+                            : (c.expectedTexts && c.expectedTexts.length > 0
+                                ? t('toolbox.checkup.status_mismatch', 'Mismatch')
+                                : (c.foundTexts && c.foundTexts.length > 0 ? `${c.foundTexts.length} ${t('toolbox.checkup.captured_texts_count', 'captured texts', { count: c.foundTexts.length })}` : (c.status === 'done' ? t('common.done', 'Done') : t('common.pending', 'Pending'))));
+                        const statusClass = isMatch !== undefined ? (isMatch ? 'success' : 'error') : (c.expectedTexts && c.expectedTexts.length > 0 ? 'error' : (c.foundTexts && c.foundTexts.length > 0 ? 'info' : 'warning'));
                         const maxLen = Math.max(c.expectedTexts?.length || 0, c.foundTexts?.length || 0);
                         let textsHtml = '';
 
-                        if (maxLen > 0) {
+                        if (c.expectedTexts && c.expectedTexts.length > 0) {
+                            const diff = computeManualCheckDivergenceDetails(c.foundTexts, c.expectedTexts);
                             textsHtml += `<div style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px;">
                                 <table style="width: 100%; margin: 0; border: none; font-size: 0.85em;">
                                     <thead style="background: #f9f9f9; position: sticky; top: 0;">
@@ -2087,16 +2746,32 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                     </thead>
                                     <tbody>`;
 
-                            for (let i = 0; i < maxLen; i++) {
-                                const exp = c.expectedTexts?.[i] || '-';
-                                const fnd = c.foundTexts?.[i] || '-';
-                                const match = exp === fnd;
+                            diff.items.forEach(d => {
+                                const exp = d.expected || '-';
+                                const fnd = d.found || '-';
+                                const itemStatusClass = d.status === 'match' ? 'success' : (d.status === 'extra' ? 'info' : 'error');
                                 textsHtml += `
                                     <tr>
                                         <td style="padding: 4px 8px; border-bottom: 1px solid #f1f5f9; word-break: break-all; color: #555;">${exp}</td>
-                                        <td style="padding: 4px 8px; border-bottom: 1px solid #f1f5f9; word-break: break-all;" class="${match ? 'success' : 'error'}">${fnd}</td>
+                                        <td style="padding: 4px 8px; border-bottom: 1px solid #f1f5f9; word-break: break-all;" class="${itemStatusClass}">${fnd}</td>
                                     </tr>`;
-                            }
+                            });
+                            textsHtml += `</tbody></table></div>`;
+                        } else if (maxLen > 0) {
+                            textsHtml += `<div style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px;">
+                                <table style="width: 100%; margin: 0; border: none; font-size: 0.85em;">
+                                    <thead style="background: #f9f9f9; position: sticky; top: 0;">
+                                        <tr>
+                                            <th style="padding: 4px 8px; border-bottom: 1px solid #ddd;">${t('toolbox.checkup.found', 'Found')}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>`;
+                            (c.foundTexts || []).forEach(fnd => {
+                                textsHtml += `
+                                    <tr>
+                                        <td style="padding: 4px 8px; border-bottom: 1px solid #f1f5f9; word-break: break-all;" class="info">${fnd}</td>
+                                    </tr>`;
+                            });
                             textsHtml += `</tbody></table></div>`;
                         } else {
                             textsHtml = `<em>${t('toolbox.checkup.not_found', 'No texts found')}</em>`;
@@ -2331,6 +3006,17 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     delayMs: c.delayMs || 1500,
                     expectedTexts: c.expectedTexts || [],
                     enabled: c.enabled
+                })),
+                manual_checks: manualChecks.map(m => ({
+                    id: m.id,
+                    name: m.name,
+                    type: m.type,
+                    valueText: m.valueText,
+                    status: m.status,
+                    notes: m.notes,
+                    expectedTexts: (m.expectedTexts && m.expectedTexts.length > 0)
+                        ? m.expectedTexts
+                        : (m.extractedTexts && m.extractedTexts.length > 0 ? m.extractedTexts : [])
                 }))
             };
 
@@ -2721,6 +3407,18 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsBasePropsModalOpen(true)}
+                        aria-label={t('toolbox.checkup.search_config.config_title', 'Search Configuration')}
+                        title={t('toolbox.checkup.search_config.config_title', 'Search Configuration')}
+                        data-position="left"
+                        disabled={disabled}
+                        className="h-8 px-2.5 text-xs flex items-center gap-1.5"
+                    >
+                        <SlidersHorizontal size={14} />
+                    </Button>
                     {isGoldenLoaded && (
                         <Button
                             variant={filterDivergent ? "primary" : "ghost"}
@@ -2736,7 +3434,6 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                             data-position="left"
                         >
                             {filterDivergent ? <FilterX size={14} /> : <Filter size={14} />}
-                            <span>{filterDivergent ? t('toolbox.checkup.show_all', 'Show All') : t('toolbox.checkup.show_only_divergent', 'Only Divergences')}</span>
                         </Button>
                     )}
 
@@ -2780,20 +3477,6 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                     >
                         <Upload size={14} />
                         <span>{t('toolbox.checkup.import_golden_file', 'Import Golden')}</span>
-                    </Button>
-
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIsBasePropsModalOpen(true)}
-                        aria-label={t('toolbox.checkup.search_config.config_title', 'Search Configuration')}
-                        title={t('toolbox.checkup.search_config.config_title', 'Search Configuration')}
-                        data-position="left"
-                        disabled={disabled}
-                        className="h-8 px-2.5 text-xs flex items-center gap-1.5"
-                    >
-                        <SlidersHorizontal size={14} />
-                        <span>{t('toolbox.checkup.search_config_btn', 'Search Settings')}</span>
                     </Button>
 
                     <Button
@@ -3204,32 +3887,82 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         </div>
                     }
                 >
-                    {manualChecks.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full text-on-surface-variant/40 p-8 text-center min-h-[180px]">
-                            <CheckSquare size={36} className="mb-2 opacity-50" />
-                            <p className="text-xs max-w-[260px]">
-                                {t('toolbox.checkup.no_manual_checks', 'No manual checks added yet. Click "Add Check" to record custom hardware/visual inspections.')}
-                            </p>
-                        </div>
+                    {displayedManualChecks.length === 0 ? (
+                        manualChecks.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-full text-on-surface-variant/40 p-8 text-center min-h-[180px]">
+                                <CheckSquare size={36} className="mb-2 opacity-50" />
+                                <p className="text-xs max-w-[260px]">
+                                    {t('toolbox.checkup.no_manual_checks', 'No manual checks added yet. Click "Add Check" to record custom hardware/visual inspections.')}
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="p-8 text-center text-xs text-on-surface-variant/60 italic">
+                                {t('toolbox.checkup.no_divergences', 'No divergences found.')}
+                            </div>
+                        )
                     ) : (
-                        manualChecks.map(item => {
+                        displayedManualChecks.map(item => {
                             const isPass = item.status === 'pass';
                             const isFail = item.status === 'fail';
+                            const isExpanded = expandedManualCheckIds.has(item.id);
+                            const hasExtracted = Boolean(item.extractedTexts && item.extractedTexts.length > 0);
+                            const hasExpected = Boolean(item.expectedTexts && item.expectedTexts.length > 0);
+                            const isGoldenConfigured = hasExpected;
+                            const isAnalyzing = analyzingManualCheckId === item.id;
 
                             return (
-                                <div key={item.id} className="p-3 rounded-xl bg-surface/50 border border-outline-variant/30 hover:border-outline-variant/60 transition-all flex flex-col gap-2">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <span className={clsx(
-                                                "text-[10px] px-2 py-0.5 rounded font-semibold border uppercase",
-                                                isPass ? "bg-success/10 text-success border-success/20" : (isFail ? "bg-error/10 text-error border-error/20" : "bg-surface-variant/40 text-on-surface-variant border-outline-variant/30")
-                                            )}>
-                                                {isPass ? t('toolbox.checkup.conforme', 'CONFORME') : (isFail ? t('toolbox.checkup.nao_conforme', 'NÃO CONFORME') : 'N/A')}
-                                            </span>
-                                            <h4 className="text-xs font-semibold text-on-surface">{item.name}</h4>
+                                <div key={item.id} className="p-3 rounded-xl bg-surface/50 border border-outline-variant/30 flex flex-col gap-2 transition-all">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h4 className="text-xs font-semibold text-on-surface truncate">{item.name}</h4>
+                                                    {isAnalyzing ? (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-full font-medium">
+                                                            <ExpressiveLoading variant="circular" size="xsm" />
+                                                            {t('common.running', 'Running...')}
+                                                        </span>
+                                                    ) : item.isGoldenMatch === true ? (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-success/10 text-success border border-success/20 rounded-full font-semibold">
+                                                            <CheckCircle2 size={10} />
+                                                            {t('toolbox.checkup.conforme', 'CONFORME')}
+                                                        </span>
+                                                    ) : item.isGoldenMatch === false ? (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-error/10 text-error border border-error/20 rounded-full font-semibold">
+                                                            <XCircle size={10} />
+                                                            {t('toolbox.checkup.nao_conforme', 'NÃO CONFORME')}
+                                                        </span>
+                                                    ) : (
+                                                        <span className={clsx(
+                                                            "text-[10px] px-2 py-0.5 rounded font-semibold border uppercase",
+                                                            isPass ? "bg-success/10 text-success border-success/20" : (isFail ? "bg-error/10 text-error border-error/20" : "bg-surface-variant/40 text-on-surface-variant border-outline-variant/30")
+                                                        )}>
+                                                            {isPass ? t('toolbox.checkup.conforme', 'CONFORME') : (isFail ? t('toolbox.checkup.nao_conforme', 'NÃO CONFORME') : 'N/A')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
 
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            {item.type === 'image' && item.valueImageBase64 && (
+                                                <Button
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    onClick={() => handleAnalyzeItemImageWithAi(item)}
+                                                    disabled={disabled || isAnalyzing}
+                                                    className="h-7 px-2 text-xs flex items-center gap-1 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20"
+                                                    title={t('toolbox.checkup.analyze_image_ai', 'Analyze image texts with AI')}
+                                                    data-position="left"
+                                                >
+                                                    {isAnalyzing ? (
+                                                        <ExpressiveLoading variant="circular" size="xsm" />
+                                                    ) : (
+                                                        <Sparkles size={12} />
+                                                    )}
+                                                    <span className="text-[11px] font-medium">{t('toolbox.checkup.ai_ocr', 'AI OCR')}</span>
+                                                </Button>
+                                            )}
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
@@ -3273,6 +4006,81 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Quick Summary & Expand Accordion */}
+                                    {item.type === 'image' && (
+                                        <div className="flex items-center justify-between pt-1 border-t border-outline-variant/15 text-[11px] text-on-surface-variant">
+                                            <div className="flex items-center gap-2">
+                                                <span>
+                                                    <strong>{item.extractedTexts?.length || 0}</strong> {t('toolbox.checkup.captured_texts_count', 'captured texts', { count: item.extractedTexts?.length || 0 })}
+                                                    {isGoldenConfigured && (
+                                                        <span className="text-on-surface-variant/70 ml-1">
+                                                            ({t('toolbox.checkup.expected_texts_count', '{{count}} expected', { count: item.expectedTexts?.length || 0 })})
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleExpandManualCheck(item.id)}
+                                                className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                                            >
+                                                <span>{isExpanded ? t('toolbox.checkup.hide_captured_texts', 'Hide texts') : t('toolbox.checkup.view_captured_texts', 'View captured texts')}</span>
+                                                <ChevronDown size={14} className={clsx("transition-transform duration-200", isExpanded && "rotate-180")} />
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Expanded UI Texts List */}
+                                    {isExpanded && item.type === 'image' && (
+                                        <div className="mt-1 bg-surface-variant/20 rounded-lg p-2 border border-outline-variant/20 max-h-[220px] overflow-y-auto">
+                                            {isGoldenConfigured ? (
+                                                <table className="w-full text-left text-[11px] table-fixed">
+                                                    <thead>
+                                                        <tr className="border-b border-outline-variant/20 text-on-surface-variant text-[10px]">
+                                                            <th className="p-1 w-1/2 font-semibold">{t('toolbox.checkup.expected', 'Expected')}</th>
+                                                            <th className="p-1 w-1/2 font-semibold">{t('toolbox.checkup.found', 'Found')}</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {computeManualCheckDivergenceDetails(item.extractedTexts, item.expectedTexts).items.map((d, idx) => {
+                                                            const exp = d.expected || '-';
+                                                            const fnd = d.found || '-';
+                                                            const isItemMatch = d.status === 'match';
+                                                            const isExtra = d.status === 'extra';
+                                                            return (
+                                                                <tr key={idx} className="border-b border-outline-variant/10">
+                                                                    <td className="p-1 text-on-surface-variant truncate font-mono text-[10px]">{exp}</td>
+                                                                    <td className={clsx(
+                                                                        "p-1 truncate font-mono text-[10px] font-medium",
+                                                                        isItemMatch ? "text-success" : (isExtra ? "text-info" : "text-error")
+                                                                    )}>
+                                                                        {fnd}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            ) : hasExtracted ? (
+                                                <div className="flex flex-wrap gap-1">
+                                                    {item.extractedTexts!.map((txt, idx) => (
+                                                        <span
+                                                            key={idx}
+                                                            className="px-2 py-0.5 rounded bg-surface border border-outline-variant/30 text-[10px] font-mono text-on-surface select-all"
+                                                            title={txt}
+                                                        >
+                                                            {txt}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="text-[11px] text-on-surface-variant/60 italic text-center py-2">
+                                                    {t('toolbox.checkup.no_texts_captured_yet_manual', 'No texts extracted yet. Click "AI OCR" to analyze the attached image.')}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {item.notes && (
                                         <p className="text-[11px] text-on-surface-variant/80 italic border-t border-outline-variant/10 pt-1">
@@ -3328,171 +4136,187 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                         </div>
                     }
                 >
-                    {uiTextChecks.map(check => {
-                        const isExpanded = expandedUiCheckIds.has(check.id);
-                        const hasFoundTexts = check.foundTexts && check.foundTexts.length > 0;
-                        const hasExpectedTexts = check.expectedTexts && check.expectedTexts.length > 0;
-                        const isGoldenConfigured = Boolean(hasExpectedTexts);
+                    {displayedUiTextChecks.length === 0 ? (
+                        uiTextChecks.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-full text-on-surface-variant/40 p-8 text-center min-h-[180px]">
+                                <Tv size={36} className="mb-2 opacity-50" />
+                                <p className="text-xs max-w-[260px]">
+                                    {t('toolbox.checkup.no_ui_text_checks', 'No UI text checks configured. Click "Add" to set up screen text extraction tests.')}
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="p-8 text-center text-xs text-on-surface-variant/60 italic">
+                                {t('toolbox.checkup.no_divergences', 'No divergences found.')}
+                            </div>
+                        )
+                    ) : (
+                        displayedUiTextChecks.map(check => {
+                            const isExpanded = expandedUiCheckIds.has(check.id);
+                            const hasFoundTexts = check.foundTexts && check.foundTexts.length > 0;
+                            const hasExpectedTexts = check.expectedTexts && check.expectedTexts.length > 0;
+                            const isGoldenConfigured = Boolean(hasExpectedTexts);
 
-                        return (
-                            <div key={check.id} className="p-3 rounded-xl bg-surface/50 border border-outline-variant/30 flex flex-col gap-2 transition-all">
-                                <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <input
-                                            type="checkbox"
-                                            checked={check.enabled}
-                                            onChange={(e) => {
-                                                const enabled = e.target.checked;
-                                                setUiTextChecks(prev => prev.map(c => c.id === check.id ? { ...c, enabled } : c));
-                                            }}
-                                            className="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4 shrink-0"
-                                        />
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <h4 className="text-xs font-semibold text-on-surface truncate">{check.name}</h4>
-                                                {check.status === 'running' ? (
-                                                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-full font-medium">
-                                                        <ExpressiveLoading variant="circular" size="xsm" />
-                                                        {t('common.running', 'Running...')}
-                                                    </span>
-                                                ) : check.isGoldenMatch === true ? (
-                                                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-success/10 text-success border border-success/20 rounded-full font-semibold">
-                                                        <CheckCircle2 size={10} />
-                                                        {t('toolbox.checkup.conforme', 'CONFORME')}
-                                                    </span>
-                                                ) : check.isGoldenMatch === false ? (
-                                                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-error/10 text-error border border-error/20 rounded-full font-semibold">
-                                                        <XCircle size={10} />
-                                                        {t('toolbox.checkup.nao_conforme', 'NÃO CONFORME')}
-                                                    </span>
-                                                ) : hasFoundTexts ? (
-                                                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-info/10 text-info border border-info/20 rounded-full font-medium">
-                                                        {t('toolbox.checkup.captured_texts_count', '{{count}} captured texts', { count: check.foundTexts?.length || 0 })}
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-surface-variant/30 text-on-surface-variant/70 rounded-full font-medium">
-                                                        {t('common.pending', 'Pending')}
-                                                    </span>
-                                                )}
+                            return (
+                                <div key={check.id} className="p-3 rounded-xl bg-surface/50 border border-outline-variant/30 flex flex-col gap-2 transition-all">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <input
+                                                type="checkbox"
+                                                checked={check.enabled}
+                                                onChange={(e) => {
+                                                    const enabled = e.target.checked;
+                                                    setUiTextChecks(prev => prev.map(c => c.id === check.id ? { ...c, enabled } : c));
+                                                }}
+                                                className="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4 shrink-0"
+                                            />
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h4 className="text-xs font-semibold text-on-surface truncate">{check.name}</h4>
+                                                    {check.status === 'running' ? (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-full font-medium">
+                                                            <ExpressiveLoading variant="circular" size="xsm" />
+                                                            {t('common.running', 'Running...')}
+                                                        </span>
+                                                    ) : check.isGoldenMatch === true ? (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-success/10 text-success border border-success/20 rounded-full font-semibold">
+                                                            <CheckCircle2 size={10} />
+                                                            {t('toolbox.checkup.conforme', 'CONFORME')}
+                                                        </span>
+                                                    ) : check.isGoldenMatch === false ? (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-error/10 text-error border border-error/20 rounded-full font-semibold">
+                                                            <XCircle size={10} />
+                                                            {t('toolbox.checkup.nao_conforme', 'NÃO CONFORME')}
+                                                        </span>
+                                                    ) : hasFoundTexts ? (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-info/10 text-info border border-info/20 rounded-full font-medium">
+                                                            {t('toolbox.checkup.captured_texts_count', '{{count}} captured texts', { count: check.foundTexts?.length || 0 })}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-surface-variant/30 text-on-surface-variant/70 rounded-full font-medium">
+                                                            {t('common.pending', 'Pending')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <code className="text-[10px] text-on-surface-variant/70 block truncate">{check.activity || 'Current Screen'}</code>
                                             </div>
-                                            <code className="text-[10px] text-on-surface-variant/70 block truncate">{check.activity || 'Current Screen'}</code>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                onClick={() => runSingleUiTextCheck(check)}
+                                                disabled={disabled || check.status === 'running'}
+                                                className="h-7 px-2 text-xs"
+                                                title={t('common.run', 'Run')}
+                                                data-position="left"
+                                            >
+                                                <Play size={12} className={clsx(check.status === 'running' && "animate-spin")} />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setEditingUiCheck(check);
+                                                    setUiCheckNameInput(check.name);
+                                                    setUiCheckActivityInput(check.activity);
+                                                    setUiCheckDelayInput(String(check.delayMs || 1500));
+                                                    setIsUiCheckModalOpen(true);
+                                                }}
+                                                className="h-7 w-7 p-0 flex items-center justify-center rounded"
+                                                title={t('common.edit', 'Edit')}
+                                                data-position="left"
+                                            >
+                                                <Edit3 size={12} />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setUiTextChecks(prev => prev.filter(c => c.id !== check.id))}
+                                                className="h-7 w-7 p-0 flex items-center justify-center rounded hover:text-error"
+                                                title={t('common.delete', 'Delete')}
+                                                data-position="left"
+                                            >
+                                                <Trash2 size={12} />
+                                            </Button>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                        <Button
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => runSingleUiTextCheck(check)}
-                                            disabled={disabled || check.status === 'running'}
-                                            className="h-7 px-2 text-xs"
-                                            title={t('common.run', 'Run')}
-                                            data-position="left"
-                                        >
-                                            <Play size={12} className={clsx(check.status === 'running' && "animate-spin")} />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => {
-                                                setEditingUiCheck(check);
-                                                setUiCheckNameInput(check.name);
-                                                setUiCheckActivityInput(check.activity);
-                                                setUiCheckDelayInput(String(check.delayMs || 1500));
-                                                setIsUiCheckModalOpen(true);
-                                            }}
-                                            className="h-7 w-7 p-0 flex items-center justify-center rounded"
-                                            title={t('common.edit', 'Edit')}
-                                            data-position="left"
-                                        >
-                                            <Edit3 size={12} />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => setUiTextChecks(prev => prev.filter(c => c.id !== check.id))}
-                                            className="h-7 w-7 p-0 flex items-center justify-center rounded hover:text-error"
-                                            title={t('common.delete', 'Delete')}
-                                            data-position="left"
-                                        >
-                                            <Trash2 size={12} />
-                                        </Button>
-                                    </div>
-                                </div>
 
-                                {/* Quick Summary & Expand Accordion */}
-                                <div className="flex items-center justify-between pt-1 border-t border-outline-variant/15 text-[11px] text-on-surface-variant">
-                                    <div className="flex items-center gap-2">
-                                        <span>
-                                            <strong>{check.foundTexts?.length || 0}</strong> {t('toolbox.checkup.captured_texts_count', 'captured texts', { count: check.foundTexts?.length || 0 })}
-                                            {isGoldenConfigured && (
-                                                <span className="text-on-surface-variant/70 ml-1">
-                                                    ({t('toolbox.checkup.expected_texts_count', '{{count}} expected', { count: check.expectedTexts?.length || 0 })})
-                                                </span>
-                                            )}
-                                        </span>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => toggleExpandUiCheck(check.id)}
-                                        className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
-                                    >
-                                        <span>{isExpanded ? t('toolbox.checkup.hide_captured_texts', 'Hide texts') : t('toolbox.checkup.view_captured_texts', 'View captured texts')}</span>
-                                        <ChevronDown size={14} className={clsx("transition-transform duration-200", isExpanded && "rotate-180")} />
-                                    </button>
-                                </div>
-
-                                {/* Expanded UI Texts List */}
-                                {isExpanded && (
-                                    <div className="mt-1 bg-surface-variant/20 rounded-lg p-2 border border-outline-variant/20 max-h-[220px] overflow-y-auto">
-                                        {isGoldenConfigured ? (
-                                            <table className="w-full text-left text-[11px] table-fixed">
-                                                <thead>
-                                                    <tr className="border-b border-outline-variant/20 text-on-surface-variant text-[10px]">
-                                                        <th className="p-1 w-1/2 font-semibold">{t('toolbox.checkup.expected', 'Expected')}</th>
-                                                        <th className="p-1 w-1/2 font-semibold">{t('toolbox.checkup.found', 'Found')}</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {Array.from({ length: Math.max(check.expectedTexts?.length || 0, check.foundTexts?.length || 0) }).map((_, idx) => {
-                                                        const exp = check.expectedTexts?.[idx] || '-';
-                                                        const fnd = check.foundTexts?.[idx] || '-';
-                                                        const isItemMatch = exp.trim() === fnd.trim();
-                                                        return (
-                                                            <tr key={idx} className="border-b border-outline-variant/10">
-                                                                <td className="p-1 text-on-surface-variant truncate font-mono text-[10px]">{exp}</td>
-                                                                <td className={clsx(
-                                                                    "p-1 truncate font-mono text-[10px] font-medium",
-                                                                    isItemMatch ? "text-success" : "text-error"
-                                                                )}>
-                                                                    {fnd}
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
-                                        ) : hasFoundTexts ? (
-                                            <div className="flex flex-wrap gap-1">
-                                                {check.foundTexts!.map((txt, idx) => (
-                                                    <span
-                                                        key={idx}
-                                                        className="px-2 py-0.5 rounded bg-surface border border-outline-variant/30 text-[10px] font-mono text-on-surface select-all"
-                                                        title={txt}
-                                                    >
-                                                        {txt}
+                                    {/* Quick Summary & Expand Accordion */}
+                                    <div className="flex items-center justify-between pt-1 border-t border-outline-variant/15 text-[11px] text-on-surface-variant">
+                                        <div className="flex items-center gap-2">
+                                            <span>
+                                                <strong>{check.foundTexts?.length || 0}</strong> {t('toolbox.checkup.captured_texts_count', 'captured texts', { count: check.foundTexts?.length || 0 })}
+                                                {isGoldenConfigured && (
+                                                    <span className="text-on-surface-variant/70 ml-1">
+                                                        ({t('toolbox.checkup.expected_texts_count', '{{count}} expected', { count: check.expectedTexts?.length || 0 })})
                                                     </span>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="text-[11px] text-on-surface-variant/60 italic text-center py-2">
-                                                {t('toolbox.checkup.no_texts_captured_yet', 'No texts captured yet. Click Run to inspect the screen.')}
-                                            </div>
-                                        )}
+                                                )}
+                                            </span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleExpandUiCheck(check.id)}
+                                            className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                                        >
+                                            <span>{isExpanded ? t('toolbox.checkup.hide_captured_texts', 'Hide texts') : t('toolbox.checkup.view_captured_texts', 'View captured texts')}</span>
+                                            <ChevronDown size={14} className={clsx("transition-transform duration-200", isExpanded && "rotate-180")} />
+                                        </button>
                                     </div>
-                                )}
-                            </div>
-                        );
-                    })}
+
+                                    {/* Expanded UI Texts List */}
+                                    {isExpanded && (
+                                        <div className="mt-1 bg-surface-variant/20 rounded-lg p-2 border border-outline-variant/20 max-h-[220px] overflow-y-auto">
+                                            {isGoldenConfigured ? (
+                                                <table className="w-full text-left text-[11px] table-fixed">
+                                                    <thead>
+                                                        <tr className="border-b border-outline-variant/20 text-on-surface-variant text-[10px]">
+                                                            <th className="p-1 w-1/2 font-semibold">{t('toolbox.checkup.expected', 'Expected')}</th>
+                                                            <th className="p-1 w-1/2 font-semibold">{t('toolbox.checkup.found', 'Found')}</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {computeManualCheckDivergenceDetails(check.foundTexts, check.expectedTexts).items.map((d, idx) => {
+                                                            const exp = d.expected || '-';
+                                                            const fnd = d.found || '-';
+                                                            const isItemMatch = d.status === 'match';
+                                                            const isExtra = d.status === 'extra';
+                                                            return (
+                                                                <tr key={idx} className="border-b border-outline-variant/10">
+                                                                    <td className="p-1 text-on-surface-variant truncate font-mono text-[10px]">{exp}</td>
+                                                                    <td className={clsx(
+                                                                        "p-1 truncate font-mono text-[10px] font-medium",
+                                                                        isItemMatch ? "text-success" : (isExtra ? "text-info" : "text-error")
+                                                                    )}>
+                                                                        {fnd}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            ) : hasFoundTexts ? (
+                                                <div className="flex flex-wrap gap-1">
+                                                    {check.foundTexts!.map((txt, idx) => (
+                                                        <span
+                                                            key={idx}
+                                                            className="px-2 py-0.5 rounded bg-surface border border-outline-variant/30 text-[10px] font-mono text-on-surface select-all"
+                                                            title={txt}
+                                                        >
+                                                            {txt}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="text-[11px] text-on-surface-variant/60 italic text-center py-2">
+                                                    {t('toolbox.checkup.no_texts_captured_yet', 'No texts captured yet. Click Run to inspect the screen.')}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })
+                    )}
                 </Section>
             </div>
 
@@ -3616,7 +4440,6 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                 className="h-8 px-2.5 text-xs flex items-center gap-1.5 text-secondary hover:bg-secondary/10 border border-secondary/20"
                             >
                                 <Cpu size={14} />
-                                <span>{t('toolbox.checkup.firmware_recipe_btn', 'Firmware Recipe')}</span>
                             </Button>
                             <div className="text-xs text-on-surface-variant flex items-center gap-1.5">
                                 {companionStatus === 'connected' ? (
@@ -3708,7 +4531,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                             />
                         </div>
                     ) : (
-                        <div>
+                        <div className="flex flex-col gap-2">
                             <label className="text-xs font-semibold text-on-surface mb-1 block">
                                 {t('toolbox.checkup.value_image', 'Attach Photo / Screenshot')}
                             </label>
@@ -3717,10 +4540,56 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                                     <div className="relative rounded-xl overflow-hidden border border-outline-variant/40 max-h-[160px] bg-black/20 flex items-center justify-center">
                                         <img src={manualCheckValueImage} alt="Preview" className="max-h-[160px] object-contain" />
                                     </div>
-                                    <Button variant="outline" size="sm" onClick={handlePickManualImage} className="h-8 text-xs" title={t('toolbox.checkup.change_image', 'Change Image')} data-position="bottom">
-                                        <Upload size={14} className="mr-1.5" />
-                                        {t('toolbox.checkup.change_image', 'Change Image')}
-                                    </Button>
+                                    <div className="flex items-center gap-2">
+                                        <Button variant="outline" size="sm" onClick={handlePickManualImage} className="h-8 text-xs flex-1" title={t('toolbox.checkup.change_image', 'Change Image')} data-position="bottom">
+                                            <Upload size={14} className="mr-1.5" />
+                                            {t('toolbox.checkup.change_image', 'Change Image')}
+                                        </Button>
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={handleAnalyzeModalImageWithAi}
+                                            disabled={isAnalyzingManualModalImage}
+                                            className="h-8 text-xs flex items-center gap-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30"
+                                            title={t('toolbox.checkup.extract_texts_ai', 'Extract Texts with AI')}
+                                            data-position="bottom"
+                                        >
+                                            {isAnalyzingManualModalImage ? (
+                                                <ExpressiveLoading variant="circular" size="xsm" />
+                                            ) : (
+                                                <Sparkles size={14} />
+                                            )}
+                                            <span>{t('toolbox.checkup.extract_texts_ai', 'Extract Texts with AI')}</span>
+                                        </Button>
+                                    </div>
+
+                                    {manualCheckExtractedTexts.length > 0 && (
+                                        <div className="mt-1 p-2.5 rounded-lg bg-surface-variant/30 border border-outline-variant/20 flex flex-col gap-1.5">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[11px] font-semibold text-on-surface flex items-center gap-1">
+                                                    <Sparkles size={12} className="text-primary" />
+                                                    {t('toolbox.checkup.extracted_texts', 'Extracted Texts')} ({manualCheckExtractedTexts.length})
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setManualCheckExtractedTexts([])}
+                                                    className="text-[10px] text-on-surface-variant/60 hover:text-error transition-colors"
+                                                >
+                                                    {t('common.clear', 'Clear')}
+                                                </button>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1 max-h-[100px] overflow-y-auto pr-1">
+                                                {manualCheckExtractedTexts.map((text, idx) => (
+                                                    <span
+                                                        key={idx}
+                                                        className="text-[10px] px-2 py-0.5 bg-surface/80 text-on-surface border border-outline-variant/30 rounded font-mono"
+                                                    >
+                                                        {text}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <Button variant="outline" size="sm" onClick={handlePickManualImage} className="w-full h-16 border-dashed text-xs flex flex-col items-center justify-center gap-1" title={t('toolbox.checkup.upload_image_btn', 'Select Image File (PNG, JPG, WEBP)...')} data-position="bottom">

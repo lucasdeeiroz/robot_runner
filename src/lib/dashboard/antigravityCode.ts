@@ -188,6 +188,28 @@ export async function askAntigravityCli(
         }
         console.error("[Antigravity CLI] Invocation failed. Raw Error:", error, "Type:", typeof error);
         const errorStr = typeof error === 'string' ? error : (error?.message || String(error));
+
+        // Recovery: If errorStr contains a valid JSON AI payload (like texts, reply, actions, structured_output), recover it!
+        try {
+            const firstBrace = errorStr.indexOf('{');
+            const lastBrace = errorStr.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace > firstBrace) {
+                const candidate = errorStr.substring(firstBrace, lastBrace + 1);
+                const parsedCandidate = JSON.parse(candidate);
+                if (parsedCandidate && (parsedCandidate.reply || parsedCandidate.actions || parsedCandidate.suggested_prompts || parsedCandidate.texts || parsedCandidate.structured_output || parsedCandidate.result)) {
+                    if (options?.jsonSchema && parsedCandidate.structured_output) {
+                        return {
+                            result: parsedCandidate.result || "",
+                            structured_output: parsedCandidate.structured_output,
+                            session_id: parsedCandidate.session_id,
+                            usage: parsedCandidate.usage
+                        };
+                    }
+                    return candidate;
+                }
+            }
+        } catch(e) {}
+
         throw new Error(errorStr);
     }
 }
