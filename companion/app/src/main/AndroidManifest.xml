@@ -83,6 +83,16 @@
                 android:value="Daemon daemon for Robot Runner desktop pairing and hardware diagnostics." />
         </service>
 
+        <receiver
+            android:name=".receiver.CompanionCommandReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.lucasdeeiroz.robotrunner.START_SERVER" />
+                <action android:name="com.lucasdeeiroz.robotrunner.STOP_SERVER" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".service.CompanionAccessibilityService"
             android:exported="true"

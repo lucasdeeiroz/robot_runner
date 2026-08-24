@@ -45,11 +45,22 @@ class CompanionHttpServer(
     var requestCount = 0
         private set
 
+    @Volatile
+    var lastRequestTimestamp: Long = System.currentTimeMillis()
+        private set
+
+    fun touchRequest() {
+        lastRequestTimestamp = System.currentTimeMillis()
+    }
+
+    fun getIdleDurationMs(): Long = System.currentTimeMillis() - lastRequestTimestamp
+
     override fun serve(session: IHTTPSession): Response {
         val uri = session.uri
         val method = session.method
         Log.i("CompanionHttpServer", "Received ${method.name} request for $uri")
         requestCount++
+        touchRequest()
         com.lucasdeeiroz.robotrunner.sync.ThemeSyncManager.heartbeat()
         onStatusChangedListener?.invoke()
 

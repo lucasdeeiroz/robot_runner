@@ -99,14 +99,40 @@ pub async fn stop_companion_forward(
 }
 
 #[command]
-pub async fn launch_companion_app(app: AppHandle, device: String) -> AppResult<()> {
-    // 1. Try starting the background CompanionServerService directly (so HTTP server starts immediately)
+pub async fn start_companion_server(
+    app: AppHandle,
+    device: String,
+    timeout_seconds: Option<u32>,
+) -> AppResult<()> {
+    let timeout = timeout_seconds.unwrap_or(120);
+
+    // 1. Broadcast receiver trigger (fast & reliable on all Android versions)
+    let bcast_args = vec![
+        "shell".to_string(),
+        "am".to_string(),
+        "broadcast".to_string(),
+        "-a".to_string(),
+        "com.lucasdeeiroz.robotrunner.START_SERVER".to_string(),
+        "-n".to_string(),
+        "com.lucasdeeiroz.robotrunner/.receiver.CompanionCommandReceiver".to_string(),
+        "--ei".to_string(),
+        "IDLE_TIMEOUT_SECONDS".to_string(),
+        timeout.to_string(),
+    ];
+    let _ = execute_adb_with_recovery(&app, Some(&device), bcast_args).await;
+
+    // 2. Start foreground service directly
     let srv_args = vec![
         "shell".to_string(),
         "am".to_string(),
         "start-foreground-service".to_string(),
         "-n".to_string(),
         "com.lucasdeeiroz.robotrunner/.CompanionServerService".to_string(),
+        "-a".to_string(),
+        "com.lucasdeeiroz.robotrunner.START_SERVER".to_string(),
+        "--ei".to_string(),
+        "IDLE_TIMEOUT_SECONDS".to_string(),
+        timeout.to_string(),
     ];
     let _ = execute_adb_with_recovery(&app, Some(&device), srv_args).await;
 
@@ -116,16 +142,78 @@ pub async fn launch_companion_app(app: AppHandle, device: String) -> AppResult<(
         "startservice".to_string(),
         "-n".to_string(),
         "com.lucasdeeiroz.robotrunner/.CompanionServerService".to_string(),
+        "-a".to_string(),
+        "com.lucasdeeiroz.robotrunner.START_SERVER".to_string(),
+        "--ei".to_string(),
+        "IDLE_TIMEOUT_SECONDS".to_string(),
+        timeout.to_string(),
     ];
     let _ = execute_adb_with_recovery(&app, Some(&device), srv_args_legacy).await;
+    eprintln!("[Companion Rust] Started CompanionServerService on {} with timeout {}s", device, timeout);
+    Ok(())
+}
 
-    // 2. Start MainActivity
+#[command]
+pub async fn stop_companion_server(
+    app: AppHandle,
+    device: String,
+) -> AppResult<()> {
+    // 1. Broadcast receiver stop trigger
+    let bcast_args = vec![
+        "shell".to_string(),
+        "am".to_string(),
+        "broadcast".to_string(),
+        "-a".to_string(),
+        "com.lucasdeeiroz.robotrunner.STOP_SERVER".to_string(),
+        "-n".to_string(),
+        "com.lucasdeeiroz.robotrunner/.receiver.CompanionCommandReceiver".to_string(),
+    ];
+    let _ = execute_adb_with_recovery(&app, Some(&device), bcast_args).await;
+
+    // 2. Stop service directly
+    let srv_args = vec![
+        "shell".to_string(),
+        "am".to_string(),
+        "start-foreground-service".to_string(),
+        "-n".to_string(),
+        "com.lucasdeeiroz.robotrunner/.CompanionServerService".to_string(),
+        "-a".to_string(),
+        "com.lucasdeeiroz.robotrunner.STOP_SERVER".to_string(),
+    ];
+    let _ = execute_adb_with_recovery(&app, Some(&device), srv_args).await;
+
+    let srv_args_legacy = vec![
+        "shell".to_string(),
+        "am".to_string(),
+        "startservice".to_string(),
+        "-n".to_string(),
+        "com.lucasdeeiroz.robotrunner/.CompanionServerService".to_string(),
+        "-a".to_string(),
+        "com.lucasdeeiroz.robotrunner.STOP_SERVER".to_string(),
+    ];
+    let _ = execute_adb_with_recovery(&app, Some(&device), srv_args_legacy).await;
+    eprintln!("[Companion Rust] Stopped CompanionServerService on {}", device);
+    Ok(())
+}
+
+#[command]
+pub async fn launch_companion_app(app: AppHandle, device: String) -> AppResult<()> {
+    // 1. Start the background CompanionServerService with on-demand intent action and timeout
+    let _ = start_companion_server(app.clone(), device.clone(), Some(120)).await;
+
+    // 2. Start MainActivity with explicit intent extras to ensure it initializes the server
     let args = vec![
         "shell".to_string(),
         "am".to_string(),
         "start".to_string(),
         "-n".to_string(),
         "com.lucasdeeiroz.robotrunner/.MainActivity".to_string(),
+        "--ez".to_string(),
+        "START_SERVER".to_string(),
+        "true".to_string(),
+        "--ei".to_string(),
+        "IDLE_TIMEOUT_SECONDS".to_string(),
+        "120".to_string(),
     ];
     eprintln!("[Companion Rust] Launching intent: adb -s {} am start...", device);
     let output = execute_adb_with_recovery(&app, Some(&device), args).await?;

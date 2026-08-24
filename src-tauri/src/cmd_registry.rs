@@ -153,6 +153,8 @@ macro_rules! generate_robot_runner_handler {
             crate::companion::check_companion_installed,
             crate::companion::start_companion_forward,
             crate::companion::stop_companion_forward,
+            crate::companion::start_companion_server,
+            crate::companion::stop_companion_server,
             crate::companion::launch_companion_app,
             crate::companion::fetch_companion_info,
             crate::companion::trigger_companion_action,

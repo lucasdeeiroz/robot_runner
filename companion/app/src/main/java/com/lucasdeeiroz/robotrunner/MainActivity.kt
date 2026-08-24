@@ -82,23 +82,15 @@ class MainActivity : ComponentActivity() {
             Log.e("CompanionCrash", "Uncaught exception on thread ${thread.name}", throwable)
         }
 
-        // Start Foreground Service safely
+        // Bind to CompanionServerService safely without starting the HTTP server automatically
         try {
             val serviceIntent = Intent(this, CompanionServerService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                try {
-                    startForegroundService(serviceIntent)
-                } catch (e: Exception) {
-                    Log.w("MainActivity", "startForegroundService failed, falling back: ${e.message}")
-                    startService(serviceIntent)
-                }
-            } else {
-                startService(serviceIntent)
-            }
             bindService(serviceIntent, connection, Context.BIND_AUTO_CREATE)
         } catch (e: Exception) {
-            Log.e("MainActivity", "Error starting/binding service", e)
+            Log.e("MainActivity", "Error binding service", e)
         }
+
+        handleStartServerIntent(intent)
 
         val checkupRunner = HardwareCheckupRunner(this)
         val pdfGenerator = PdfReportGenerator(this)
@@ -127,10 +119,20 @@ class MainActivity : ComponentActivity() {
                 ipAddress = getLocalIpAddress(),
                 port = CompanionServerService.SERVER_PORT,
                 onToggleServer = {
-                    companionService?.let { s ->
-                        if (s.isRunning) s.stopServer() else s.startServer()
-                        updateState()
+                    if (isServerRunning) {
+                        try {
+                            val stopIntent = Intent(this@MainActivity, CompanionServerService::class.java).apply {
+                                action = CompanionServerService.ACTION_STOP_SERVER
+                            }
+                            startService(stopIntent)
+                            companionService?.stopServer()
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Error stopping service", e)
+                        }
+                    } else {
+                        startServerInternal(CompanionServerService.DEFAULT_MANUAL_TIMEOUT_SECONDS)
                     }
+                    updateState()
                 },
                 onLaunchDisplayTest = {
                     try {
@@ -141,6 +143,43 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             )
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleStartServerIntent(intent)
+    }
+
+    private fun handleStartServerIntent(intent: Intent?) {
+        val shouldStart = intent?.getBooleanExtra("START_SERVER", false) == true ||
+                intent?.action == CompanionServerService.ACTION_START_SERVER
+        if (shouldStart) {
+            val timeout = intent.getIntExtra(
+                CompanionServerService.EXTRA_IDLE_TIMEOUT_SECONDS,
+                CompanionServerService.DEFAULT_DESKTOP_TIMEOUT_SECONDS
+            )
+            startServerInternal(timeout)
+        }
+    }
+
+    private fun startServerInternal(timeoutSeconds: Int) {
+        try {
+            val startIntent = Intent(this, CompanionServerService::class.java).apply {
+                action = CompanionServerService.ACTION_START_SERVER
+                putExtra(CompanionServerService.EXTRA_IDLE_TIMEOUT_SECONDS, timeoutSeconds)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(startIntent)
+            } else {
+                startService(startIntent)
+            }
+            companionService?.startServer(timeoutSeconds)
+            updateState()
+            Log.i("MainActivity", "Started CompanionServerService from MainActivity with timeout ${timeoutSeconds}s")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to start server internal", e)
         }
     }
 

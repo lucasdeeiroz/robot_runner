@@ -161,3 +161,17 @@ et/ or sync/ if they are UI representations). Keep business logic in their respe
    - **Tier 2 (Optical Geometry)**: When autofocus is fixed or unavailable (e.g. basic POS terminals), calculate estimated distance using MLKit barcode bounding box pixel width ratio against sensor resolution ($d = \frac{W_{\text{real}} \cdot W_{\text{img}}}{w_{\text{px}}}$).
 3. **Safe Torch & Hardware Guarding**:
    - Always verify `cameraInfo.hasFlashUnit()` and guard with try-catch blocks when modifying `cameraControl.enableTorch()` to prevent crashes on specialized Android POS devices lacking flashlight hardware.
+
+---
+
+## 16. On-Demand HTTP Server Lifecycle & Idle Timeout Watchdog Rules
+
+1. **Lazy Server Activation**:
+   - The Companion HTTP Server (`CompanionHttpServer`) and its `CompanionServerService` must NOT start automatically on app launch (`onCreate`), preventing unnecessary Foreground Service notifications, battery drain, and Doze mode blocking.
+2. **Intent-Driven Lifecycle Control**:
+   - The server is started on demand via explicit intents (`ACTION_START_SERVER`) with an inactivity timeout parameter (`EXTRA_IDLE_TIMEOUT_SECONDS`).
+   - Desktop initiates connection via ADB (`am start-foreground-service -a START_SERVER --ei IDLE_TIMEOUT_SECONDS 120`), providing a 120-second inactivity watchdog.
+   - On-device manual toggles from the UI default to an extended timeout (e.g. 900 seconds / 15 minutes) for standalone testing sessions.
+3. **Inactivity Watchdog**:
+   - Every request received by `CompanionHttpServer.serve()` updates `lastRequestTimestamp`.
+   - A background coroutine watchdog inside `CompanionServerService` monitors inactivity. If elapsed time exceeds the timeout, the service automatically executes `stopServer()`, removes its foreground notification, and calls `stopSelf()`.

@@ -117,17 +117,25 @@ function updateCompanionCache(device: string, updates: Partial<CompanionDeviceCa
     companionListeners.forEach(listener => listener(device, updated));
 }
 
+const companionConsecutiveFailures = new Map<string, number>();
+
 function startCompanionPolling(device: string, port: number) {
     if (companionPollIntervals.has(device)) {
         clearInterval(companionPollIntervals.get(device)!);
     }
+    companionConsecutiveFailures.set(device, 0);
+
     const interval = setInterval(async () => {
         try {
             // 1. Stats
             const rawInfo = await invoke<string>('fetch_companion_info', { port, device });
             const data = safeParseCompanionJson<CompanionDeviceInfo>(rawInfo);
-            if (data && data.status !== 'error') {
+            if (data && data.status !== 'error' && data.model) {
+                companionConsecutiveFailures.set(device, 0);
                 updateCompanionCache(device, { deviceInfo: data, status: 'connected', lastConnectedAt: Date.now() });
+            } else {
+                handlePollingFailure(device);
+                return;
             }
             // 2. Events
             const rawEvents = await invoke<string>('fetch_companion_events', { port, device });
@@ -144,9 +152,21 @@ function startCompanionPolling(device: string, port: number) {
                     timestamp: Date.now()
                 });
             }
-        } catch (_) {}
+        } catch (_) {
+            handlePollingFailure(device);
+        }
     }, 3000);
     companionPollIntervals.set(device, interval);
+}
+
+function handlePollingFailure(device: string) {
+    const failures = (companionConsecutiveFailures.get(device) || 0) + 1;
+    companionConsecutiveFailures.set(device, failures);
+    if (failures >= 2) {
+        console.warn(`[useCompanion] Polling failed ${failures} times for ${device}. Marking companion as offline.`);
+        updateCompanionCache(device, { status: 'disconnected', deviceInfo: null });
+        stopCompanionPolling(device);
+    }
 }
 
 function stopCompanionPolling(device: string) {
@@ -155,6 +175,7 @@ function stopCompanionPolling(device: string) {
         clearInterval(timer);
         companionPollIntervals.delete(device);
     }
+    companionConsecutiveFailures.delete(device);
 }
 
 export function useCompanion(selectedDevice: string | null) {
@@ -263,15 +284,21 @@ export function useCompanion(selectedDevice: string | null) {
         try {
             const rawJson = await invoke<string>('fetch_companion_info', { port, device: selectedDevice });
             const data: CompanionDeviceInfo = safeParseCompanionJson<CompanionDeviceInfo>(rawJson);
+            if (!data || (data as any).status === 'error' || !data.model) {
+                setDeviceInfo(null);
+                setStatus('disconnected');
+                return false;
+            }
             setDeviceInfo(data);
             setStatus('connected');
             return true;
         } catch (err) {
             console.warn("[useCompanion] Failed to fetch device info via companion bridge:", err);
+            setDeviceInfo(null);
             setStatus('disconnected');
             return false;
         }
-    }, [selectedDevice]);
+    }, [selectedDevice, setDeviceInfo, setStatus]);
 
     const fetchRecentEvents = useCallback(async (port = 9876) => {
         try {
@@ -481,6 +508,13 @@ export function useCompanion(selectedDevice: string | null) {
             });
             console.log("[useCompanion] ADB port forward established on port:", port);
 
+            // Start Companion HTTP Server on-demand with 120s inactivity watchdog
+            try {
+                await invoke('start_companion_server', { device: selectedDevice, timeoutSeconds: 120 });
+            } catch (e) {
+                console.warn("[useCompanion] Auto start companion server failed silently:", e);
+            }
+
             // Ensure Accessibility Service is enabled via ADB on selected device
             try {
                 await invoke('enable_companion_accessibility', { device: selectedDevice });
@@ -495,8 +529,13 @@ export function useCompanion(selectedDevice: string | null) {
                 console.warn("[useCompanion] Auto grant permissions failed silently:", e);
             }
 
-            // Initial fetch
-            const success = await fetchDeviceStats(port);
+            // Initial fetch (give small window for cold start)
+            let success = await fetchDeviceStats(port);
+            if (!success) {
+                await new Promise(res => setTimeout(res, 400));
+                success = await fetchDeviceStats(port);
+            }
+
             if (success) {
                 console.log("[useCompanion] Companion connected successfully!");
                 syncTheme(
@@ -549,14 +588,16 @@ export function useCompanion(selectedDevice: string | null) {
         if (!selectedDevice) return;
         try {
             console.log("[useCompanion] Launching Companion App...");
+            setStatus('connecting');
             await invoke('launch_companion_app', { device: selectedDevice });
             setTimeout(() => {
                 connectCompanion(true);
-            }, 1200);
+            }, 1000);
         } catch (e) {
             console.error("[useCompanion] Failed to launch companion app:", e);
+            setStatus('disconnected');
         }
-    }, [selectedDevice, connectCompanion]);
+    }, [selectedDevice, connectCompanion, setStatus]);
 
     const lastSyncedThemeKeyRef = useRef<string | null>(null);
     useEffect(() => {
