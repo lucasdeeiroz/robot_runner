@@ -483,7 +483,7 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                     {/* QR Code */}
                     <div className="bg-white p-4 rounded-2xl border border-outline-variant/20 shadow-md flex items-center justify-center shrink-0">
                         <QRCodeSVG
-                            value={JSON.stringify({ ip: hostIp || "192.168.1.100", port: 5555, code: pairingPin })}
+                            value={`WIFI:T:ADB;S:robotrunner-${pairingPin};P:${pairingPin};;`}
                             size={140}
                             bgColor="#FFFFFF"
                             fgColor="#0F172A"
