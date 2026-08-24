@@ -4,7 +4,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { invoke } from '@tauri-apps/api/core';
 import { feedback } from './feedback';
 import { checkForUpdates, UpdateInfo } from './updater';
-import { getRemoteString } from './remoteConfig';
 
 export interface SystemVersions {
     adb: string;
@@ -27,6 +26,39 @@ export interface SystemVersions {
 
 // Initialize the store
 const store = new LazyStore('settings.json');
+
+export interface ComplianceRule {
+    id: string;
+    name: string;
+    pattern: string;
+    severity: 'critical' | 'warning' | 'info';
+    maskInLogs: boolean;
+    blockOnViolation: boolean;
+    enabled: boolean;
+}
+
+export interface SpecPipelineSettings {
+    enabled: boolean;
+    baseSpecsDir: string;
+    scenariosFilename: string;
+    resultsFilename: string;
+    evidenceSubdir: string;
+    autoTranspileToRobot: boolean;
+}
+
+export interface TelemetryWebhooksSettings {
+    enabled: boolean;
+    endpointUrl: string;
+    headers: Record<string, string>;
+    tags: Record<string, string>;
+    sendOnTestCompleted: boolean;
+    sendOnHardwareAudit: boolean;
+}
+
+export interface ComplianceWatcherSettings {
+    enabled: boolean;
+    rules: ComplianceRule[];
+}
 
 export interface AppSettings {
     language: string;
@@ -126,6 +158,11 @@ export interface AppSettings {
         notifyOnFail: boolean;
     };
 
+    // Plugins & Extensibility
+    specPipeline?: SpecPipelineSettings;
+    telemetryWebhooks?: TelemetryWebhooksSettings;
+    complianceWatcher?: ComplianceWatcherSettings;
+
     // Custom Logos
     customLogoLight?: string;
     customLogoDark?: string;
@@ -138,54 +175,62 @@ const getDefaultSettings = (): AppSettings => ({
     primaryColor: 'blue',
     presentationEnabled: false,
     customAdbPath: '',
+    usageMode: 'automator',
     explorerPlatform: 'mobile',
+    automationFramework: 'robot',
     updateChannel: 'stable',
-    recycleDeviceViews: false, // Default to false
-    allowActionsDuringTest: false, // Default to false (blocking)
-    saveLogs: false, // Default to false
+    recycleDeviceViews: true,
+    allowActionsDuringTest: true,
+    saveLogs: false,
     noAppiumForRobot: false,
+
     appiumHost: '127.0.0.1',
     appiumPort: 4723,
     appiumBasePath: '/',
+
     paths: {
-        automationRoot: '',
-        resources: '',
-        tests: '',
         suites: '',
+        tests: '',
+        resources: '',
         logs: '',
         logcat: '',
         screenshots: '',
         recordings: '',
-        mappings: '',
+        automationRoot: '',
+        mappings: ''
     },
     logcatKeywords: [],
-    logcatLevel: 'E',
+    logcatLevel: 'verbose',
     logcatExtraTags: '',
+    logcatSelectedPackage: '',
     stopwatchSelectedPackage: '',
+
     tools: {
-        appiumArgs: getRemoteString('default_appium_args') || '--relaxed-security',
-        scrcpyArgs: getRemoteString('default_scrcpy_args') || '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake',
-        robotArgs: '--split-log',
+        appiumArgs: '',
+        scrcpyArgs: '',
+        robotArgs: '',
         maestroArgs: '',
-        appiumJavaArgs: 'test',
-        appPackage: 'com.android.chrome, com.chrome.beta',
+        appiumJavaArgs: '',
+        appPackage: '',
         ngrokToken: '',
         cypressArgs: '',
         seleniumArgs: ''
     },
+
     aiProvider: 'gemini',
     geminiApiKey: '',
-    geminiModel: getRemoteString('default_gemini_model') || 'gemini-3.1-flash-lite',
+    geminiModel: 'gemini-2.5-flash',
     claudeApiKey: '',
-    claudeModel: getRemoteString('default_claude_model') || 'claude-3-5-sonnet-20240620',
+    claudeModel: 'claude-3-5-sonnet-20241022',
     openaiApiKey: '',
-    openaiModel: getRemoteString('default_openai_model') || 'gpt-4o',
+    openaiModel: 'gpt-4o',
     antigravityApiKey: '',
     claudeCodeToken: '',
-    aiSessionId: undefined,
-    aiChatEnabled: false,
+    aiSessionId: '',
+    aiChatEnabled: true,
     aiTestModeEnabled: false,
-    maxExplorationSteps: 30,
+    maxExplorationSteps: 20,
+
     azureDevOps: {
         org: '',
         project: '',
@@ -214,6 +259,68 @@ const getDefaultSettings = (): AppSettings => ({
         teamsUrl: '',
         notifyOnPass: false,
         notifyOnFail: false
+    },
+
+    specPipeline: {
+        enabled: false,
+        baseSpecsDir: 'specs',
+        scenariosFilename: 'cenarios-de-teste.md',
+        resultsFilename: 'resultados.md',
+        evidenceSubdir: 'evidencias',
+        autoTranspileToRobot: true
+    },
+    telemetryWebhooks: {
+        enabled: false,
+        endpointUrl: '',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        tags: {
+            source: 'robot_runner'
+        },
+        sendOnTestCompleted: true,
+        sendOnHardwareAudit: true
+    },
+    complianceWatcher: {
+        enabled: false,
+        rules: [
+            {
+                id: 'pci-pan',
+                name: 'PCI Credit Card PAN',
+                pattern: '\\b(?:\\d[ -]*?){13,19}\\b',
+                severity: 'critical',
+                maskInLogs: true,
+                blockOnViolation: true,
+                enabled: true
+            },
+            {
+                id: 'pci-cvv',
+                name: 'PCI CVV / CVC Code',
+                pattern: '\\b\\d{3,4}\\b',
+                severity: 'critical',
+                maskInLogs: true,
+                blockOnViolation: true,
+                enabled: false
+            },
+            {
+                id: 'selinux-denied',
+                name: 'SELinux AVC Denials',
+                pattern: 'avc:\\s+denied',
+                severity: 'warning',
+                maskInLogs: false,
+                blockOnViolation: false,
+                enabled: true
+            },
+            {
+                id: 'private-key',
+                name: 'Private Key / Certificate Secret',
+                pattern: '-----BEGIN (?:RSA )?PRIVATE KEY-----',
+                severity: 'critical',
+                maskInLogs: true,
+                blockOnViolation: true,
+                enabled: true
+            }
+        ]
     }
 });
 

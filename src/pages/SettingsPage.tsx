@@ -1,7 +1,8 @@
 import { useSettings } from "@/lib/settings";
-import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles, FileJson, RefreshCcw, GitBranch, Link2, Briefcase, ChevronDown, FilePlus, Copy } from "lucide-react";
+import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles, FileJson, RefreshCcw, GitBranch, Link2, Briefcase, ChevronDown, FilePlus, Copy, FileText, Activity, ShieldAlert } from "lucide-react";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { emitTelemetryEvent } from "@/lib/telemetryService";
 
 const Slack = ({ size = 18 }: { size?: number }) => (
     <svg viewBox="0 0 24 24" width={size} height={size} stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -1073,6 +1074,388 @@ const parsed = JSON.parse(fileContent);
                             </AnimatePresence>
                         </div>
                     )}
+
+                    {/* Spec Pipeline (Spec-Driven QA) */}
+                    <div className="border border-outline-variant/30 rounded-2xl bg-surface/30 overflow-hidden">
+                        <div
+                            className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface-variant/10 transition-colors select-none"
+                            onClick={() => toggleIntegrationExpanded('specPipeline')}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                    <FileText size={18} />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-on-surface">
+                                        {t('settings.integrations.spec_pipeline.title', 'Spec Pipeline & Spec-Driven QA')}
+                                    </h3>
+                                    <span className="text-xs text-on-surface-variant/80">
+                                        {settings.specPipeline?.enabled
+                                            ? t('settings.integrations.enabled', 'Enabled')
+                                            : t('settings.integrations.disabled', 'Disabled')}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                                <Switch
+                                    checked={settings.specPipeline?.enabled || false}
+                                    onCheckedChange={(checked) => updateSetting('specPipeline', {
+                                        enabled: checked,
+                                        baseSpecsDir: settings.specPipeline?.baseSpecsDir || 'specs',
+                                        scenariosFilename: settings.specPipeline?.scenariosFilename || 'cenarios-de-teste.md',
+                                        resultsFilename: settings.specPipeline?.resultsFilename || 'resultados.md',
+                                        evidenceSubdir: settings.specPipeline?.evidenceSubdir || 'evidencias',
+                                        autoTranspileToRobot: settings.specPipeline?.autoTranspileToRobot ?? true
+                                    })}
+                                />
+                                <Button
+                                    type="button"
+                                    onClick={() => toggleIntegrationExpanded('specPipeline')}
+                                    className={clsx(
+                                        "p-1.5 text-on-surface-variant/80 hover:text-on-surface bg-transparent shadow-none hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                        expandedIntegrations.specPipeline && "transform rotate-180"
+                                    )}
+                                >
+                                    <ChevronDown size={20} />
+                                </Button>
+                            </div>
+                        </div>
+                        <AnimatePresence initial={false}>
+                            {expandedIntegrations.specPipeline && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="overflow-hidden"
+                                >
+                                    <div className="p-4 pt-0 border-t border-outline-variant/10 space-y-3">
+                                        <div className="h-2" />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <Input
+                                                label={t('settings.integrations.spec_pipeline.base_dir', 'Base Specifications Directory')}
+                                                type="text"
+                                                value={settings.specPipeline?.baseSpecsDir || 'specs'}
+                                                onChange={(e) => updateSetting('specPipeline', {
+                                                    ...settings.specPipeline,
+                                                    enabled: settings.specPipeline?.enabled || false,
+                                                    baseSpecsDir: e.target.value,
+                                                    scenariosFilename: settings.specPipeline?.scenariosFilename || 'cenarios-de-teste.md',
+                                                    resultsFilename: settings.specPipeline?.resultsFilename || 'resultados.md',
+                                                    evidenceSubdir: settings.specPipeline?.evidenceSubdir || 'evidencias',
+                                                    autoTranspileToRobot: settings.specPipeline?.autoTranspileToRobot ?? true
+                                                })}
+                                                placeholder="specs"
+                                            />
+                                            <Input
+                                                label={t('settings.integrations.spec_pipeline.scenarios_file', 'Test Scenarios Filename')}
+                                                type="text"
+                                                value={settings.specPipeline?.scenariosFilename || 'cenarios-de-teste.md'}
+                                                onChange={(e) => updateSetting('specPipeline', {
+                                                    ...settings.specPipeline,
+                                                    enabled: settings.specPipeline?.enabled || false,
+                                                    baseSpecsDir: settings.specPipeline?.baseSpecsDir || 'specs',
+                                                    scenariosFilename: e.target.value,
+                                                    resultsFilename: settings.specPipeline?.resultsFilename || 'resultados.md',
+                                                    evidenceSubdir: settings.specPipeline?.evidenceSubdir || 'evidencias',
+                                                    autoTranspileToRobot: settings.specPipeline?.autoTranspileToRobot ?? true
+                                                })}
+                                                placeholder="cenarios-de-teste.md"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <Input
+                                                label={t('settings.integrations.spec_pipeline.results_file', 'QA Results Filename')}
+                                                type="text"
+                                                value={settings.specPipeline?.resultsFilename || 'resultados.md'}
+                                                onChange={(e) => updateSetting('specPipeline', {
+                                                    ...settings.specPipeline,
+                                                    enabled: settings.specPipeline?.enabled || false,
+                                                    baseSpecsDir: settings.specPipeline?.baseSpecsDir || 'specs',
+                                                    scenariosFilename: settings.specPipeline?.scenariosFilename || 'cenarios-de-teste.md',
+                                                    resultsFilename: e.target.value,
+                                                    evidenceSubdir: settings.specPipeline?.evidenceSubdir || 'evidencias',
+                                                    autoTranspileToRobot: settings.specPipeline?.autoTranspileToRobot ?? true
+                                                })}
+                                                placeholder="resultados.md"
+                                            />
+                                            <Input
+                                                label={t('settings.integrations.spec_pipeline.evidence_dir', 'Evidence & Screenshots Subfolder')}
+                                                type="text"
+                                                value={settings.specPipeline?.evidenceSubdir || 'evidencias'}
+                                                onChange={(e) => updateSetting('specPipeline', {
+                                                    ...settings.specPipeline,
+                                                    enabled: settings.specPipeline?.enabled || false,
+                                                    baseSpecsDir: settings.specPipeline?.baseSpecsDir || 'specs',
+                                                    scenariosFilename: settings.specPipeline?.scenariosFilename || 'cenarios-de-teste.md',
+                                                    resultsFilename: settings.specPipeline?.resultsFilename || 'resultados.md',
+                                                    evidenceSubdir: e.target.value,
+                                                    autoTranspileToRobot: settings.specPipeline?.autoTranspileToRobot ?? true
+                                                })}
+                                                placeholder="evidencias"
+                                            />
+                                        </div>
+                                        <div className="flex items-center justify-between py-1">
+                                            <span className="text-xs font-semibold text-on-surface-variant/80 select-none">
+                                                {t('settings.integrations.spec_pipeline.auto_transpile', 'Auto-Transpile Markdown Scenarios to Robot Framework')}
+                                            </span>
+                                            <Switch
+                                                checked={settings.specPipeline?.autoTranspileToRobot ?? true}
+                                                onCheckedChange={(checked) => updateSetting('specPipeline', {
+                                                    ...settings.specPipeline,
+                                                    enabled: settings.specPipeline?.enabled || false,
+                                                    baseSpecsDir: settings.specPipeline?.baseSpecsDir || 'specs',
+                                                    scenariosFilename: settings.specPipeline?.scenariosFilename || 'cenarios-de-teste.md',
+                                                    resultsFilename: settings.specPipeline?.resultsFilename || 'resultados.md',
+                                                    evidenceSubdir: settings.specPipeline?.evidenceSubdir || 'evidencias',
+                                                    autoTranspileToRobot: checked
+                                                })}
+                                            />
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
+                    {/* Telemetry & Metrics Webhooks */}
+                    <div className="border border-outline-variant/30 rounded-2xl bg-surface/30 overflow-hidden">
+                        <div
+                            className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface-variant/10 transition-colors select-none"
+                            onClick={() => toggleIntegrationExpanded('telemetry')}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                    <Activity size={18} />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-on-surface">
+                                        {t('settings.integrations.telemetry.title', 'Telemetry & Metrics Webhooks')}
+                                    </h3>
+                                    <span className="text-xs text-on-surface-variant/80">
+                                        {settings.telemetryWebhooks?.enabled
+                                            ? t('settings.integrations.enabled', 'Enabled')
+                                            : t('settings.integrations.disabled', 'Disabled')}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                                <Switch
+                                    checked={settings.telemetryWebhooks?.enabled || false}
+                                    onCheckedChange={(checked) => updateSetting('telemetryWebhooks', {
+                                        enabled: checked,
+                                        endpointUrl: settings.telemetryWebhooks?.endpointUrl || '',
+                                        headers: settings.telemetryWebhooks?.headers || { 'Content-Type': 'application/json' },
+                                        tags: settings.telemetryWebhooks?.tags || { source: 'robot_runner' },
+                                        sendOnTestCompleted: settings.telemetryWebhooks?.sendOnTestCompleted ?? true,
+                                        sendOnHardwareAudit: settings.telemetryWebhooks?.sendOnHardwareAudit ?? true
+                                    })}
+                                />
+                                <Button
+                                    type="button"
+                                    onClick={() => toggleIntegrationExpanded('telemetry')}
+                                    className={clsx(
+                                        "p-1.5 text-on-surface-variant/80 hover:text-on-surface bg-transparent shadow-none hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                        expandedIntegrations.telemetry && "transform rotate-180"
+                                    )}
+                                >
+                                    <ChevronDown size={20} />
+                                </Button>
+                            </div>
+                        </div>
+                        <AnimatePresence initial={false}>
+                            {expandedIntegrations.telemetry && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="overflow-hidden"
+                                >
+                                    <div className="p-4 pt-0 border-t border-outline-variant/10 space-y-3">
+                                        <div className="h-2" />
+                                        <Input
+                                            label={t('settings.integrations.telemetry.endpoint_url', 'Event Ingestion Endpoint URL (e.g., web-metricas)')}
+                                            type="text"
+                                            value={settings.telemetryWebhooks?.endpointUrl || ''}
+                                            onChange={(e) => updateSetting('telemetryWebhooks', {
+                                                ...settings.telemetryWebhooks,
+                                                enabled: settings.telemetryWebhooks?.enabled || false,
+                                                endpointUrl: e.target.value,
+                                                headers: settings.telemetryWebhooks?.headers || { 'Content-Type': 'application/json' },
+                                                tags: settings.telemetryWebhooks?.tags || { source: 'robot_runner' },
+                                                sendOnTestCompleted: settings.telemetryWebhooks?.sendOnTestCompleted ?? true,
+                                                sendOnHardwareAudit: settings.telemetryWebhooks?.sendOnHardwareAudit ?? true
+                                            })}
+                                            placeholder="http://localhost:4317/api/eventos"
+                                        />
+                                        <div className="flex gap-6 pt-1">
+                                            <div className="flex items-center gap-2.5">
+                                                <span className="text-xs font-semibold text-on-surface-variant/80 select-none">
+                                                    {t('settings.integrations.telemetry.send_test', 'Dispatch telemetry upon test suite completion')}
+                                                </span>
+                                                <Switch
+                                                    checked={settings.telemetryWebhooks?.sendOnTestCompleted ?? true}
+                                                    onCheckedChange={(checked) => updateSetting('telemetryWebhooks', {
+                                                        ...settings.telemetryWebhooks,
+                                                        enabled: settings.telemetryWebhooks?.enabled || false,
+                                                        endpointUrl: settings.telemetryWebhooks?.endpointUrl || '',
+                                                        headers: settings.telemetryWebhooks?.headers || { 'Content-Type': 'application/json' },
+                                                        tags: settings.telemetryWebhooks?.tags || { source: 'robot_runner' },
+                                                        sendOnTestCompleted: checked,
+                                                        sendOnHardwareAudit: settings.telemetryWebhooks?.sendOnHardwareAudit ?? true
+                                                    })}
+                                                />
+                                            </div>
+                                            <div className="flex items-center gap-2.5">
+                                                <span className="text-xs font-semibold text-on-surface-variant/80 select-none">
+                                                    {t('settings.integrations.telemetry.send_audit', 'Dispatch telemetry upon hardware audit completion')}
+                                                </span>
+                                                <Switch
+                                                    checked={settings.telemetryWebhooks?.sendOnHardwareAudit ?? true}
+                                                    onCheckedChange={(checked) => updateSetting('telemetryWebhooks', {
+                                                        ...settings.telemetryWebhooks,
+                                                        enabled: settings.telemetryWebhooks?.enabled || false,
+                                                        endpointUrl: settings.telemetryWebhooks?.endpointUrl || '',
+                                                        headers: settings.telemetryWebhooks?.headers || { 'Content-Type': 'application/json' },
+                                                        tags: settings.telemetryWebhooks?.tags || { source: 'robot_runner' },
+                                                        sendOnTestCompleted: settings.telemetryWebhooks?.sendOnTestCompleted ?? true,
+                                                        sendOnHardwareAudit: checked
+                                                    })}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-end pt-2">
+                                            <Button
+                                                onClick={async () => {
+                                                    if (!settings.telemetryWebhooks?.endpointUrl) return;
+                                                    try {
+                                                        const success = await emitTelemetryEvent(settings, {
+                                                            evento: 'ping_test',
+                                                            status: 'PASS',
+                                                            duracaoMs: 100,
+                                                            totalTestes: 1,
+                                                            testesPass: 1,
+                                                            metadados: { ping: true }
+                                                        });
+                                                        if (success) {
+                                                            feedback.toast.success(t('settings.integrations.telemetry.test_success', 'Telemetry event dispatched successfully!'));
+                                                        } else {
+                                                            feedback.toast.error(t('settings.integrations.telemetry.test_failed', 'Failed to dispatch telemetry event.'));
+                                                        }
+                                                    } catch (err) {
+                                                        feedback.toast.error(t('settings.integrations.telemetry.test_failed', 'Failed to dispatch telemetry event.'), err);
+                                                    }
+                                                }}
+                                                disabled={!settings.telemetryWebhooks?.endpointUrl}
+                                                variant="secondary"
+                                                size="sm"
+                                            >
+                                                {t('settings.integrations.telemetry.test_webhook', 'Test Event Dispatch')}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
+                    {/* Logcat Compliance & Security Watcher */}
+                    <div className="border border-outline-variant/30 rounded-2xl bg-surface/30 overflow-hidden">
+                        <div
+                            className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface-variant/10 transition-colors select-none"
+                            onClick={() => toggleIntegrationExpanded('compliance')}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                    <ShieldAlert size={18} />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-on-surface">
+                                        {t('settings.integrations.compliance.title', 'Logcat Compliance & Privacy Watcher')}
+                                    </h3>
+                                    <span className="text-xs text-on-surface-variant/80">
+                                        {settings.complianceWatcher?.enabled
+                                            ? t('settings.integrations.enabled', 'Enabled')
+                                            : t('settings.integrations.disabled', 'Disabled')}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                                <Switch
+                                    checked={settings.complianceWatcher?.enabled || false}
+                                    onCheckedChange={(checked) => updateSetting('complianceWatcher', {
+                                        enabled: checked,
+                                        rules: settings.complianceWatcher?.rules || []
+                                    })}
+                                />
+                                <Button
+                                    type="button"
+                                    onClick={() => toggleIntegrationExpanded('compliance')}
+                                    className={clsx(
+                                        "p-1.5 text-on-surface-variant/80 hover:text-on-surface bg-transparent shadow-none hover:bg-surface-variant/30 rounded-2xl transition-all duration-200",
+                                        expandedIntegrations.compliance && "transform rotate-180"
+                                    )}
+                                >
+                                    <ChevronDown size={20} />
+                                </Button>
+                            </div>
+                        </div>
+                        <AnimatePresence initial={false}>
+                            {expandedIntegrations.compliance && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="overflow-hidden"
+                                >
+                                    <div className="p-4 pt-0 border-t border-outline-variant/10 space-y-3">
+                                        <div className="h-2" />
+                                        <div className="space-y-2">
+                                            {(settings.complianceWatcher?.rules || []).map((rule, rIdx) => {
+                                                const ruleKey = rule.id.replace(/-/g, '_');
+                                                const ruleLabel = t(`settings.integrations.compliance.${ruleKey}` as any, rule.name);
+                                                return (
+                                                    <div key={rule.id || rIdx} className="p-3 bg-surface/50 border border-outline-variant/20 rounded-xl flex items-center justify-between gap-3">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-xs font-bold text-on-surface truncate">{ruleLabel}</span>
+                                                                <span className={clsx(
+                                                                    "text-[10px] font-mono px-1.5 py-0.2 rounded font-bold uppercase",
+                                                                    rule.severity === 'critical' ? 'bg-error/10 text-error' : 'bg-warning/10 text-warning'
+                                                                )}>
+                                                                    {rule.severity}
+                                                                </span>
+                                                            </div>
+                                                            <span className="text-[11px] font-mono text-on-surface-variant/60 truncate block mt-0.5" title={rule.pattern}>
+                                                                {rule.pattern}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-4 shrink-0">
+                                                            <label className="text-[11px] text-on-surface-variant flex items-center gap-1.5 cursor-pointer">
+                                                                <Switch
+                                                                    checked={rule.enabled}
+                                                                    onCheckedChange={(c) => {
+                                                                        const updated = [...(settings.complianceWatcher?.rules || [])];
+                                                                        updated[rIdx] = { ...rule, enabled: c };
+                                                                        updateSetting('complianceWatcher', {
+                                                                            enabled: settings.complianceWatcher?.enabled || false,
+                                                                            rules: updated
+                                                                        });
+                                                                    }}
+                                                                />
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
                 </div>
             </Modal>
 

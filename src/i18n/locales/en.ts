@@ -1573,8 +1573,34 @@ export const en = {
                     title: "Slack & MS Teams Webhooks",
                     slack_url: "Slack Webhook URL",
                     teams_url: "MS Teams Webhook URL",
-                    notify_pass: "Notify on Test Pass",
-                    notify_fail: "Notify on Test Fail"
+                    notify_pass: "Notify on Pass",
+                    notify_fail: "Notify on Fail"
+                },
+                spec_pipeline: {
+                    title: "Spec Pipeline & Spec-Driven QA",
+                    base_dir: "Base Specifications Directory",
+                    scenarios_file: "Test Scenarios Filename",
+                    results_file: "QA Results Filename",
+                    evidence_dir: "Evidence & Screenshots Subfolder",
+                    auto_transpile: "Auto-Transpile Markdown Scenarios to Robot Framework"
+                },
+                telemetry: {
+                    title: "Telemetry & Metrics Webhooks",
+                    endpoint_url: "Event Ingestion Endpoint URL (e.g., web-metricas)",
+                    send_test: "Dispatch telemetry upon test suite completion",
+                    send_audit: "Dispatch telemetry upon hardware audit completion",
+                    test_webhook: "Test Event Dispatch",
+                    test_success: "Telemetry event dispatched successfully!",
+                    test_failed: "Failed to dispatch telemetry event."
+                },
+                compliance: {
+                    title: "Logcat Compliance & Privacy Watcher",
+                    rules_count: "{{count}} active rules",
+                    mask_in_logs: "Mask/Obfuscate in Logs",
+                    block_violation: "Fail QA on Critical Violation",
+                    pci_pan: "PCI Credit Card PAN",
+                    selinux_denied: "SELinux Violations (avc denied)",
+                    private_key: "Private Keys / Secrets"
                 },
                 test_connection: "Test Connection",
                 testing: "Testing..."

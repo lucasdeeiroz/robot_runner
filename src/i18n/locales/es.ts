@@ -1577,8 +1577,35 @@ export const es = {
                     title: "Webhooks de Slack y MS Teams",
                     slack_url: "URL del Webhook de Slack",
                     teams_url: "URL del Webhook de MS Teams",
-                    notify_pass: "Notificar cuando la Prueba Pase",
-                    notify_fail: "Notificar cuando la Prueba Falle"
+                    notify_pass: "Notificar quando la Prueba Pase",
+                    notify_fail: "Notificar quando la Prueba Falle"
+                },
+                spec_pipeline: {
+                    title: "Pipeline de Specs (Spec-Driven QA)",
+                    base_dir: "Directorio Base de Especificaciones",
+                    scenarios_file: "Nombre de Archivo de Escenarios de Prueba",
+                    results_file: "Nombre de Archivo de Resultados de QA",
+                    evidence_dir: "Subcarpeta de Evidencias / Capturas de Pantalla",
+                    auto_transpile: "Transpilar Escenarios Markdown a Robot Framework Automáticamente"
+                },
+                telemetry: {
+                    title: "Telemetría y Webhooks de Métricas",
+                    endpoint_url: "URL del Endpoint de Ingesta de Eventos (Ej: web-metricas)",
+                    send_test: "Emitir telemetría al completar pruebas",
+                    send_audit: "Emitir telemetría al completar auditoría de hardware",
+                    test_webhook: "Probar Envío de Evento",
+                    test_success: "¡Evento de telemetría enviado con éxito!",
+                    test_failed: "Error al enviar evento de telemetría."
+                },
+                compliance: {
+                    title: "Compliance y Protección de Datos en Logcat",
+                    rules_count: "{{count}} reglas activas",
+                    mask_in_logs: "Ocultar/Enmascarar en Registros",
+                    block_violation: "Reprobar QA en Violación Crítica",
+                    pci_pan: "PCI Tarjeta de Crédito (PAN)",
+                    pci_cvv: "PCI Código CVV/CVC",
+                    selinux_denied: "Violaciones SELinux (avc denied)",
+                    private_key: "Claves Privadas / Secretos"
                 },
                 test_connection: "Probar Conexión",
                 testing: "Probando..."

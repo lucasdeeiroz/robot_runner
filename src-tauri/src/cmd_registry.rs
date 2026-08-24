@@ -175,7 +175,12 @@ macro_rules! generate_robot_runner_handler {
             crate::files::get_reports_dir,
             crate::files::save_app_report,
             crate::files::list_app_reports,
-            crate::files::delete_app_report
+            crate::files::delete_app_report,
+            crate::telemetry_dispatcher::dispatch_telemetry_event,
+            crate::spec_runner::find_spec_directories,
+            crate::spec_runner::read_spec_file,
+            crate::spec_runner::write_spec_file,
+            crate::spec_runner::save_spec_evidence_screenshot
         ]
     };
 }

@@ -1578,6 +1578,33 @@ export const pt = {
                     notify_pass: "Notificar quando o Teste Passar",
                     notify_fail: "Notificar quando o Teste Falhar"
                 },
+                spec_pipeline: {
+                    title: "Pipeline de Specs (Spec-Driven QA)",
+                    base_dir: "Diretório Base de Especificações",
+                    scenarios_file: "Arquivo de Cenários de Teste",
+                    results_file: "Arquivo de Resultados de QA",
+                    evidence_dir: "Subpasta de Evidências / Screenshots",
+                    auto_transpile: "Transpilar Markdown para Robot Framework Automaticamente"
+                },
+                telemetry: {
+                    title: "Telemetria & Webhooks de Métricas",
+                    endpoint_url: "URL do Endpoint de Ingestão de Eventos (Ex: web-metricas)",
+                    send_test: "Emitir telemetria ao concluir execução de testes",
+                    send_audit: "Emitir telemetria ao concluir auditoria de hardware",
+                    test_webhook: "Testar Disparo de Evento",
+                    test_success: "Evento de telemetria disparado com sucesso!",
+                    test_failed: "Falha ao disparar evento de telemetria."
+                },
+                compliance: {
+                    title: "Compliance & Proteção de Dados no Logcat",
+                    rules_count: "{{count}} regras ativas",
+                    mask_in_logs: "Ocultar/Mascarar em Logs",
+                    block_violation: "Bloquear/Reprovar QA em Violação Crítica",
+                    pci_pan: "PCI Cartão de Crédito (PAN)",
+                    pci_cvv: "PCI Código CVV/CVC",
+                    selinux_denied: "Violações SELinux (avc denied)",
+                    private_key: "Chaves Privadas / Segredos"
+                },
                 test_connection: "Testar Conexão",
                 testing: "Testando..."
             }

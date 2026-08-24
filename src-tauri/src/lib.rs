@@ -19,6 +19,8 @@ mod git;
 pub mod env_setup;
 pub mod updater;
 pub mod companion;
+pub mod telemetry_dispatcher;
+pub mod spec_runner;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
