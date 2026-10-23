@@ -1,0 +1,28 @@
+{
+  "name": "gemini-api",
+  "displayName": "Gemini API",
+  "version": "2.2.0",
+  "description": "Build applications with the Gemini Interactions API and Live API, including text, image, video, and speech generation, managed agents, and real-time multimodal streaming.",
+  "logo": "https://www.gstatic.com/images/branding/productlogos/gemini_2026/v1/web-96dp/logo_gemini_2026_color_2x_web_96dp.png",
+  "suggestedPrompts": [
+    "Build a stateful multi-turn chat script using the Interactions API and the latest models",
+    "Create a real-time voice agent using the Gemini Live API and non-blocking function calling",
+    "Migrate my project from client.models.generate_content to the Interactions API"
+  ],
+  "author": {
+    "name": "Google"
+  },
+  "homepage": "https://aistudio.google.com/docs",
+  "repository": "https://github.com/google-gemini/gemini-skills",
+  "license": "Apache-2.0",
+  "keywords": [
+    "gemini",
+    "interactions-api",
+    "live-api",
+    "omni-flash",
+    "tts",
+    "agents",
+    "multimodal",
+    "streaming"
+  ]
+}
