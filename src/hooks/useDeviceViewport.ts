@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { XMLParser } from 'fast-xml-parser';
-import { InspectorNode, transformXmlToTree, findNodesAtCoords, transformCompanionTreeToInspectorNode } from '@/lib/inspectorUtils';
+import { InspectorNode, transformXmlToTree, findNodesAtCoords, transformCompanionTreeToInspectorNode, getXmlToImageScale } from '@/lib/inspectorUtils';
 import { feedback } from '@/lib/feedback';
 import { useSettings } from '@/lib/settings';
 
@@ -239,27 +239,36 @@ export function useDeviceViewport({
         }
     }, [deviceId, isActive, isBusy, refreshAll]);
 
+    // Scale from XML (device) space to rendered element space, keeping the XML->image mapping uniform
+    const getXmlToDisplayScale = useCallback((rect: DOMRect): { scaleX: number, scaleY: number } | null => {
+        if (!rootNode?.bounds) return null;
+        if (!imgLayout?.naturalWidth || !imgLayout.naturalHeight) {
+            return { scaleX: rect.width / rootNode.bounds.w, scaleY: rect.height / rootNode.bounds.h };
+        }
+        const { sx, sy } = getXmlToImageScale(rootNode.bounds.w, rootNode.bounds.h, imgLayout.naturalWidth, imgLayout.naturalHeight);
+        return {
+            scaleX: sx * (rect.width / imgLayout.naturalWidth),
+            scaleY: sy * (rect.height / imgLayout.naturalHeight)
+        };
+    }, [rootNode, imgLayout]);
+
     const addTapAnimation = useCallback((x: number, y: number) => {
         const id = Date.now();
-        if (!imgRef.current || !rootNode?.bounds) return;
-        const rect = imgRef.current.getBoundingClientRect();
-        
-        // Scale from XML space to screen space
-        const scaleX = rect.width / rootNode.bounds.w;
-        const scaleY = rect.height / rootNode.bounds.h;
+        if (!imgRef.current) return;
+        const scale = getXmlToDisplayScale(imgRef.current.getBoundingClientRect());
+        if (!scale) return;
+        const { scaleX, scaleY } = scale;
 
         setTaps(prev => [...prev, { id, x: x * scaleX, y: y * scaleY }]);
         setTimeout(() => setTaps(prev => prev.filter(t => t.id !== id)), 500);
-    }, [rootNode]);
+    }, [getXmlToDisplayScale]);
 
     const addSwipeAnimation = useCallback((startX: number, startY: number, endX: number, endY: number) => {
         const id = Date.now();
-        if (!imgRef.current || !rootNode?.bounds) return;
-        const rect = imgRef.current.getBoundingClientRect();
-        
-        // Scale from XML space to screen space
-        const scaleX = rect.width / rootNode.bounds.w;
-        const scaleY = rect.height / rootNode.bounds.h;
+        if (!imgRef.current) return;
+        const scale = getXmlToDisplayScale(imgRef.current.getBoundingClientRect());
+        if (!scale) return;
+        const { scaleX, scaleY } = scale;
 
         setSwipes(prev => [...prev, {
             id,
@@ -269,7 +278,7 @@ export function useDeviceViewport({
             endY: endY * scaleY
         }]);
         setTimeout(() => setSwipes(prev => prev.filter(s => s.id !== id)), 600);
-    }, [rootNode]);
+    }, [getXmlToDisplayScale]);
 
     const sendAdbInput = useCallback(async (cmd: string) => {
         if (!deviceId || isBusy || isWeb) return;
@@ -293,16 +302,16 @@ export function useDeviceViewport({
         const naturalY = (e.clientY - rect.top) * scaleY;
 
         // If we have a rootNode, we should scale back to its coordinate system (original device size)
+        // Uniform inverse mapping: the dump may exclude system bars (e.g. nav bar on Android <= 11)
         if (rootNode?.bounds) {
-            const xmlW = rootNode.bounds.w;
-            const xmlH = rootNode.bounds.h;
             const imgW = imgLayout.naturalWidth;
             const imgH = imgLayout.naturalHeight;
 
             if (imgW > 0 && imgH > 0) {
+                const { sx, sy } = getXmlToImageScale(rootNode.bounds.w, rootNode.bounds.h, imgW, imgH);
                 return {
-                    x: Math.round((naturalX / imgW) * xmlW),
-                    y: Math.round((naturalY / imgH) * xmlH)
+                    x: Math.round(naturalX / sx),
+                    y: Math.round(naturalY / sy)
                 };
             }
         }

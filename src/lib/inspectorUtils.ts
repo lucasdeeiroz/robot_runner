@@ -129,6 +129,27 @@ export function transformBounds(
 }
 
 /**
+ * Uniform scale factors from XML (device) space to screenshot space.
+ * The UI dump may exclude system bars (e.g. the 3-button nav bar on Android <= 11), so its extent
+ * can be smaller than the screenshot on one axis. Scaling each axis independently would stretch
+ * the overlay, so the axis fully covered by the dump (the smaller ratio) defines the scale.
+ */
+export function getXmlToImageScale(
+    xmlRootWidth: number,
+    xmlRootHeight: number,
+    actualImgWidth: number,
+    actualImgHeight: number
+): { sx: number; sy: number } {
+    if (!xmlRootWidth || !xmlRootHeight || !actualImgWidth || !actualImgHeight) return { sx: 1, sy: 1 };
+    const sx = actualImgWidth / xmlRootWidth;
+    const sy = actualImgHeight / xmlRootHeight;
+    // Orientation mismatch between dump and screenshot: keep legacy per-axis mapping
+    if ((xmlRootWidth > xmlRootHeight) !== (actualImgWidth > actualImgHeight)) return { sx, sy };
+    const k = Math.min(sx, sy);
+    return { sx: k, sy: k };
+}
+
+/**
  * Recursively converts the raw fast-xml-parser object into a cleaner InspectorNode tree.
  * Adds computed bounds and parent references.
  */
@@ -1001,13 +1022,18 @@ export function getHighlighterStyle(
         root = root.parent;
     }
     if (root?.bounds?.w && root.bounds.h) {
-        transformedBounds = transformBounds(
-            node.bounds,
+        const { sx, sy } = getXmlToImageScale(
             root.bounds.w,
             root.bounds.h,
             imgLayout.naturalWidth,
             imgLayout.naturalHeight
         );
+        transformedBounds = {
+            x: node.bounds.x * sx,
+            y: node.bounds.y * sy,
+            w: node.bounds.w * sx,
+            h: node.bounds.h * sy
+        };
     }
 
     const scaleX = imgLayout.width / imgLayout.naturalWidth;
