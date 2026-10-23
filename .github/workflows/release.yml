@@ -60,7 +60,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build-tauri:
+  build-tauri-windows:
     needs: create-release
     permissions:
       contents: write
@@ -68,22 +68,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest'
-            args: '--target universal-apple-darwin'
-          - platform: 'ubuntu-22.04'
-            args: ''
           - platform: 'windows-latest'
             args: ''
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install dependencies (Ubuntu)
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev
-
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -153,25 +142,64 @@ jobs:
              Write-Warning "Source Portable EXE file not found!"
           }
 
+      - name: Upload Renamed Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            Robot.Runner_*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Rename and Upload Artifacts (Linux)
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          VERSION="${{ github.ref_name }}"
-          VERSION=${VERSION#v}
-          
-          # AppImage
-          find src-tauri/target/release/bundle/appimage -name "*.AppImage" -exec cp {} Robot.Runner_${VERSION}_linux_amd64.AppImage \;
-          
-          # Deb
-          find src-tauri/target/release/bundle/deb -name "*.deb" -exec cp {} Robot.Runner_${VERSION}_linux_amd64.deb \;
-          
-          # Rpm (Tauri < v2 might stick headers, but standard name is usually package-version.arch.rpm)
-          # Assuming standard build.
-          # Note: rpm might not be built by default if not in tauri.conf.json targets? "all" usually includes it if tools present.
-          # Ubuntu runner has rpm/alien usually? Maybe not.
-          # If RPM is missing, this line just warns.
-          find src-tauri/target/release/bundle/rpm -name "*.rpm" -exec cp {} Robot.Runner_${VERSION}_linux_x86_64.rpm \; || true
+  build-tauri-macos:
+    needs: create-release
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            args: '--target universal-apple-darwin'
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Sync node version and setup cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build the app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
+        with:
+          # tagName, releaseName, releaseBody, releaseId REMOVED to prevent auto-upload
+          # We manually upload renamed artifacts in the next steps.
+          args: ${{ matrix.args }}
+
+      # Custom Artifact Renaming & Upload
 
       - name: Rename and Upload Artifacts (macOS)
         if: matrix.platform == 'macos-latest'
@@ -198,8 +226,93 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  build-tauri-linux:
+    needs: create-release
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'ubuntu-22.04'
+            args: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Sync node version and setup cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build the app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
+        with:
+          # tagName, releaseName, releaseBody, releaseId REMOVED to prevent auto-upload
+          # We manually upload renamed artifacts in the next steps.
+          args: ${{ matrix.args }}
+
+      # Custom Artifact Renaming & Upload
+
+      - name: Rename and Upload Artifacts (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION=${VERSION#v}
+          
+          # AppImage
+          find src-tauri/target/release/bundle/appimage -name "*.AppImage" -exec cp {} Robot.Runner_${VERSION}_linux_amd64.AppImage \;
+          
+          # Deb
+          find src-tauri/target/release/bundle/deb -name "*.deb" -exec cp {} Robot.Runner_${VERSION}_linux_amd64.deb \;
+          
+          # Rpm (Tauri < v2 might stick headers, but standard name is usually package-version.arch.rpm)
+          # Assuming standard build.
+          # Note: rpm might not be built by default if not in tauri.conf.json targets? "all" usually includes it if tools present.
+          # Ubuntu runner has rpm/alien usually? Maybe not.
+          # If RPM is missing, this line just warns.
+          find src-tauri/target/release/bundle/rpm -name "*.rpm" -exec cp {} Robot.Runner_${VERSION}_linux_x86_64.rpm \; || true
+
+      - name: Upload Renamed Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            Robot.Runner_*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   publish-winget:
-    needs: build-tauri
+    needs: build-tauri-windows
     runs-on: windows-latest
     steps:
       - name: Install WingetCreate
