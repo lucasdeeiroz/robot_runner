@@ -248,6 +248,21 @@ jobs:
           $VERSION = $env:VERSION
           $URL = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:RELEASE_TAG/Robot.Runner_${VERSION}_windows_x64-setup.exe"
 
+          # Sync the winget-pkgs fork first: wingetcreate cannot submit from a fork that fell far behind upstream.
+          # A missing fork is fine (wingetcreate creates it); a sync failure only warns and lets wingetcreate retry.
+          $env:GH_TOKEN = $env:WINGET_TOKEN
+          $owner = gh api user --jq .login
+          $fork = "$owner/winget-pkgs"
+          gh repo view $fork --json name *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh repo sync $fork --source microsoft/winget-pkgs --branch master
+            if ($LASTEXITCODE -ne 0) { Write-Warning "Could not sync $fork with microsoft/winget-pkgs." }
+            else { Write-Host "Synced $fork with microsoft/winget-pkgs." }
+          } else {
+            Write-Host "No $fork fork yet; wingetcreate will create it."
+          }
+          $global:LASTEXITCODE = 0
+
           # Update manifest locally first
           .\wingetcreate.exe update lucasdeeiroz.RobotRunner --version $VERSION --urls $URL --out .
 
