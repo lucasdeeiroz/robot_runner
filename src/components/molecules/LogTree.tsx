@@ -247,6 +247,7 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
         except: { label: t('run_tab.console.node_types.except', 'EXCEPT'), color: 'text-rose-400/80' },
         finally: { label: t('run_tab.console.node_types.finally', 'FINALLY'), color: 'text-purple-400/80' },
         while: { label: t('run_tab.console.node_types.while', 'WHILE'), color: 'text-orange-400/80' },
+        step: { label: t('run_tab.console.node_types.step', 'STEP'), color: 'text-cyan-400/80' },
         break: { label: t('run_tab.console.node_types.break', 'BREAK'), color: 'text-rose-300/70' },
         continue: { label: t('run_tab.console.node_types.continue', 'CONTINUE'), color: 'text-rose-300/70' },
     };
@@ -289,7 +290,7 @@ export const LogTree: React.FC<LogTreeProps> = React.memo(({
 
                     {node.type === 'suite' && <Layers size={14} className="opacity-70 shrink-0" />}
                     {node.type === 'test' && <BugPlay size={14} className="opacity-70 shrink-0" />}
-                    {node.type === 'keyword' && subType === 'keyword' && <CirclePlay size={14} className="opacity-70 shrink-0" />}
+                    {node.type === 'keyword' && (subType === 'keyword' || subType === 'step') && <CirclePlay size={14} className={clsx("opacity-70 shrink-0", subType === 'step' && "text-cyan-400")} />}
                     {node.type === 'keyword' && subType === 'for' && <Repeat size={14} className="opacity-70 shrink-0" />}
                     {node.type === 'keyword' && subType === 'iteration' && <IterationCcw size={14} className="opacity-70 shrink-0" />}
                     {node.type === 'keyword' && subType === 'if' && <Workflow size={14} className="opacity-70 shrink-0" />}

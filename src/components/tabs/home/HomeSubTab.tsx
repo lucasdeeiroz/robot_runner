@@ -203,6 +203,20 @@ export function HomeSubTab({ onNavigate }: HomeSubTabProps) {
             case 'refresh':
                 loadDevices();
                 break;
+            case 'launch_companion':
+            case 'connect_companion':
+                try {
+                    const toastId = feedback.toast.raw.loading(t('companion.launching', 'Launching Companion App...'));
+                    await invoke('launch_companion_app', { device: device.udid });
+                    feedback.toast.dismiss(toastId);
+                    feedback.toast.raw.success(t('companion.launched', 'Companion App launched'));
+                    setTimeout(() => {
+                        loadDevices();
+                    }, 1500);
+                } catch (e) {
+                    feedback.toast.raw.error(t('companion.launch_error', 'Failed to launch Companion App'));
+                }
+                break;
         }
     };
 

@@ -20,6 +20,32 @@ pub struct TestState(pub Arc<Mutex<HashMap<String, ProcessInfo>>>);
 
 use crate::cmd_utils::{new_std_command, new_tokio_command, get_adb_program};
 use crate::errors::{AppError, AppResult};
+use tauri::Manager;
+
+fn resolve_script_path(name: &str, app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let resource_candidate = resource_dir.join("scripts").join(name);
+        if resource_candidate.exists() {
+            return Ok(resource_candidate);
+        }
+        let fallback_resource_candidate = resource_dir.join(name);
+        if fallback_resource_candidate.exists() {
+            return Ok(fallback_resource_candidate);
+        }
+    }
+    
+    let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    
+    let direct = current_dir.join(format!("scripts/{}", name));
+    if direct.exists() {
+        return Ok(direct);
+    }
+    let parent = current_dir.join(format!("../scripts/{}", name));
+    if parent.exists() {
+        return Ok(parent);
+    }
+    Err(format!("Could not find scripts/{}", name))
+}
 
 /// Sends a graceful stop signal to a process.
 fn graceful_stop(child: &mut Child, output_dir: &str) -> bool {
@@ -695,7 +721,6 @@ pub async fn run_cypress_test(
     if let Ok(json) = serde_json::to_string_pretty(&metadata) {
         let _ = std::fs::write(metadata_path, json);
     }
-
     let adb_program = get_adb_program(&app);
     let mut cmd;
     #[cfg(target_os = "windows")]
@@ -790,4 +815,260 @@ pub async fn run_selenium_test(
     }
     cmd.env("ADB", &adb_program);
     spawn_and_monitor(app, state, run_id, cmd, working_dir, abs_output_dir).await
+}
+
+#[tauri::command]
+pub async fn compile_and_send_rrt(
+    app: AppHandle,
+    state: State<'_, TestState>,
+    run_id: String,
+    test_path: Option<String>,
+    output_dir: String,
+    _logs_path: Option<String>,
+    device: Option<String>,
+    _device_model: Option<String>,
+    _android_version: Option<String>,
+    working_dir: Option<String>,
+    selected_tests: Option<Vec<String>>,
+    arguments_file: Option<String>,
+    _timestamp_outputs: Option<bool>,
+) -> AppResult<String> {
+    let output_dir = crate::cmd_utils::expand_env_vars(&output_dir);
+    let test_path = test_path.map(|p| crate::cmd_utils::expand_env_vars(&p));
+    let working_dir = working_dir.map(|p| crate::cmd_utils::expand_env_vars(&p));
+
+    let abs_output_dir = std::fs::canonicalize(&output_dir)
+        .map(|p| {
+            let s = p.to_string_lossy().to_string();
+            if s.starts_with(r"\\?\") {
+                s[4..].to_string()
+            } else {
+                s
+            }
+        })
+        .unwrap_or_else(|_| output_dir.clone());
+
+    std::fs::create_dir_all(&abs_output_dir).map_err(|e| AppError::IoError(format!("Failed to create output directory: {}", e)))?;
+
+    let _ = app.emit("test-output", TestOutput {
+        run_id: run_id.clone(),
+        message: "[System] Compiling RRT...".to_string(),
+    });
+
+    let python_bin = if let Some(ref wd) = working_dir {
+        crate::env_setup::get_venv_python_path(std::path::Path::new(wd))
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| "python".to_string())
+    } else {
+        "python".to_string()
+    };
+
+    let script_path = resolve_script_path("rrt_compiler.py", &app)
+        .map_err(|e| AppError::CommandFailed(e))?;
+
+    let mut compiler_cmd = Command::new(&python_bin);
+    compiler_cmd.arg(&script_path);
+
+    if let Some(ref af) = arguments_file {
+        if !af.is_empty() {
+            compiler_cmd.arg("--args-file").arg(af);
+        }
+    }
+    if let Some(ref tp) = test_path {
+        if !tp.is_empty() {
+            compiler_cmd.arg("--path").arg(tp);
+        }
+    }
+    if let Some(ref selected) = selected_tests {
+        for s in selected {
+            if !s.is_empty() {
+                compiler_cmd.arg("--selected").arg(s);
+            }
+        }
+    }
+
+    if let Some(ref wd) = working_dir {
+        compiler_cmd.current_dir(wd);
+    }
+    compiler_cmd.stdout(Stdio::piped());
+    compiler_cmd.stderr(Stdio::piped());
+
+    let output = compiler_cmd.output().await.map_err(|e| AppError::IoError(format!("Failed to run rrt_compiler: {}", e)))?;
+    let payload = String::from_utf8_lossy(&output.stdout).to_string();
+
+    if !output.status.success() {
+        let err = String::from_utf8_lossy(&output.stderr).to_string();
+        let _ = app.emit("test-output", TestOutput {
+            run_id: run_id.clone(),
+            message: format!("RRT Compilation failed: {}", err),
+        });
+        let _ = app.emit("test-finished", TestFinished {
+            run_id: run_id.clone(),
+            exit_code: 1,
+        });
+        return Err(AppError::CommandFailed(format!("RRT Compilation failed: {}", err)));
+    }
+
+    let _ = app.emit("test-output", TestOutput {
+        run_id: run_id.clone(),
+        message: "[System] Compiled Robot file to RRT protocol payload.".to_string(),
+    });
+
+    // Send to Companion through the per-device gateway (forward + auth token)
+    let udid = match device {
+        Some(d) if !d.trim().is_empty() => d,
+        _ => {
+            let msg = "[System] No device selected for RRT execution.".to_string();
+            let _ = app.emit("test-output", TestOutput { run_id: run_id.clone(), message: msg.clone() });
+            let _ = app.emit("test-finished", TestFinished { run_id: run_id.clone(), exit_code: 1 });
+            return Err(AppError::CommandFailed(msg));
+        }
+    };
+
+    let target_package = serde_json::from_str::<serde_json::Value>(&payload)
+        .ok()
+        .and_then(|v| v.get("target_package").and_then(|p| p.as_str().map(|s| s.to_string())))
+        .filter(|p| crate::cmd_utils::is_valid_android_package(p));
+
+    // Register the run so `stop_test` can cancel it like any other run.
+    let (control_tx, mut control_rx) = tokio::sync::mpsc::channel::<ProcessCommand>(10);
+    {
+        let mut procs = state
+            .0
+            .lock()
+            .map_err(|e| AppError::ProcessError(format!("Failed to lock process state: {}", e)))?;
+        if procs.contains_key(&run_id) {
+            return Err(AppError::ProcessError(format!(
+                "A test with run ID '{}' is already running",
+                run_id
+            )));
+        }
+        procs.insert(run_id.clone(), ProcessInfo { control_tx });
+    }
+
+    let outcome = stream_rrt_execution(&app, &run_id, &udid, payload, &mut control_rx).await;
+
+    if let Ok(mut procs) = state.0.lock() {
+        procs.remove(&run_id);
+    }
+
+    // Guaranteed ADB privileged termination of the target application on teardown
+    if let Some(ref target_pkg) = target_package {
+        let adb_program = get_adb_program(&app);
+        let mut force_stop_cmd = new_tokio_command(&adb_program);
+        force_stop_cmd.args(["-s", &udid, "shell", "am", "force-stop", target_pkg]);
+        let _ = force_stop_cmd.output().await;
+    }
+
+    let (exit_code, result_msg) = match outcome {
+        RrtOutcome::Finished(code) => (code, "RRT executed"),
+        RrtOutcome::Stopped => {
+            let _ = app.emit("test-output", TestOutput {
+                run_id: run_id.clone(),
+                message: "[System] RRT run stopped by user.".to_string(),
+            });
+            (1, "RRT stopped")
+        }
+        RrtOutcome::Failed(msg) => {
+            let _ = app.emit("test-output", TestOutput { run_id: run_id.clone(), message: msg });
+            (1, "RRT failed")
+        }
+    };
+
+    let _ = app.emit("test-finished", TestFinished { run_id: run_id.clone(), exit_code });
+    Ok(result_msg.to_string())
+}
+
+enum RrtOutcome {
+    /// A `finish` event was received with this exit code.
+    Finished(i32),
+    Stopped,
+    /// Connection/HTTP/stream error, or the stream ended without a `finish` event.
+    Failed(String),
+}
+
+/// Handles one NDJSON line of the RRT stream. Returns `Some(exit_code)` on a `finish` event.
+fn handle_rrt_line(app: &AppHandle, run_id: &str, line: &str) -> Option<i32> {
+    let Ok(json_val) = serde_json::from_str::<serde_json::Value>(line) else {
+        let _ = app.emit("test-output", TestOutput { run_id: run_id.to_string(), message: line.to_string() });
+        return None;
+    };
+    let event_type = json_val.get("type").and_then(|t| t.as_str()).unwrap_or("");
+    if let Some(msg) = json_val.get("message").and_then(|m| m.as_str()) {
+        let _ = app.emit("test-output", TestOutput { run_id: run_id.to_string(), message: msg.to_string() });
+    }
+    if event_type != "finish" {
+        return None;
+    }
+    // Default to failure unless the Companion explicitly reports success.
+    let mut exit_code = json_val
+        .get("exitCode")
+        .and_then(|c| c.as_i64())
+        .map(|c| c as i32)
+        .unwrap_or(1);
+    if json_val.get("status").and_then(|s| s.as_str()) == Some("error") && exit_code == 0 {
+        exit_code = 1;
+    }
+    Some(exit_code)
+}
+
+async fn stream_rrt_execution(
+    app: &AppHandle,
+    run_id: &str,
+    udid: &str,
+    payload: String,
+    control_rx: &mut tokio::sync::mpsc::Receiver<ProcessCommand>,
+) -> RrtOutcome {
+    let open = crate::companion::companion_open_stream(app, udid, "POST", "/rrt/execute", Some(payload));
+    let mut response = tokio::select! {
+        res = open => match res {
+            Ok(r) => r,
+            Err(e) => return RrtOutcome::Failed(format!("[System] Error connecting to Companion server: {}", e)),
+        },
+        Some(_) = control_rx.recv() => return RrtOutcome::Stopped,
+    };
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let text = response.text().await.unwrap_or_default();
+        return RrtOutcome::Failed(format!(
+            "[System] Failed to execute RRT on Companion. Status: {}, Body: {}",
+            status, text
+        ));
+    }
+
+    let mut buffer = String::new();
+    loop {
+        let chunk = tokio::select! {
+            c = response.chunk() => c,
+            Some(_) = control_rx.recv() => return RrtOutcome::Stopped,
+        };
+        match chunk {
+            Ok(Some(bytes)) => {
+                buffer.push_str(&String::from_utf8_lossy(&bytes));
+                while let Some(pos) = buffer.find('\n') {
+                    let line = buffer[..pos].trim().to_string();
+                    buffer.drain(..=pos);
+                    if line.is_empty() {
+                        continue;
+                    }
+                    if let Some(code) = handle_rrt_line(app, run_id, &line) {
+                        return RrtOutcome::Finished(code);
+                    }
+                }
+            }
+            Ok(None) => break,
+            Err(e) => {
+                return RrtOutcome::Failed(format!("[System] RRT stream interrupted: {}", e));
+            }
+        }
+    }
+
+    let leftover = buffer.trim().to_string();
+    if !leftover.is_empty() {
+        if let Some(code) = handle_rrt_line(app, run_id, &leftover) {
+            return RrtOutcome::Finished(code);
+        }
+    }
+    RrtOutcome::Failed("[System] RRT stream ended without a finish event; marking the run as failed.".to_string())
 }

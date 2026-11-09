@@ -50,9 +50,14 @@ export function CustomLogo({ path, className }: CustomLogoProps) {
                 if (!data) throw lastError;
 
                 // Convert to Base64
-                const base64 = btoa(
-                    new Uint8Array(data).reduce((data, byte) => data + String.fromCharCode(byte), '')
-                );
+                const uint8Array = new Uint8Array(data);
+                let binaryString = '';
+                const chunkSize = 8192;
+                for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                    const chunk = uint8Array.subarray(i, i + chunkSize);
+                    binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+                }
+                const base64 = btoa(binaryString);
 
                 const ext = path.split('.').pop()?.toLowerCase();
                 const mime = ext === 'svg' ? 'image/svg+xml' : (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg' : 'image/png';

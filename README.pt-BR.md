@@ -52,6 +52,7 @@ Explore nossos guias detalhados para obter o máximo do Robot Runner:
 ### 📖 Guias Principais
 - [Instalação e Configuração](docs/pt-BR/SETUP.md)
 - [Guia do Usuário](docs/pt-BR/USAGE.md)
+- [Arquitetura e Benchmarks do Companion](docs/pt-BR/CompanionIntegration.md)
 - [Solução de Problemas](docs/pt-BR/TROUBLESHOOTING.md)
 
 ### 🏠 Módulos Principais

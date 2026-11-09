@@ -24,7 +24,8 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
     // 3. Testing Error (Python/Robot/Appium)
     // 4. Mirroring Error (Scrcpy)
 
-    if (status.loading || !status.complete) {
+    // Only the critical ADB check blocks the UI; other tools are identified in background
+    if (status.loading) {
         return (
             <motion.div
                 key="loading"
@@ -98,6 +99,9 @@ export function SystemCheckOverlay({ status, onCriticalExit, onTestingRedirect, 
             </motion.div>
         );
     }
+
+    // Optional tool warnings wait for the background check to finish
+    if (!status.complete) return null;
 
     // Testing Tools Check
     if (status.missingTesting.length > 0) {

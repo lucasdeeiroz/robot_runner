@@ -1,0 +1,177 @@
+---
+trigger: always_on
+---
+
+# Android Companion App (Kotlin) Development & Architecture Rules
+
+This document outlines mandatory architectural guidelines, performance standards, and code patterns for developing the native **Robot Runner Companion** application (`companion/`) and complements the android-companion-tech.md document. If you find better, more efficient ways to implement the features you were asked to, feel free to enhance or complement this document.
+
+---
+
+## 1. Dual Independence & Synergy Principle
+
+1. **Independent Operation**: The Companion app must be fully functional as an on-device standalone Android QA tool. Every core feature (Inspection, Hardware Checkup, Logcat View, Test Execution, Report Export) must work locally on the device without requiring a connection to Robot Runner Desktop. But you can make the features work better when they are connected if the connection offers you benefits over local implementation.
+2. **Synergistic Integration**: When connected to Robot Runner Desktop over USB/Wi-Fi (port 9876), Companion acts as a high-speed agent (sub-10ms UI tree, REST telemetry, native icon provider).
+3. **Bi-Directional Data Exchange**: Test artifacts, Golden Files (`golden_*.json`), UI Element Maps (`map_*.json`), and audit reports (`report_*.json`, `audit_*.pdf`) must use standard JSON/PDF schemas compatible with both Desktop and Companion.
+
+---
+
+## 2. Kotlin Architecture & Performance Standards
+
+1. **Coroutines & Thread Safety**:
+   - Heavy tasks (UI tree traversal, REST server responses, PDF generation, filesystem I/O) MUST run on `Dispatchers.IO` or `Dispatchers.Default`. Never block the Main UI Thread.
+   - Use `StateFlow` and `SharedFlow` for reactive state management between NanoHTTPd REST endpoints and Jetpack Compose screens.
+
+2. **Memory Leak Prevention in `AccessibilityService`**:
+   - `AccessibilityNodeInfo` objects hold strong references to OS UI trees. Always scope node inspection properly and call `.recycle()` on legacy nodes when applicable to prevent memory leaks during continuous inspection loops.
+   - Guard against `null` returns on `rootInActiveWindow` (especially on Android 14+ or multi-window / Samsung DeX / Knox devices) by falling back to `accessibilityService.windows`.
+
+3. **Restricted Device & POS Fallbacks**:
+   - Dispositivos POS (SmartPOS Android) frequently restrict access to `/proc/` or system settings. Always implement multi-tier fallbacks:
+     - Priority 1: Native Android API (`ActivityManager`, `BatteryManager`, `PackageManager`).
+     - Priority 2: Standard Shell commands (`dumpsys`, `getprop`).
+     - Priority 3: Graceful fallback indicator (`N/A` or Restricted Mode) without crashing the app.
+
+---
+
+## 3. Hardware Telemetry & Accessibility Detection Rules
+
+1. **Accessibility Service Status Check**:
+   - Always check `CompanionAccessibilityService.isRunning` first (checking `instance != null`) before querying system settings.
+   - Supplement with `AccessibilityManager.getEnabledAccessibilityServiceList()` and multi-format component checks (`packageName/.service.CompanionAccessibilityService` and full canonical name) to ensure accurate active state detection across all OEM Android skins (One UI, MIUI, ColorOS).
+
+2. **SELinux-Proof Multi-Tier CPU Calculation**:
+   - Never rely solely on `/proc/stat` for CPU load on Android 8.0+ (API 26+) as non-root SELinux policies block `/proc/stat` access.
+   - Implement a multi-tier fallback:
+     - Tier 1: Hardware CPU scaling frequencies (`/sys/devices/system/cpu/cpu*/cpufreq/`).
+     - Tier 2: `/proc/stat` (for legacy/rooted Android).
+     - Tier 3: Process CPU delta via `Process.getElapsedCpuTime()` combined with system uptime.
+
+---
+
+## 4. On-Device Package Management & Local Shell Execution Rules
+
+1. **Async Package Traversal**:
+   - Querying `packageManager.getInstalledPackages()` or requested permissions can inspect hundreds of applications on Android devices. This operation MUST be run asynchronously on `Dispatchers.IO` to prevent blocking the UI frame rendering or triggering ANR (Application Not Responding) dialogs.
+
+2. **FileProvider & Temporary Storage Scoping for APK Sharing**:
+   - Never share APK files directly from `/data/app/...` via raw file paths, as Android 10+ scoped storage blocks cross-package file access.
+   - Always copy the APK file (`applicationInfo.sourceDir`) to `context.cacheDir` (or external storage) and expose it securely using `FileProvider.getUriForFile()` with `Intent.FLAG_GRANT_READ_URI_PERMISSION`.
+
+3. **Local Shell Command Timeout & Stream Isolation**:
+   - When executing local shell commands (`dumpsys`, `pm`, `getprop`, `settings`, `wm`) via `ProcessBuilder("sh", "-c", command)`, always enforce a timeout limit (e.g. 10 seconds) and read `stdout` and `stderr` on separate worker threads to avoid stream deadlocks when stdout buffers fill up.
+
+---
+
+## 5. Wireless ADB & Network Interface Traversal Rules
+
+1. **Android 11+ Wireless Debugging Deep-Linking**:
+   - Always verify `Build.VERSION.SDK_INT >= Build.VERSION_CODES.R` (API 30) before suggesting Wireless Debugging workflows. Use `Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS` with fallback to `Settings.ACTION_SETTINGS` to safely open system Developer Options.
+
+2. **Multi-Transport Network Interface Parsing**:
+   - Network interface enumeration (`NetworkInterface.getNetworkInterfaces()`) must filter out loopback (`lo`) addresses while accurately categorizing `wlan*` (Wi-Fi), `eth*` (Ethernet), `ap*`/`swlan*` (Hotspot), `rmnet*` (Cellular), and `tun*` (VPN) interfaces.
+
+---
+
+## 6. Ring-Buffer Logcat Streaming & Overlay HUD Rules
+
+1. **Memory-Bounded Ring Buffer for Logcat**:
+   - Streaming `logcat` on device can generate thousands of lines per minute. Always bound the in-memory log buffer (e.g. max 1,000 items) using thread-safe synchronization (`Collections.synchronizedList` or `ArrayDeque`) to prevent OutOfMemory (OOM) crashes during long QA testing sessions.
+
+2. **System Alert Window Permission Guard for Overlay HUD**:
+   - Creating a floating overlay window requires `SYSTEM_ALERT_WINDOW` permission and `WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY` (API 26+). Always verify `Settings.canDrawOverlays(context)` before starting `FloatingHudService`, and guide the user to `Settings.ACTION_MANAGE_OVERLAY_PERMISSION` if ungranted.
+
+---
+
+## 7. Accessibility-Driven Redraw Latency & Stopwatch Rules
+
+1. **Hardware-Accurate Event Delta Calculation**:
+   - Screen redraw deltas are computed inside `CompanionAccessibilityService` by pairing the touch event timestamp (`TYPE_VIEW_CLICKED`, `performTap`) with the subsequent screen content change event timestamp (`TYPE_WINDOW_CONTENT_CHANGED`). Always validate that `now >= lastTouchTimestamp` and cap realistic UI render deltas between 1ms and 10,000ms to eliminate anomalous background redraw noise.
+
+2. **Thread-Safe Benchmark History Isolation**:
+   - Lap history and session summaries in `RedrawStopwatchEngine` must use synchronized lists (`Collections.synchronizedList`) and thread-safe data structures so concurrent REST queries (`/stopwatch/laps`) and UI Compose renders never trigger `ConcurrentModificationException`.
+
+---
+
+## 8. Accessibility-Driven BDD Execution & Report Generation Rules
+
+1. **Native UI Tree Matching & Gesture Dispatching**:
+   - Native BDD test step execution relies on `CompanionAccessibilityService.performNodeActionByMatch` to locate interactive views by `textMatch`, `contentDescMatch`, or `resourceId`. Always fallback to parent containers if `isClickable` is false on child text views.
+
+2. **On-Device Audit Report Formatting**:
+   - Generated audit reports (`report_*.html` and `report_*.json`) must be self-contained files saved directly to `Environment.DIRECTORY_DOWNLOADS` or served securely via `FileProvider`. HTML reports must include dark mode CSS themes compatible with mobile and desktop web browsers.
+
+---
+
+## 9. On-Device DFS Graph Autonomous Exploration Rules
+
+1. **Native DFS State Machine Isolation**:
+   - On-device autonomous exploration runs on `Dispatchers.IO` using Kotlin Coroutines inside `AutonomousExplorerEngine`. Always emit graph state changes (`UNEXPLORED`, `EXPLORING`, `EXHAUSTED`) through thread-safe `StateFlow` streams.
+
+2. **Dead-End & Back-Navigation Guards**:
+   - When no unvisited interactive elements remain on the active screen node, the explorer must dispatch `AccessibilityService.GLOBAL_ACTION_BACK` to backtrack to parent screen nodes without causing ANR crashes or navigation traps.
+
+---
+
+## 10. Offline Hardware Diagnostics, UI Text Verification & PDF Audit Rules
+
+1. **Golden File Schema Compatibility**:
+   - Golden Files generated on device (`golden_*.json`) must conform strictly to `version 2.0` schema, exporting clean `id`, `text`, and `description` properties compatible with Desktop assertions.
+
+2. **Native PDF Canvas Layout & Thread Isolation**:
+   - Technical audit PDF reports (`audit_report_*.pdf`) are rendered via `android.graphics.pdf.PdfDocument` on `Dispatchers.IO`. Always compute Y-offset bounds dynamically (`y += 18f`) to prevent text overlapping across document sections.
+
+---
+
+## 11. Bi-Directional Synchronization & Fleet P2P Subnet Discovery Rules
+
+1. **Artifact Vault Indexing & Scoped File Sharing**:
+   - `SyncManager` indexes local artifacts (`map_*.json`, `golden_*.json`, `suite_*.json`, `report_*.html`, `audit_report_*.pdf`) directly from `Environment.DIRECTORY_DOWNLOADS`. Sharing files to external apps or Desktop must always go through `FileProvider.getUriForFile()` with `FLAG_GRANT_READ_URI_PERMISSION`.
+
+---
+
+## 12. Continuous Learning & Rule Maintenance Instruction
+
+> **IMPORTANT**: As new features, optimizations, or Android SDK workarounds are implemented in `companion/`, the **Android Companion Engineer** profile MUST update and append new rules directly to this document.
+---
+
+## 13. UI Folder Structure & Code Organization
+
+1. **Desktop Parity**: The Android Companion app MUST mirror the React Desktop structure for its UI components to maintain consistency across the workspace.
+   - **Pages**: Root-level screens should reside in ui/pages (e.g., HomePage.kt).
+   - **Tabs**: Tab contents and sub-sections should be organized in ui/components/tabs/<feature_name> (e.g., ui/components/tabs/home/HomeSubTab.kt, ConnectSubTab.kt).
+   - Never place UI tab components loosely in root packages or unorganized folders (like 
+et/ or sync/ if they are UI representations). Keep business logic in their respective modules, but UI components must follow the ui/ hierarchy.
+
+## 14. Internationalization & Strings
+
+1. **No Hardcoded UI Strings**: Ensure that any string exposed to the UI (titles, descriptions, placeholders) uses stringResource(id = R.string.key). Avoid hardcoded English or Portuguese text in Compose files.
+2. **Resource Duplication Prevention**: Always check for existing keys before adding new strings to `strings.xml` in multiple languages (`values`, `values-pt`, `values-es`) to avoid Gradle build failures from resource merging.
+3. **Strings outside Composable Context**: For strings that need to be accessed outside of the Compose hierarchy (e.g., inside `onClick` lambdas for `Toast.makeText` or `Intent.createChooser`), do NOT use `@Composable` `stringResource`. Retrieve the `Context` beforehand (e.g. `val context = LocalContext.current`) and use `context.getString(R.string.key)`.
+
+---
+
+## 15. CameraX & MLKit Barcode Scanner Benchmarking Rules
+
+1. **Hot Start vs Cold Start Lifecycle Management**:
+   - **Hot Start**: Camera stays pre-warmed and running in the staging viewfinder. `cameraInitMs` is recorded as 0ms, measuring pure target acquisition (`searchMs`) and neural decoding (`decodeMs`). The camera preview MUST stay alive after saving/discarding a lap to allow consecutive rounds without hardware re-initialization overhead.
+   - **Cold Start**: Camera provider is unbound while idle and strictly bound upon tapping Start. `cameraInitMs` measures the full hardware sensor startup delay (`firstFrameTimestamp - sessionStartTime`).
+2. **Dual-Tier Distance Estimation**:
+   - **Tier 1 (Hardware Autofocus)**: Intercept Camera2 `CaptureResult.LENS_FOCUS_DISTANCE` via `Camera2Interop.Extender` capture callback ($d = \frac{100}{\text{diopters}}\text{ cm}$).
+   - **Tier 2 (Optical Geometry)**: When autofocus is fixed or unavailable (e.g. basic POS terminals), calculate estimated distance using MLKit barcode bounding box pixel width ratio against sensor resolution ($d = \frac{W_{\text{real}} \cdot W_{\text{img}}}{w_{\text{px}}}$).
+3. **Safe Torch & Hardware Guarding**:
+   - Always verify `cameraInfo.hasFlashUnit()` and guard with try-catch blocks when modifying `cameraControl.enableTorch()` to prevent crashes on specialized Android POS devices lacking flashlight hardware.
+
+---
+
+## 16. On-Demand HTTP Server Lifecycle & Idle Timeout Watchdog Rules
+
+1. **Lazy Server Activation**:
+   - The Companion HTTP Server (`CompanionHttpServer`) and its `CompanionServerService` must NOT start automatically on app launch (`onCreate`), preventing unnecessary Foreground Service notifications, battery drain, and Doze mode blocking.
+2. **Intent-Driven Lifecycle Control**:
+   - The server is started on demand via explicit intents (`ACTION_START_SERVER`) with an inactivity timeout parameter (`EXTRA_IDLE_TIMEOUT_SECONDS`).
+   - Desktop initiates connection via ADB (`am start-foreground-service -a START_SERVER --ei IDLE_TIMEOUT_SECONDS 120`), providing a 120-second inactivity watchdog.
+   - On-device manual toggles from the UI default to an extended timeout (e.g. 900 seconds / 15 minutes) for standalone testing sessions.
+3. **Inactivity Watchdog**:
+   - Every request received by `CompanionHttpServer.serve()` updates `lastRequestTimestamp`.
+   - A background coroutine watchdog inside `CompanionServerService` monitors inactivity. If elapsed time exceeds the timeout, the service automatically executes `stopServer()`, removes its foreground notification, and calls `stopSelf()`.

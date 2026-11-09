@@ -459,19 +459,21 @@ export function FileExplorer({
                             </p>
                         </div>
                         <Button
+                            variant="primary"
                             onClick={handleSelectFolder}
-                            className="flex items-center gap-2 px-6 py-2.5 bg-primary text-on-primary rounded-2xl text-sm font-medium hover:bg-primary/90 transition-all shadow-md active:scale-95"
+                            leftIcon={<Folder size={18} />}
+                            className="px-6 py-2.5 rounded-2xl text-sm shadow-md"
                         >
-                            <Folder size={18} />
                             {t('file_explorer.select_folder_btn')}
                         </Button>
 
                         {onNavigate && (
                             <Button
+                                variant="secondary"
                                 onClick={() => onNavigate?.('settings')}
-                                className="flex items-center gap-2 px-6 py-2 text-on-surface-variant/60 hover:text-primary transition-all text-sm"
+                                leftIcon={<Settings size={16} />}
+                                className="px-6 py-2 rounded-2xl text-sm"
                             >
-                                <Settings size={14} />
                                 {t('common.go_to_settings', "Go to Settings")}
                             </Button>
                         )}

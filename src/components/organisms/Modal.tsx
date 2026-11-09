@@ -11,9 +11,10 @@ interface ModalProps {
     title: string;
     children: React.ReactNode;
     className?: string;
+    zIndex?: number;
 }
 
-export function Modal({ isOpen, onClose, title, children, className }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, className, zIndex }: ModalProps) {
     const overlayRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -39,7 +40,8 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-[150000] flex items-center justify-center p-4"
+                    style={{ zIndex: zIndex ?? 150000 }}
+                    className="fixed inset-0 flex items-center justify-center p-4"
                 >
                     {/* Backdrop */}
                     <motion.div

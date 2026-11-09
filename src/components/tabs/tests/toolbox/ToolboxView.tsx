@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { AlignLeft, Terminal, Cpu, Cast, FileText, StopCircle, RefreshCcw, Camera, Video, Square, LayoutGrid, Minimize2, Maximize2, Package, Globe, Activity, Timer, ShieldCheck } from "lucide-react";
+import { AlignLeft, Terminal, Cpu, Cast, FileText, StopCircle, RefreshCcw, Camera, Video, Square, LayoutGrid, Minimize2, Maximize2, Package, Globe, Activity, Timer, ShieldCheck, Rocket } from "lucide-react";
 import clsx from "clsx";
 import { invoke } from "@tauri-apps/api/core";
-import { useSettings } from "@/lib/settings";
+import { useSettings, isToolGroupUnavailable } from "@/lib/settings";
 import { logEvent } from "@/lib/analytics";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import packageJson from "../../../../../package.json";
 import { LogcatSubTab } from "./LogcatSubTab";
 // import { DmesgSubTab } from "./DmesgSubTab";
 import { AppsSubTab } from "./AppsSubTab";
@@ -25,6 +27,8 @@ import { Button } from "@/components/atoms/Button";
 import { TabBar } from "@/components/organisms/TabBar";
 import { useDeviceViewport } from "@/hooks/useDeviceViewport";
 import { DeviceViewport } from "@/components/organisms/DeviceViewport";
+import { useCompanion } from "@/hooks/useCompanion";
+import { CompanionBadge } from "@/components/atoms/CompanionBadge";
 
 interface ToolboxViewProps {
     session: TestSession;
@@ -38,7 +42,8 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
     const { stopSession, rerunSession, setSessionActiveTool } = useTestSessions();
     const { t } = useTranslation();
     const { settings, systemCheckStatus } = useSettings();
-    const isMirrorDisabled = systemCheckStatus?.missingMirroring?.length > 0;
+    const isMirrorPending = systemCheckStatus?.pendingGroups?.includes('mirroring') ?? false;
+    const isMirrorDisabled = isToolGroupUnavailable(systemCheckStatus, 'mirroring');
     const isWebMode = session.androidVersion === 'web';
 
     const [activeTool, setActiveTool] = useState<ToolTab>(
@@ -66,6 +71,8 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
 
     // Calculate isNarrow based on container width AND session type
     // If running a test, we have big "Stop" / "Rerun" buttons, so we need more space (higher threshold)
+    const { status: companionStatus, deviceInfo: companionInfo, connectCompanion, launchCompanion } = useCompanion(session.deviceUdid);
+
     const narrowThreshold = session.type === 'test' ? 1000 : 700;
     const isNarrow = containerWidth < narrowThreshold;
 
@@ -291,6 +298,26 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
         recordingSaver.clearFeedback();
     };
 
+    const handleDownloadCompanion = async () => {
+        try {
+            // Companion APK is published with the same version as the desktop release
+            let version = packageJson.version;
+            try {
+                const { getVersion } = await import('@tauri-apps/api/app');
+                const v = await getVersion();
+                if (v) version = v;
+            } catch (_) { }
+
+            const tag = version.startsWith('v') ? version : `v${version}`;
+            const downloadUrl = `https://github.com/lucasdeeiroz/robot_runner/releases/download/${tag}/companion.apk`;
+
+            feedback.toast.raw.success(t('apps.downloading_companion', { version: tag, defaultValue: `Downloading companion.apk (${tag})...` }));
+            await openUrl(downloadUrl);
+        } catch (e) {
+            feedback.toast.raw.error(t('apps.error.download_companion_failed', { defaultValue: 'Failed to open download link' }), e);
+        }
+    };
+
     return (
         <div ref={containerRef} className={clsx(
             "h-full flex-1 min-h-0 flex flex-col space-y-4 pointer-events-auto relative z-10 bg-surface",
@@ -378,30 +405,57 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                 variant="pills"
                 className="z-10 shrink-0"
                 menus={
-                    !isCompact && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                                if (!isGridView) {
-                                    const defaults: ToolTab[] = isWebMode
-                                        ? ['console', 'webview']
-                                        : ['console', 'logcat', 'performance'];
-                                    setVisibleToolsInGrid(new Set([...defaults, activeTool]));
-                                }
-                                setIsGridView(!isGridView);
-                            }}
-                            className={clsx(
-                                "p-1.5 rounded-2xl transition-all flex items-center justify-center border border-transparent h-8 w-8",
-                                isGridView
-                                    ? "bg-primary/10 text-primary dark:text-primary/80 border-none"
-                                    : "text-on-surface/80 hover:text-on-surface/80 hover:bg-surface-variant/30"
+                    !isCompact && !isWebMode && (
+                        <>
+                            {(companionStatus === 'not_installed' || companionStatus === 'needs_update') ? (
+                                <Button
+                                    onClick={handleDownloadCompanion}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 hover:bg-primary/20 border border-primary/30 rounded-xl py-1.5 px-3 transition-all h-auto"
+                                    data-tooltip={companionStatus === 'needs_update'
+                                        ? t('apps.update_companion_tooltip', { version: packageJson.version, defaultValue: `Update companion.apk from current release (v${packageJson.version})` })
+                                        : t('apps.download_companion_tooltip', { version: packageJson.version, defaultValue: `Download companion.apk from current release (v${packageJson.version})` })}
+                                    data-position="bottom"
+                                >
+                                    <Rocket size={14} className="text-primary animate-pulse" />
+                                    <span>{companionStatus === 'needs_update'
+                                        ? t('apps.update_companion', 'Update Companion APK')
+                                        : t('apps.download_companion', 'Download Companion APK')}</span>
+                                </Button>
+                            ) : (
+                                <CompanionBadge
+                                    status={companionStatus}
+                                    deviceInfo={companionInfo}
+                                    showBattery={true}
+                                    onConnect={() => connectCompanion(true, true)}
+                                    onLaunch={launchCompanion}
+                                />
                             )}
-                            data-tooltip={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
-                            data-position="top"
-                        >
-                            <LayoutGrid size={18} />
-                        </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                    if (!isGridView) {
+                                        const defaults: ToolTab[] = isWebMode
+                                            ? ['console', 'webview']
+                                            : ['console', 'logcat', 'performance'];
+                                        setVisibleToolsInGrid(new Set([...defaults, activeTool]));
+                                    }
+                                    setIsGridView(!isGridView);
+                                }}
+                                className={clsx(
+                                    "ml-2 p-1.5 rounded-2xl transition-all flex items-center justify-center border border-transparent h-8 w-8",
+                                    isGridView
+                                        ? "bg-primary/10 text-primary dark:text-primary/80 border-none"
+                                        : "text-on-surface/80 hover:text-on-surface/80 hover:bg-surface-variant/30"
+                                )}
+                                data-tooltip={isGridView ? t('toolbox.actions.switch_to_tabs') : t('toolbox.actions.switch_to_grid')}
+                                data-position="top"
+                            >
+                                <LayoutGrid size={18} />
+                            </Button>
+                        </>
                     )
                 }
                 actions={
@@ -423,7 +477,9 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                                 ? "text-on-surface/80 cursor-not-allowed"
                                                 : "text-on-surface/80 hover:text-primary hover:bg-primary/10"
                                         )}
-                                        data-tooltip={isMirrorDisabled ? t('startup.mirroring.description') : t('scrcpy.title')}
+                                        data-tooltip={isMirrorPending
+                                            ? t('startup.background.feature_pending', 'Checking required tools...')
+                                            : isMirrorDisabled ? t('startup.mirroring.description') : t('scrcpy.title')}
                                         data-position="top"
                                     >
                                         <Cast size={18} />

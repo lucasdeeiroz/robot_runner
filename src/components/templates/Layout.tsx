@@ -5,6 +5,8 @@ import { AiAgentPanel } from '../organisms/AiAgentPanel';
 import { useSettings } from "@/lib/settings";
 import { useRemoteConfig } from '@/lib/RemoteConfigProvider';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useCompanion } from '@/hooks/useCompanion';
+import { IncomingSnippetModal } from '../molecules/IncomingSnippetModal';
 
 interface LayoutProps {
     children: ReactNode;
@@ -14,6 +16,7 @@ interface LayoutProps {
 
 export function Layout({ children, activePage, onNavigate }: LayoutProps) {
     const { settings } = useSettings();
+    const { incomingSnippet, clearIncomingSnippet } = useCompanion(null);
     const remoteConfig = useRemoteConfig() as {
         isFeatureEnabled?: (feature: string) => boolean;
     };
@@ -55,6 +58,10 @@ export function Layout({ children, activePage, onNavigate }: LayoutProps) {
             >
                 {children}
             </main>
+            <IncomingSnippetModal
+                snippetData={incomingSnippet}
+                onClose={clearIncomingSnippet}
+            />
         </div>
     );
 }

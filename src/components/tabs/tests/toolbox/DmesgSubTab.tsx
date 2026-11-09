@@ -282,14 +282,16 @@ export function DmesgSubTab({ selectedDevice, isTestRunning = false, allowAction
                                 <span>{t('logcat.not_saving')}</span>
                                 <Button
                                     onClick={handleConfigurePath}
-                                    className="underline hover:text-warning/80 ml-1"
+                                    variant="unstyled"
+                                    className="h-auto px-0 text-[11px] underline hover:brightness-125 ml-1"
                                 >
                                     {t('logcat.configure_path')}
                                 </Button>
                                 {onNavigate && (
                                     <Button
                                         onClick={() => onNavigate?.('settings')}
-                                        className="flex items-center gap-1 hover:text-warning/80 ml-2 border-l border-warning/20 pl-2"
+                                        variant="unstyled"
+                                        className="h-auto gap-1 pr-0 pl-2 ml-2 text-[11px] border-l border-warning/20 rounded-none hover:brightness-125"
                                     >
                                         <Settings size={12} />
                                         {t('common.go_to_settings')}

@@ -13,6 +13,7 @@ import { FileSavedFeedback } from "@/components/molecules/FileSavedFeedback";
 import { Section } from "@/components/organisms/Section";
 import { DeviceStats } from "@/hooks/usePerformanceRecorder";
 import { useProcessMonitor } from "@/hooks/useProcessMonitor";
+import { useCompanion } from "@/hooks/useCompanion";
 import { Virtuoso } from "react-virtuoso";
 import { Button } from "@/components/atoms/Button";
 import { Select } from "@/components/atoms/Select";
@@ -70,6 +71,7 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
     const { t } = useTranslation();
     const { settings, updateSetting } = useSettings();
     const [showHighImpactWarning, setShowHighImpactWarning] = useState(false);
+    const { status: companionStatus } = useCompanion(selectedDevice);
 
     // Process Monitor State
     const [showProcessMonitor, setShowProcessMonitor] = useState(true);
@@ -171,7 +173,34 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
     const fetchBatteryAudit = async () => {
         setIsBatteryAuditLoading(true);
         try {
-            const data: BatteryAuditData = await invoke("get_battery_audit", { device: selectedDevice });
+            let data: BatteryAuditData;
+            if (companionStatus === 'connected') {
+                const rawJson = await invoke<string>('trigger_companion_action', {
+                    device: selectedDevice,
+                    endpoint: '/performance/battery-audit',
+                    method: 'GET'
+                });
+                console.log("[BatteryAudit] rawJson:", rawJson);
+                const parsed = JSON.parse(rawJson);
+                if (parsed.status === 'ok' && parsed.audit) {
+                    data = {
+                        capacity: 0,
+                        computed_drain: 0,
+                        actual_drain: 0,
+                        apps: parsed.audit.map((a: any) => ({
+                            uid: a.uid,
+                            name: a.packageName,
+                            usage: a.consumptionMah,
+                            details: ''
+                        }))
+                    };
+                } else {
+                    console.error("[BatteryAudit] Invalid payload:", parsed);
+                    throw new Error("Invalid payload from companion: " + JSON.stringify(parsed));
+                }
+            } else {
+                data = await invoke("get_battery_audit", { device: selectedDevice });
+            }
             setBatteryAuditData(data);
             setBatteryAuditLastUpdate(Date.now());
         } catch (e) {
@@ -184,7 +213,15 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
     const resetBatteryAudit = async () => {
         setIsBatteryAuditLoading(true);
         try {
-            await invoke("reset_battery_stats", { device: selectedDevice });
+            if (companionStatus === 'connected') {
+                await invoke('trigger_companion_action', {
+                    device: selectedDevice,
+                    endpoint: '/performance/battery-audit',
+                    method: 'POST'
+                });
+            } else {
+                await invoke("reset_battery_stats", { device: selectedDevice });
+            }
             feedback.toast.success(t('performance.battery_reset_success', 'Battery stats reset successfully'));
             await fetchBatteryAudit();
         } catch (e) {
@@ -323,14 +360,16 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
                                 <span>{t('logcat.not_saving')}</span>
                                 <Button
                                     onClick={handleConfigurePath}
-                                    className="underline hover:text-warning/80 ml-1"
+                                    variant="unstyled"
+                                    className="h-auto px-0 text-[11px] underline hover:brightness-125 ml-1"
                                 >
                                     {t('logcat.configure_path')}
                                 </Button>
                                 {onNavigate && (
                                     <Button
                                         onClick={() => onNavigate?.('settings')}
-                                        className="flex items-center gap-1 hover:text-warning/80 ml-2 border-l border-warning/20 pl-2"
+                                        variant="unstyled"
+                                        className="h-auto gap-1 pr-0 pl-2 ml-2 text-[11px] border-l border-warning/20 rounded-none hover:brightness-125"
                                     >
                                         <Settings size={12} />
                                         {t('common.go_to_settings')}
@@ -828,12 +867,20 @@ function ProgressBar({ value, max, color }: { value: number, max: number, color:
 
 
 const PerformanceCharts = React.memo(({ history, t, selectedPackage }: { history: any[], t: any, selectedPackage: string }) => {
+    // Flatten nested app_stats into top-level keys for Recharts compatibility
+    const flatHistory = useMemo(() => history.map(h => ({
+        ...h,
+        app_cpu: h.app_stats?.cpu_usage ?? null,
+        app_ram: h.app_stats?.ram_used ?? null,
+        app_fps: h.app_stats?.fps ?? null,
+    })), [history]);
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card title={t('performance.general_history', 'System History')} icon={<Activity size={20} className="text-primary" />}>
                 <div className="h-64 w-full mt-4">
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={history} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                        <AreaChart data={flatHistory} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
                             <defs>
                                 <linearGradient id="colorSysRam" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3} />
@@ -874,7 +921,7 @@ const PerformanceCharts = React.memo(({ history, t, selectedPackage }: { history
                 <Card title={t('performance.app_history', 'App History')} icon={<PackageIcon size={20} className="text-secondary" />}>
                     <div className="h-64 w-full mt-4">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={history} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                            <AreaChart data={flatHistory} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="colorAppRam" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%" stopColor="#ec4899" stopOpacity={0.3} />
@@ -897,15 +944,15 @@ const PerformanceCharts = React.memo(({ history, t, selectedPackage }: { history
                                     contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-outline-variant)', borderRadius: '8px', fontSize: '12px', color: 'var(--color-on-surface)' }}
                                     labelFormatter={(label) => new Date(label).toLocaleTimeString()}
                                     formatter={(value: any, name: any) => {
-                                        if (name === 'app_stats.ram_used') return [(Number(value) / 1024).toFixed(1) + ' MB', t('performance.app_ram', 'App RAM')];
-                                        if (name === 'app_stats.cpu_usage') return [Number(value).toFixed(1) + '%', t('performance.cpu', 'CPU')];
-                                        if (name === 'app_stats.fps') return [Math.round(Number(value)) + ' fps', t('performance.fps', 'FPS')];
+                                        if (name === 'app_ram') return [(Number(value) / 1024).toFixed(1) + ' MB', t('performance.app_ram', 'App RAM')];
+                                        if (name === 'app_cpu') return [Number(value).toFixed(1) + '%', t('performance.cpu', 'CPU')];
+                                        if (name === 'app_fps') return [Math.round(Number(value)) + ' fps', t('performance.fps', 'FPS')];
                                         return [value, name];
                                     }}
                                 />
-                                <Area yAxisId="left" type="monotone" dataKey="app_stats.ram_used" stroke="#ec4899" fillOpacity={1} fill="url(#colorAppRam)" isAnimationActive={false} name="app_stats.ram_used" />
-                                <Area yAxisId="right" type="monotone" dataKey="app_stats.cpu_usage" stroke="#f97316" fillOpacity={1} fill="url(#colorAppCpu)" isAnimationActive={false} name="app_stats.cpu_usage" />
-                                <Area yAxisId="right" type="monotone" dataKey="app_stats.fps" stroke="#22c55e" fillOpacity={1} fill="url(#colorAppFps)" isAnimationActive={false} name="app_stats.fps" />
+                                <Area yAxisId="left" type="monotone" dataKey="app_ram" stroke="#ec4899" fillOpacity={1} fill="url(#colorAppRam)" isAnimationActive={false} name="app_ram" />
+                                <Area yAxisId="right" type="monotone" dataKey="app_cpu" stroke="#f97316" fillOpacity={1} fill="url(#colorAppCpu)" isAnimationActive={false} name="app_cpu" />
+                                <Area yAxisId="right" type="monotone" dataKey="app_fps" stroke="#22c55e" fillOpacity={1} fill="url(#colorAppFps)" isAnimationActive={false} name="app_fps" />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>

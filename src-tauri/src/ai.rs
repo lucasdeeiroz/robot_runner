@@ -24,6 +24,7 @@ pub async fn call_claude_code_cli(
     // -p is the programmatic mode
     command.arg("-p");
     command.args(&["--output-format", "json"]);
+    command.args(&["--permission-mode", "bypassPermissions"]);
 
     // Feature: Allowed Tools
     if let Some(tools) = allowed_tools {
@@ -49,7 +50,6 @@ pub async fn call_claude_code_cli(
         }
     }
 
-    
     // Authentication
     if let Some(ref t) = token {
         let trimmed_token = t.trim();
@@ -72,6 +72,33 @@ pub async fn call_claude_code_cli(
         }
     }
 
+    let mut full_prompt = prompt.clone();
+    if let Some(b64) = image_base_64 {
+        if !b64.is_empty() {
+            use base64::Engine;
+            let temp_dir = std::env::temp_dir();
+            let timestamp = chrono::Local::now().timestamp_micros();
+            let file_name = format!("claude_screenshot_{}.png", timestamp);
+            let file_path = temp_dir.join(file_name);
+
+            let clean_b64 = if let Some(pos) = b64.find("base64,") {
+                &b64[pos + 7..]
+            } else {
+                &b64
+            };
+
+            if let Ok(decoded) = base64::engine::general_purpose::STANDARD.decode(clean_b64.trim()) {
+                if std::fs::write(&file_path, decoded).is_ok() {
+                    full_prompt = format!(
+                        "{}\n\n[VISUAL CONTEXT]: The image/screenshot for visual inspection is saved at: {}\nPlease inspect or view this image file to fulfill the user request and extract/analyze the content.",
+                        full_prompt,
+                        file_path.to_string_lossy()
+                    );
+                }
+            }
+        }
+    }
+
     command.stdin(Stdio::piped());
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
@@ -80,18 +107,6 @@ pub async fn call_claude_code_cli(
     
     if let Some(mut stdin) = child.stdin.take() {
         use tokio::io::AsyncWriteExt;
-        
-        let mut full_prompt = prompt.clone();
-        if let Some(b64) = image_base_64 {
-            if !b64.is_empty() {
-                full_prompt = format!(
-                    "{}\n\n[VISUAL CONTEXT]: The following is a base64 encoded screenshot of the current screen. Please use it for visual analysis:\n\n<screenshot_base64>\n{}\n</screenshot_base64>",
-                    full_prompt,
-                    b64
-                );
-            }
-        }
-
         stdin.write_all(full_prompt.as_bytes()).await.map_err(|e| AppError::ProcessError(format!("Failed to write to Claude CLI stdin: {}", e)))?;
         drop(stdin);
     }
@@ -102,12 +117,16 @@ pub async fn call_claude_code_cli(
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     
     let trimmed_stdout = stdout.trim();
+    let has_matching_braces = (trimmed_stdout.contains('{') && trimmed_stdout.contains('}')) || 
+                              (trimmed_stdout.contains('[') && trimmed_stdout.contains(']'));
     let is_stdout_json = !trimmed_stdout.is_empty() && (
         trimmed_stdout.contains("\"reply\"") || 
         trimmed_stdout.contains("\"actions\"") || 
         trimmed_stdout.contains("\"result\"") || 
         trimmed_stdout.contains("\"type\"") ||
-        (trimmed_stdout.starts_with('{') && trimmed_stdout.ends_with('}'))
+        trimmed_stdout.contains("\"texts\"") ||
+        trimmed_stdout.contains("\"structured_output\"") ||
+        has_matching_braces
     );
 
     if output.status.success() || is_stdout_json {
@@ -247,7 +266,13 @@ pub async fn call_antigravity_cli(
             let file_name = format!("agy_screenshot_{}.png", timestamp);
             let file_path = temp_dir.join(file_name);
             
-            if let Ok(decoded) = base64::engine::general_purpose::STANDARD.decode(b64.trim()) {
+            let clean_b64 = if let Some(pos) = b64.find("base64,") {
+                &b64[pos + 7..]
+            } else {
+                &b64
+            };
+
+            if let Ok(decoded) = base64::engine::general_purpose::STANDARD.decode(clean_b64.trim()) {
                 if std::fs::write(&file_path, decoded).is_ok() {
                     full_prompt = format!(
                         "{}\n\n[VISUAL CONTEXT]: The screenshot of the current screen/state is saved at: {}\nIf you need to analyze it, you can view this file using your tools.",

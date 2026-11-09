@@ -1,5 +1,5 @@
 import { LazyStore } from '@tauri-apps/plugin-store';
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { invoke } from '@tauri-apps/api/core';
 import { feedback } from './feedback';
@@ -27,6 +27,39 @@ export interface SystemVersions {
 
 // Initialize the store
 const store = new LazyStore('settings.json');
+
+export interface ComplianceRule {
+    id: string;
+    name: string;
+    pattern: string;
+    severity: 'critical' | 'warning' | 'info';
+    maskInLogs: boolean;
+    blockOnViolation: boolean;
+    enabled: boolean;
+}
+
+export interface SpecPipelineSettings {
+    enabled: boolean;
+    baseSpecsDir: string;
+    scenariosFilename: string;
+    resultsFilename: string;
+    evidenceSubdir: string;
+    autoTranspileToRobot: boolean;
+}
+
+export interface TelemetryWebhooksSettings {
+    enabled: boolean;
+    endpointUrl: string;
+    headers: Record<string, string>;
+    tags: Record<string, string>;
+    sendOnTestCompleted: boolean;
+    sendOnHardwareAudit: boolean;
+}
+
+export interface ComplianceWatcherSettings {
+    enabled: boolean;
+    rules: ComplianceRule[];
+}
 
 export interface AppSettings {
     language: string;
@@ -126,10 +159,19 @@ export interface AppSettings {
         notifyOnFail: boolean;
     };
 
+    // Plugins & Extensibility
+    specPipeline?: SpecPipelineSettings;
+    telemetryWebhooks?: TelemetryWebhooksSettings;
+    complianceWatcher?: ComplianceWatcherSettings;
+
     // Custom Logos
     customLogoLight?: string;
     customLogoDark?: string;
 }
+
+// Logcat priorities accepted by the Logcat/Stopwatch level selects (`adb logcat *:<level>`)
+const VALID_LOGCAT_LEVELS = ['V', 'D', 'I', 'W', 'E', 'F', 'S'];
+const isValidLogcatLevel = (level: string | undefined): boolean => !level || VALID_LOGCAT_LEVELS.includes(level);
 
 const getDefaultSettings = (): AppSettings => ({
     language: 'en_US',
@@ -138,54 +180,62 @@ const getDefaultSettings = (): AppSettings => ({
     primaryColor: 'blue',
     presentationEnabled: false,
     customAdbPath: '',
+    usageMode: 'automator',
     explorerPlatform: 'mobile',
+    automationFramework: 'robot',
     updateChannel: 'stable',
-    recycleDeviceViews: false, // Default to false
-    allowActionsDuringTest: false, // Default to false (blocking)
-    saveLogs: false, // Default to false
+    recycleDeviceViews: true,
+    allowActionsDuringTest: true,
+    saveLogs: false,
     noAppiumForRobot: false,
+
     appiumHost: '127.0.0.1',
     appiumPort: 4723,
     appiumBasePath: '/',
+
     paths: {
-        automationRoot: '',
-        resources: '',
-        tests: '',
         suites: '',
+        tests: '',
+        resources: '',
         logs: '',
         logcat: '',
         screenshots: '',
         recordings: '',
-        mappings: '',
+        automationRoot: '',
+        mappings: ''
     },
     logcatKeywords: [],
     logcatLevel: 'E',
     logcatExtraTags: '',
+    logcatSelectedPackage: '',
     stopwatchSelectedPackage: '',
+
     tools: {
         appiumArgs: getRemoteString('default_appium_args') || '--relaxed-security',
         scrcpyArgs: getRemoteString('default_scrcpy_args') || '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake',
-        robotArgs: '--split-log',
+        robotArgs: '',
         maestroArgs: '',
-        appiumJavaArgs: 'test',
-        appPackage: 'com.android.chrome, com.chrome.beta',
+        appiumJavaArgs: '',
+        appPackage: '',
         ngrokToken: '',
         cypressArgs: '',
         seleniumArgs: ''
     },
+
     aiProvider: 'gemini',
     geminiApiKey: '',
-    geminiModel: getRemoteString('default_gemini_model') || 'gemini-3.1-flash-lite',
+    geminiModel: 'gemini-2.5-flash',
     claudeApiKey: '',
-    claudeModel: getRemoteString('default_claude_model') || 'claude-3-5-sonnet-20240620',
+    claudeModel: 'claude-3-5-sonnet-20241022',
     openaiApiKey: '',
-    openaiModel: getRemoteString('default_openai_model') || 'gpt-4o',
+    openaiModel: 'gpt-4o',
     antigravityApiKey: '',
     claudeCodeToken: '',
-    aiSessionId: undefined,
-    aiChatEnabled: false,
+    aiSessionId: '',
+    aiChatEnabled: true,
     aiTestModeEnabled: false,
-    maxExplorationSteps: 30,
+    maxExplorationSteps: 20,
+
     azureDevOps: {
         org: '',
         project: '',
@@ -214,6 +264,68 @@ const getDefaultSettings = (): AppSettings => ({
         teamsUrl: '',
         notifyOnPass: false,
         notifyOnFail: false
+    },
+
+    specPipeline: {
+        enabled: false,
+        baseSpecsDir: 'specs',
+        scenariosFilename: 'cenarios-de-teste.md',
+        resultsFilename: 'resultados.md',
+        evidenceSubdir: 'evidencias',
+        autoTranspileToRobot: true
+    },
+    telemetryWebhooks: {
+        enabled: false,
+        endpointUrl: '',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        tags: {
+            source: 'robot_runner'
+        },
+        sendOnTestCompleted: true,
+        sendOnHardwareAudit: true
+    },
+    complianceWatcher: {
+        enabled: false,
+        rules: [
+            {
+                id: 'pci-pan',
+                name: 'PCI Credit Card PAN',
+                pattern: '\\b(?:\\d[ -]*?){13,19}\\b',
+                severity: 'critical',
+                maskInLogs: true,
+                blockOnViolation: true,
+                enabled: true
+            },
+            {
+                id: 'pci-cvv',
+                name: 'PCI CVV / CVC Code',
+                pattern: '\\b\\d{3,4}\\b',
+                severity: 'critical',
+                maskInLogs: true,
+                blockOnViolation: true,
+                enabled: false
+            },
+            {
+                id: 'selinux-denied',
+                name: 'SELinux AVC Denials',
+                pattern: 'avc:\\s+denied',
+                severity: 'warning',
+                maskInLogs: false,
+                blockOnViolation: false,
+                enabled: true
+            },
+            {
+                id: 'private-key',
+                name: 'Private Key / Certificate Secret',
+                pattern: '-----BEGIN (?:RSA )?PRIVATE KEY-----',
+                severity: 'critical',
+                maskInLogs: true,
+                blockOnViolation: true,
+                enabled: true
+            }
+        ]
     }
 });
 
@@ -317,15 +429,141 @@ async function processStoreDataSecrets(data: SettingsStoreData, mode: 'encrypt' 
     await Promise.all(promises);
     return copy;
 }
+// Tools resolved individually by the `get_tool_version` backend command
+export type ToolKey = 'adb' | 'node' | 'appium' | 'uiautomator2' | 'python' | 'robot' | 'appium_lib'
+    | 'java' | 'maven' | 'maestro' | 'scrcpy' | 'ngrok' | 'claude_code' | 'antigravity';
+
+// Placeholder value shown while a tool is still being identified in background
+export const TOOL_CHECKING = 'Checking';
+
+// Returns true only when the tool was identified as installed (not missing, skipped or still pending)
+export function isToolInstalled(version?: string | null): boolean {
+    return !!version && version !== 'Not Found' && version !== 'Not Checked' && version !== TOOL_CHECKING;
+}
+
+// Feature groups that depend on optional tools
+export type ToolGroup = 'appium' | 'testing' | 'mirroring' | 'tunnelling';
+
 // Initial Check Status Interface
 export interface SystemCheckStatus {
-    loading: boolean;
-    complete: boolean;
+    loading: boolean; // True only while the critical ADB check is pending (blocks the UI)
+    complete: boolean; // True once every tool check has finished
     missingCritical: string[]; // Only ADB
     missingAppium: string[]; // Node, Appium, UiAutomator2 -- affects Appium Settings & Controls
     missingTesting: string[]; // Python, Robot, AppiumLibrary -- affects Launcher Tab
     missingMirroring: string[]; // Scrcpy -- affects Mirroring options
     missingTunnelling: string[]; // Ngrok -- affects Connect Tab remote features
+    pendingGroups: ToolGroup[]; // Groups whose dependencies are still being identified in background
+    revalidating: boolean; // Cached versions are applied and being confirmed in background
+    checkedTools: number; // Progress of the background check
+    totalTools: number;
+}
+
+const MISSING_KEY_BY_GROUP: Record<ToolGroup, 'missingAppium' | 'missingTesting' | 'missingMirroring' | 'missingTunnelling'> = {
+    appium: 'missingAppium',
+    testing: 'missingTesting',
+    mirroring: 'missingMirroring',
+    tunnelling: 'missingTunnelling',
+};
+
+// A feature group is unavailable while its tools are missing OR still being identified
+export function isToolGroupUnavailable(status: SystemCheckStatus | undefined, group: ToolGroup): boolean {
+    if (!status) return false;
+    return (status[MISSING_KEY_BY_GROUP[group]]?.length ?? 0) > 0 || (status.pendingGroups?.includes(group) ?? false);
+}
+
+type UsageMode = 'explorer' | 'automator';
+type Framework = 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium';
+
+// ADB comes first so the blocking check finishes as soon as possible
+function getToolsToCheck(mode: UsageMode | undefined, framework: Framework, checkNgrok: boolean): ToolKey[] {
+    const tools: ToolKey[] = ['adb', 'scrcpy', 'claude_code', 'antigravity'];
+    if (mode !== 'explorer') {
+        tools.push('node', 'java', 'python');
+        if (framework === 'robot') tools.push('robot', 'appium_lib', 'appium', 'uiautomator2');
+        if (framework === 'appium') tools.push('maven', 'appium', 'uiautomator2');
+        if (framework === 'maestro') tools.push('maestro');
+    }
+    if (checkNgrok) tools.push('ngrok');
+    return tools;
+}
+
+function createBaseVersions(): SystemVersions {
+    return {
+        adb: 'Not Checked', node: 'Not Checked', appium: 'Not Checked', uiautomator2: 'Not Checked',
+        python: 'Not Checked', robot: 'Not Checked', appium_lib: 'Not Checked', java: 'Not Checked',
+        maven: 'Not Checked', maestro: 'Not Checked', scrcpy: 'Not Found', ngrok: 'Not Checked',
+        claude_code: 'Not Found', antigravity: 'Not Found', cypress: 'Not Checked', pytest: 'Not Checked',
+    };
+}
+
+type SystemStatusEvaluation = Omit<SystemCheckStatus, 'loading' | 'complete' | 'revalidating' | 'checkedTools' | 'totalTools'>;
+
+// Computes missing/pending tool groups from partially resolved versions
+function evaluateSystemStatus(
+    versions: SystemVersions,
+    pending: Set<ToolKey>,
+    mode: UsageMode | undefined,
+    framework: Framework,
+    isWebMode: boolean,
+    checkNgrok: boolean,
+): SystemStatusEvaluation {
+    const missing: Record<'critical' | ToolGroup, string[]> = { critical: [], appium: [], testing: [], mirroring: [], tunnelling: [] };
+    const pendingGroups = new Set<ToolGroup>();
+
+    const requireTool = (key: ToolKey, group: 'critical' | ToolGroup, label: string, notCheckedIsMissing = false) => {
+        if (pending.has(key)) {
+            if (group !== 'critical') pendingGroups.add(group);
+            return;
+        }
+        const value = versions[key];
+        if (value === 'Not Found' || (notCheckedIsMissing && value === 'Not Checked')) missing[group].push(label);
+    };
+
+    // Critical & mirroring tools (skipped in web mode)
+    if (!isWebMode) {
+        requireTool('adb', 'critical', 'ADB');
+        requireTool('scrcpy', 'mirroring', 'Scrcpy');
+    }
+
+    // Appium/Web tools (only when not in explorer mode)
+    if (mode !== 'explorer') {
+        if (isWebMode) {
+            if (framework === 'cypress') requireTool('node', 'testing', 'Node.js (Required for Cypress)');
+            else if (framework === 'selenium') requireTool('python', 'testing', 'Python', true);
+        } else {
+            requireTool('node', 'appium', 'Node.js');
+
+            if (framework === 'robot') {
+                requireTool('appium', 'appium', 'Appium (Node.js)');
+                requireTool('uiautomator2', 'appium', 'UiAutomator2 (Appium)');
+                requireTool('python', 'testing', 'Python');
+                requireTool('robot', 'testing', 'Robot Framework (Python)');
+                requireTool('appium_lib', 'testing', 'AppiumLibrary (Robot Framework)');
+            }
+
+            if (framework === 'appium') {
+                requireTool('appium', 'appium', 'Appium (Node.js)');
+                requireTool('uiautomator2', 'appium', 'UiAutomator2 (Appium)');
+                requireTool('java', 'testing', 'Java (JDK)');
+                requireTool('maven', 'testing', 'Maven');
+            }
+
+            if (framework === 'maestro') requireTool('maestro', 'testing', 'Maestro');
+        }
+    }
+
+    // Tunnelling tools
+    if (checkNgrok) requireTool('ngrok', 'tunnelling', 'Ngrok');
+
+    return {
+        missingCritical: missing.critical,
+        missingAppium: missing.appium,
+        missingTesting: missing.testing,
+        missingMirroring: missing.mirroring,
+        missingTunnelling: missing.tunnelling,
+        pendingGroups: Array.from(pendingGroups),
+    };
 }
 
 
@@ -343,7 +581,7 @@ interface SettingsContextType {
     loading: boolean;
     hasHydrated: boolean;
     systemVersions: SystemVersions | null;
-    checkSystemVersions: (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium', silent?: boolean) => Promise<void>;
+    checkSystemVersions: (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium', useCache?: boolean, forceNgrok?: boolean) => Promise<void>;
     systemCheckStatus: SystemCheckStatus;
     updateInfo: UpdateInfo | null;
     checkForAppUpdate: (manual?: boolean) => Promise<void>;
@@ -457,11 +695,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                         // Active Migration for Remote Config overrides
                         const s = migrated.profiles[pid].settings;
                         const ds = getDefaultSettings();
-                        if (s.geminiModel === 'gemini-1.5-flash' || s.geminiModel === 'gemini-3.1-flash-lite') s.geminiModel = ds.geminiModel;
+                        if (s.geminiModel === 'gemini-1.5-flash') s.geminiModel = ds.geminiModel;
                         if (s.claudeModel === 'claude-3-5-sonnet-20240620') s.claudeModel = ds.claudeModel;
                         if (s.openaiModel === 'gpt-4o') s.openaiModel = ds.openaiModel;
-                        if (s.tools.scrcpyArgs === '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake') s.tools.scrcpyArgs = ds.tools.scrcpyArgs;
-                        if (s.tools.appiumArgs === '--relaxed-security') s.tools.appiumArgs = ds.tools.appiumArgs;
+                        if (!isValidLogcatLevel(s.logcatLevel)) s.logcatLevel = ds.logcatLevel;
                     });
 
                     // Validate activeProfileId
@@ -487,11 +724,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
                     // Active Migration for old flat format
                     const ds = getDefaultSettings();
-                    if (migratedSettings.geminiModel === 'gemini-1.5-flash' || migratedSettings.geminiModel === 'gemini-3.1-flash-lite') migratedSettings.geminiModel = ds.geminiModel;
+                    if (migratedSettings.geminiModel === 'gemini-1.5-flash') migratedSettings.geminiModel = ds.geminiModel;
                     if (migratedSettings.claudeModel === 'claude-3-5-sonnet-20240620') migratedSettings.claudeModel = ds.claudeModel;
                     if (migratedSettings.openaiModel === 'gpt-4o') migratedSettings.openaiModel = ds.openaiModel;
-                    if (migratedSettings.tools.scrcpyArgs === '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake') migratedSettings.tools.scrcpyArgs = ds.tools.scrcpyArgs;
-                    if (migratedSettings.tools.appiumArgs === '--relaxed-security') migratedSettings.tools.appiumArgs = ds.tools.appiumArgs;
+                    if (!isValidLogcatLevel(migratedSettings.logcatLevel)) migratedSettings.logcatLevel = ds.logcatLevel;
 
                     const newStoreData: SettingsStoreData = {
                         activeProfileId: 'default',
@@ -740,122 +976,114 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
     const [systemVersions, setSystemVersions] = useState<SystemVersions | null>(null);
 
+    // Starts as loading so the blocking overlay is shown until the first ADB check resolves
     const [systemCheckStatus, setSystemCheckStatus] = useState<SystemCheckStatus>({
-        loading: false,
+        loading: true,
         complete: false,
         missingCritical: [],
         missingAppium: [],
         missingTesting: [],
         missingMirroring: [],
-        missingTunnelling: []
+        missingTunnelling: [],
+        pendingGroups: [],
+        revalidating: false,
+        checkedTools: 0,
+        totalTools: 0,
     });
 
-    const checkSystemVersions = async (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium', silent: boolean = false) => {
+    // Identifies the latest check run so results from superseded runs are ignored
+    const checkRunIdRef = useRef(0);
+
+    /**
+     * Identifies installed host tools.
+     * - useCache = true (startup, mode/framework switch): applies the last saved versions instantly
+     *   (no blocking screen) and revalidates every tool in background, fixing the state if anything changed.
+     * - useCache = false (manual refresh): ignores the saved versions and reads every tool fresh.
+     */
+    const checkSystemVersions = async (forceUsageMode?: UsageMode, forceFramework?: Framework, useCache: boolean = false, forceNgrok?: boolean) => {
+        const runId = ++checkRunIdRef.current;
         const mode = forceUsageMode || activeProfile.settings.usageMode;
-        const framework = forceFramework || activeProfile.settings.automationFramework || 'robot';
+        const framework: Framework = forceFramework || activeProfile.settings.automationFramework || 'robot';
+        // forceNgrok avoids reading a stale isNgrokEnabled right after enableNgrok()
+        const checkNgrok = forceNgrok ?? isNgrokEnabled;
+        const isWebMode = mode === 'explorer'
+            ? (activeProfile.settings.explorerPlatform === 'web')
+            : ['cypress', 'selenium'].includes(framework);
 
-        const processVersions = (versions: SystemVersions) => {
-            setSystemVersions(versions);
+        const tools = getToolsToCheck(mode, framework, checkNgrok);
+        const pending = new Set<ToolKey>(tools);
+        const versions = createBaseVersions();
+        const cacheKey = `cached_system_versions_${mode}_${framework}_${checkNgrok}`;
 
-            const missingCritical: string[] = [];
-            const missingAppium: string[] = [];
-            const missingTesting: string[] = [];
-            const missingMirroring: string[] = [];
-            const missingTunnelling: string[] = [];
-
-            const isWebMode = mode === 'explorer'
-                ? (activeProfile.settings.explorerPlatform === 'web')
-                : ['cypress', 'selenium'].includes(framework);
-
-            // Critical Tools (Skip mobile checks in web mode)
-            if (!isWebMode) {
-                if (versions.adb === 'Not Found') {
-                    missingCritical.push('ADB');
+        // Tools whose last known version was restored from the cache
+        const cachedVersions: Partial<Record<ToolKey, string>> = {};
+        if (useCache) {
+            try {
+                const cached = localStorage.getItem(cacheKey);
+                const parsed = cached ? JSON.parse(cached) as Partial<SystemVersions> : null;
+                if (parsed) {
+                    tools.forEach(tool => {
+                        const value = parsed[tool];
+                        if (typeof value === 'string' && value !== TOOL_CHECKING) cachedVersions[tool] = value;
+                    });
                 }
-                // Mirroring Tools (Skip in web mode)
-                if (versions.scrcpy === 'Not Found') {
-                    missingMirroring.push('Scrcpy');
-                }
+            } catch (e) {
+                console.warn('[SystemCheck] Ignoring invalid cached versions:', e);
             }
+        }
+        const isRevalidating = Object.keys(cachedVersions).length > 0;
 
-            // Appium/Web Tools (Only check if not explorer)
-            if (mode !== 'explorer') {
-                if (isWebMode) {
-                    if (framework === 'cypress') {
-                        if (versions.node === 'Not Found') missingTesting.push('Node.js (Required for Cypress)');
-                    } else if (framework === 'selenium') {
-                        if (versions.python === 'Not Found' || versions.python === 'Not Checked') missingTesting.push('Python');
-                    }
-                } else {
-                    if (versions.node === 'Not Found') missingAppium.push('Node.js');
+        tools.forEach(tool => { versions[tool] = cachedVersions[tool] ?? TOOL_CHECKING; });
 
-                    // Framework Specific Tools
-                    if (framework === 'robot') {
-                        if (versions.appium === 'Not Found') missingAppium.push('Appium (Node.js)');
-                        if (versions.uiautomator2 === 'Not Found') missingAppium.push('UiAutomator2 (Appium)');
-                        if (versions.python === 'Not Found') missingTesting.push('Python');
-                        if (versions.robot === 'Not Found') missingTesting.push('Robot Framework (Python)');
-                        if (versions.appium_lib === 'Not Found') missingTesting.push('AppiumLibrary (Robot Framework)');
-                    }
+        // Cached tools count as resolved for feature gating; only uncached tools stay pending
+        const unresolved = () => new Set(Array.from(pending).filter(tool => !(tool in cachedVersions)));
 
-                    if (framework === 'appium') {
-                        if (versions.appium === 'Not Found') missingAppium.push('Appium (Node.js)');
-                        if (versions.uiautomator2 === 'Not Found') missingAppium.push('UiAutomator2 (Appium)');
-                        if (versions.java === 'Not Found') missingTesting.push('Java (JDK)');
-                        if (versions.maven === 'Not Found') missingTesting.push('Maven');
-                    }
-
-                    if (framework === 'maestro') {
-                        if (versions.maestro === 'Not Found') missingTesting.push('Maestro');
-                    }
-                }
-            }
-
-            // Tunnelling Tools
-            if (isNgrokEnabled && versions.ngrok === 'Not Found') missingTunnelling.push('Ngrok');
-
+        const publish = () => {
+            if (runId !== checkRunIdRef.current) return;
+            setSystemVersions({ ...versions });
+            const blockingPending = unresolved();
+            const evaluation = evaluateSystemStatus(versions, blockingPending, mode, framework, isWebMode, checkNgrok);
             setSystemCheckStatus({
-                loading: false,
-                complete: true,
-                missingCritical,
-                missingAppium,
-                missingTesting,
-                missingMirroring,
-                missingTunnelling
+                ...evaluation,
+                loading: blockingPending.has('adb'),
+                complete: pending.size === 0,
+                revalidating: isRevalidating && pending.size > 0,
+                checkedTools: tools.length - pending.size,
+                totalTools: tools.length,
             });
         };
 
-        const cacheKey = `cached_system_versions_${mode}_${framework}_${isNgrokEnabled}`;
+        publish();
 
-        if (!silent) {
-            const cached = localStorage.getItem(cacheKey);
-            if (cached) {
-                try {
-                    const parsedVersions = JSON.parse(cached) as SystemVersions;
-                    processVersions(parsedVersions);
-                    // Continue to background fetch
-                } catch (e) {
-                    setSystemCheckStatus(prev => ({ ...prev, loading: true }));
-                }
-            } else {
-                setSystemCheckStatus(prev => ({ ...prev, loading: true }));
+        let failedTools = 0;
+        // All tools are resolved in parallel; each result enables/disables its features as soon as it arrives
+        await Promise.all(tools.map(async (tool) => {
+            let value: string;
+            try {
+                value = await invoke<string>('get_tool_version', { tool });
+            } catch (e) {
+                console.error(`[SystemCheck] Failed to resolve ${tool} version:`, e);
+                failedTools++;
+                value = 'Not Found';
             }
+            versions[tool] = value;
+            pending.delete(tool);
+            publish();
+        }));
+
+        if (runId !== checkRunIdRef.current) return;
+        if (failedTools > 0) {
+            feedback.toast.error("settings.versions_load_error");
+            return;
         }
+        localStorage.setItem(cacheKey, JSON.stringify(versions));
 
-        try {
-            // Conditionally skip ngrok and automator dependencies checks
-            const versions = await invoke<SystemVersions>('get_system_versions', {
-                checkAutomator: mode !== 'explorer',
-                framework: framework,
-                checkNgrok: isNgrokEnabled
-            });
-
-            localStorage.setItem(cacheKey, JSON.stringify(versions));
-            processVersions(versions);
-
-        } catch (e) {
-            feedback.toast.error("settings.versions_load_error", e);
-            setSystemCheckStatus(prev => ({ ...prev, loading: false }));
+        // Warn the user when the background revalidation changed a tool's availability
+        const changedTools = tools.filter(tool =>
+            tool in cachedVersions && isToolInstalled(cachedVersions[tool]) !== isToolInstalled(versions[tool])
+        );
+        if (changedTools.length > 0) {
+            feedback.toast.info('startup.background.tools_changed', { tools: changedTools.join(', ') });
         }
     };
 

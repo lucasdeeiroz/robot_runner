@@ -167,7 +167,7 @@ scrcpy*/
 recordings/
 screenshots/
 logs/
-logcat*/
+/logcat*/
 frontend/
 .allure
 .gemini_cache
@@ -211,4 +211,5 @@ companion/*/*.iml
 companion/*.iml
 companion/.cxx/
 companion/captures/
+companion-release.jks
 

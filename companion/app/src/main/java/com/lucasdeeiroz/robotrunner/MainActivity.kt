@@ -1,0 +1,348 @@
+package com.lucasdeeiroz.robotrunner
+
+import com.lucasdeeiroz.robotrunner.ui.pages.HomePage
+
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
+import android.net.Uri
+import android.net.wifi.WifiManager
+import android.os.Build
+import android.os.Bundle
+import android.os.IBinder
+import android.text.format.Formatter
+import android.util.Log
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
+import com.lucasdeeiroz.robotrunner.checkup.HardwareCheckupRunner
+import com.lucasdeeiroz.robotrunner.checkup.LocalCheckupResult
+import com.lucasdeeiroz.robotrunner.checkup.PdfReportGenerator
+import com.lucasdeeiroz.robotrunner.hardware.HardwareSpecsProvider
+import com.lucasdeeiroz.robotrunner.model.LiveTelemetry
+import java.io.File
+import java.net.NetworkInterface
+import java.util.Collections
+
+class MainActivity : ComponentActivity() {
+
+    private var companionService: CompanionServerService? = null
+    private var isBound by mutableStateOf(false)
+    private var isServerRunning by mutableStateOf(false)
+    private var activeClients by mutableStateOf(0)
+
+    private val connection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            val binder = service as CompanionServerService.LocalBinder
+            companionService = binder.getService().apply {
+                onStatusChangedListener = {
+                    updateState()
+                }
+            }
+            isBound = true
+            updateState()
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            companionService = null
+            isBound = false
+            isServerRunning = false
+            activeClients = 0
+        }
+    }
+
+    private fun updateState() {
+        companionService?.let { s ->
+            isServerRunning = s.isRunning
+            activeClients = s.activeClientsCount
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+
+        // Log uncaught exceptions
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            Log.e("CompanionCrash", "Uncaught exception on thread ${thread.name}", throwable)
+        }
+
+        // Bind to CompanionServerService safely without starting the HTTP server automatically
+        try {
+            val serviceIntent = Intent(this, CompanionServerService::class.java)
+            bindService(serviceIntent, connection, Context.BIND_AUTO_CREATE)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error binding service", e)
+        }
+
+        handleStartServerIntent(intent)
+
+        val checkupRunner = HardwareCheckupRunner(this)
+        val pdfGenerator = PdfReportGenerator(this)
+
+        setContent {
+            var telemetry by remember { mutableStateOf(LiveTelemetry()) }
+
+            LaunchedEffect(Unit) {
+                while (true) {
+                    telemetry = HardwareSpecsProvider.getLiveTelemetry(
+                        context = this@MainActivity,
+                        isServerRunning = isServerRunning,
+                        activeClients = activeClients
+                    )
+                    kotlinx.coroutines.delay(2000)
+                }
+            }
+
+            val additionalSpecs by HardwareSpecsProvider.additionalSpecsFlow.collectAsState()
+            val detailedSpecs = remember(additionalSpecs) { HardwareSpecsProvider.getDetailedSpecs(this@MainActivity, additionalSpecs) }
+
+            HomePage(
+                isServerRunning = isServerRunning,
+                telemetry = telemetry,
+                detailedSpecs = detailedSpecs,
+                ipAddress = getLocalIpAddress(),
+                port = CompanionServerService.SERVER_PORT,
+                onToggleServer = {
+                    if (isServerRunning) {
+                        try {
+                            val stopIntent = Intent(this@MainActivity, CompanionServerService::class.java).apply {
+                                action = CompanionServerService.ACTION_STOP_SERVER
+                            }
+                            startService(stopIntent)
+                            companionService?.stopServer()
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Error stopping service", e)
+                        }
+                    } else {
+                        startServerInternal(CompanionServerService.DEFAULT_MANUAL_TIMEOUT_SECONDS)
+                    }
+                    updateState()
+                },
+                onLaunchDisplayTest = {
+                    try {
+                        val intent = Intent(this, com.lucasdeeiroz.robotrunner.hardware.DisplayTestActivity::class.java)
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        Toast.makeText(this, "Failed to launch display test", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            )
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleStartServerIntent(intent)
+    }
+
+    private fun handleStartServerIntent(intent: Intent?) {
+        val shouldStart = intent?.getBooleanExtra("START_SERVER", false) == true ||
+                intent?.action == CompanionServerService.ACTION_START_SERVER
+        if (shouldStart) {
+            // MainActivity is exported: any AUTH_TOKEN extra is deliberately ignored here.
+            // Only the DUMP-protected CompanionCommandReceiver may set the session token.
+            val timeout = CompanionServerService.clampIdleTimeout(
+                intent.getIntExtra(
+                    CompanionServerService.EXTRA_IDLE_TIMEOUT_SECONDS,
+                    CompanionServerService.DEFAULT_DESKTOP_TIMEOUT_SECONDS
+                )
+            )
+            startServerInternal(timeout)
+        }
+    }
+
+    private fun startServerInternal(requestedTimeoutSeconds: Int) {
+        val timeoutSeconds = CompanionServerService.clampIdleTimeout(requestedTimeoutSeconds)
+        try {
+            val startIntent = Intent(this, CompanionServerService::class.java).apply {
+                action = CompanionServerService.ACTION_START_SERVER
+                putExtra(CompanionServerService.EXTRA_IDLE_TIMEOUT_SECONDS, timeoutSeconds)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(startIntent)
+            } else {
+                startService(startIntent)
+            }
+            companionService?.startServer(timeoutSeconds)
+            updateState()
+            Log.i("MainActivity", "Started CompanionServerService from MainActivity with timeout ${timeoutSeconds}s")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to start server internal", e)
+        }
+    }
+
+    override fun onDestroy() {
+        if (isBound) {
+            try {
+                unbindService(connection)
+            } catch (ignored: Exception) {}
+            isBound = false
+        }
+        super.onDestroy()
+    }
+
+    private fun getLocalIpAddress(): String {
+        try {
+            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            @Suppress("DEPRECATION")
+            val ipInt = wifiManager.connectionInfo.ipAddress
+            if (ipInt != 0) {
+                @Suppress("DEPRECATION")
+                return Formatter.formatIpAddress(ipInt)
+            }
+            val interfaces = Collections.list(NetworkInterface.getNetworkInterfaces())
+            for (intf in interfaces) {
+                val addrs = Collections.list(intf.inetAddresses)
+                for (addr in addrs) {
+                    if (!addr.isLoopbackAddress && addr.hostAddress?.contains(':') == false) {
+                        return addr.hostAddress ?: "127.0.0.1"
+                    }
+                }
+            }
+        } catch (ignored: Exception) {}
+        return "127.0.0.1"
+    }
+}
+
+@Composable
+fun CompanionAppUI(
+    isServerRunning: Boolean,
+    activeClients: Int,
+    ipAddress: String,
+    port: Int,
+    onToggleService: () -> Unit
+) {
+    MaterialTheme(
+        colorScheme = darkColorScheme(
+            primary = Color(0xFF6366F1),
+            surface = MaterialTheme.colorScheme.surface,
+            background = Color(0xFF090D16)
+        )
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Header
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(top = 16.dp)
+                ) {
+                    Text(
+                        text = stringResource(id = R.string.app_name),
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Mobile Companion Agent",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Main Status Card
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .background(
+                                    color = if (isServerRunning) {
+                                        if (activeClients > 0) Color(0xFF10B981) else Color(0xFF3B82F6)
+                                    } else Color(0xFFEF4444),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text(
+                            text = if (isServerRunning) {
+                                if (activeClients > 0) stringResource(id = R.string.status_connected) else stringResource(id = R.string.status_server_ready)
+                            } else "Server Stopped",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(text = "ADB Port", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                            Text(text = "$port", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(text = "Device IP", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                            Text(text = ipAddress, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                // Controls Column
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = onToggleService,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isServerRunning) Color(0xFFDC2626) else Color(0xFF4F46E5)
+                        )
+                    ) {
+                        Text(
+                            text = if (isServerRunning) stringResource(id = R.string.btn_stop_service) else stringResource(id = R.string.btn_start_service),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

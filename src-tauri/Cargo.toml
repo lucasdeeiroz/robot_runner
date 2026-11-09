@@ -1,6 +1,6 @@
 [package]
 name = "robot_runner"
-version = "2.3.3-stable1"
+version = "3.0.0-stable1"
 description = "The Professional Command Center for Android Automation"
 authors = ["Lucas de Eiroz Rodrigues"]
 edition = "2024"
@@ -57,3 +57,7 @@ libc = "0.2"
 
 [dev-dependencies]
 tempfile = "3"
+
+[profile.dev.package."*"]
+opt-level = 3
+

@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Wifi, Link, Unplug, Globe, Copy } from "lucide-react";
+import { Wifi, Link, Unplug, Globe, Copy, KeyRound } from "lucide-react";
 import clsx from "clsx";
-import { useSettings } from "@/lib/settings";
+import { useSettings, isToolGroupUnavailable } from "@/lib/settings";
 import { useTranslation } from "react-i18next";
 import { feedback } from "@/lib/feedback";
 import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
@@ -31,6 +31,13 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
     const [code, setCode] = useState("");
     const [statusMsg, setStatusMsg] = useState<{ text: string, type: 'success' | 'error' | 'info' } | null>(null);
     const [loading, setLoading] = useState(false);
+    const [hostIp, setHostIp] = useState<string>("");
+
+    useEffect(() => {
+        invoke<string>('get_host_local_ip')
+            .then(resIp => setHostIp(resIp))
+            .catch(() => setHostIp(""));
+    }, []);
 
     useEffect(() => {
         if (selectedDevice) {
@@ -190,7 +197,8 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                 cmd = 'adb_connect';
                 args = { ip, port };
             } else if (action === 'pair') {
-                cmd = 'adb_pair';
+                // CODE and IP:PORT come from Android's "Pair device with pairing code" dialog
+                cmd = 'adb_pair_device';
                 args = { ip, port, code };
             } else if (action === 'disconnect') {
                 cmd = 'adb_disconnect';
@@ -299,7 +307,8 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                     setIsLoadingSecurity(true);
                     try {
                         enableNgrok();
-                        await checkSystemVersions(); // Trigger re-check to potentially find ngrok if it was skipped
+                        // isNgrokEnabled is still stale in this closure: force the ngrok check explicitly
+                        await checkSystemVersions(undefined, undefined, false, true);
                         setShowSecurityModal(false);
                     } finally {
                         setIsLoadingSecurity(false);
@@ -457,7 +466,29 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                         />
                     </div>
                 </div>
+            </Section>
 
+            {/* Wireless Debugging Pairing (Android 11+) */}
+            <Section
+                title={t('connect.wireless.pairing_title', 'Pair with Wireless Debugging (Android 11+)')}
+                icon={KeyRound}
+                description={t('connect.wireless.pairing_desc', 'Pair the computer once using the code shown by Android, then connect over Wi-Fi.')}
+                variant="card"
+            >
+                <div className="flex flex-col gap-3 p-4 bg-surface/50 border border-outline-variant/15 rounded-3xl">
+                    {hostIp && (
+                        <span className="self-start text-[11px] font-mono bg-primary/10 text-primary px-2.5 py-0.5 rounded-full border border-primary/20">
+                            {t('connect.wireless.host_ip', 'PC Host IP')}: {hostIp}
+                        </span>
+                    )}
+                    <ol className="text-xs text-on-surface-variant/80 leading-relaxed space-y-1 list-none">
+                        <li>{t('connect.wireless.pair_step1', '1. Make sure the phone and this computer are on the same Wi-Fi network.')}</li>
+                        <li>{t('connect.wireless.pair_step2', '2. On the phone, open Settings → Developer options → Wireless debugging and tap "Pair device with pairing code".')}</li>
+                        <li>{t('connect.wireless.pair_step3', '3. Type the "Wi-Fi pairing code" into the Code field above, and the IP address and port shown in that dialog into the IP and Port fields.')}</li>
+                        <li>{t('connect.wireless.pair_step4', '4. Open the Connect menu arrow and choose "Pair".')}</li>
+                        <li>{t('connect.wireless.pair_step5', '5. After pairing, close the dialog, enter the IP address & port shown on the main Wireless debugging screen (a different port) and click "Connect".')}</li>
+                    </ol>
+                </div>
             </Section>
 
             {/* Ngrok Integration Card */}
@@ -469,10 +500,14 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                     variant="card"
                     className={clsx(
                         "transition-opacity",
-                        systemCheckStatus?.missingTunnelling?.length > 0 ? "opacity-50 pointer-events-none grayscale" : ""
+                        isToolGroupUnavailable(systemCheckStatus, 'tunnelling') ? "opacity-50 pointer-events-none grayscale" : ""
                     )}
                     status={
-                        systemCheckStatus?.missingTunnelling?.length > 0 && (
+                        systemCheckStatus?.pendingGroups?.includes('tunnelling') ? (
+                            <span className="text-xs font-bold text-on-surface-variant bg-surface-variant px-2 py-1 rounded">
+                                {t('startup.background.feature_pending', 'Checking required tools...')}
+                            </span>
+                        ) : systemCheckStatus?.missingTunnelling?.length > 0 && (
                             <span className="text-xs font-bold text-error bg-error-container px-2 py-1 rounded">
                                 Ngrok Not Found
                             </span>

@@ -16,38 +16,59 @@ pub async fn save_screenshot(app: AppHandle, device: String, path: String) -> Re
         .await
         .map_err(|e| format!("Failed to run {}: {}", program, e))?;
 
-    let bytes = if !output.status.success() || output.stdout.is_empty() {
-        let remote_path = "/data/local/tmp/screencap_fallback.png";
-        
-        let mut cmd_cap = new_tokio_command(&program);
-        cmd_cap.args(&["-s", &device, "shell", "screencap", "-p", remote_path]);
-        let output_cap = cmd_cap.output().await
-            .map_err(|e| format!("Failed to execute fallback screencap on device: {}", e))?;
-        
-        if !output_cap.status.success() {
-            return Err(format!(
-                "Fallback screencap failed on device: {}",
-                String::from_utf8_lossy(&output_cap.stderr)
-            ));
+    let bytes = if !output.status.success() || output.stdout.len() < 1000 {
+        // Priority 1: Base64 piped screencap via shell (works on POS terminals, rede.exe, and avoids Windows CRLF corruption)
+        let mut cmd_b64 = new_tokio_command(&program);
+        cmd_b64.args(&["-s", &device, "shell", "screencap -p | base64"]);
+        let mut resolved_bytes: Option<Vec<u8>> = None;
+        if let Ok(out_b64) = cmd_b64.output().await {
+            if out_b64.status.success() {
+                use base64::Engine;
+                let raw = String::from_utf8_lossy(&out_b64.stdout);
+                let clean: String = raw.chars().filter(|c| !c.is_whitespace()).collect();
+                if clean.len() > 100 {
+                    if let Ok(b) = base64::engine::general_purpose::STANDARD.decode(clean) {
+                        resolved_bytes = Some(b);
+                    }
+                }
+            }
         }
 
-        let mut cmd_pull = new_tokio_command(&program);
-        cmd_pull.args(&["-s", &device, "pull", remote_path, &path]);
-        let output_pull = cmd_pull.output().await
-            .map_err(|e| format!("Failed to pull fallback screenshot: {}", e))?;
+        if let Some(b) = resolved_bytes {
+            b
+        } else {
+            let remote_path = "/data/local/tmp/screencap_fallback.png";
+            
+            let mut cmd_cap = new_tokio_command(&program);
+            cmd_cap.args(&["-s", &device, "shell", "screencap", "-p", remote_path]);
+            let output_cap = cmd_cap.output().await
+                .map_err(|e| format!("Failed to execute fallback screencap on device: {}", e))?;
+            
+            if !output_cap.status.success() {
+                return Err(format!(
+                    "Fallback screencap failed on device: {}",
+                    String::from_utf8_lossy(&output_cap.stderr)
+                ));
+            }
 
-        let mut cmd_rm = new_tokio_command(&program);
-        cmd_rm.args(&["-s", &device, "shell", "rm", remote_path]);
-        let _ = cmd_rm.output().await;
+            let mut cmd_pull = new_tokio_command(&program);
+            cmd_pull.args(&["-s", &device, "pull", remote_path, &path]);
+            let output_pull = cmd_pull.output().await
+                .map_err(|e| format!("Failed to pull fallback screenshot: {}", e))?;
 
-        if !output_pull.status.success() {
-            return Err(format!(
-                "Failed to pull screenshot from device: {}",
-                String::from_utf8_lossy(&output_pull.stderr)
-            ));
+            let mut cmd_rm = new_tokio_command(&program);
+            cmd_rm.args(&["-s", &device, "shell", "rm", remote_path]);
+            let _ = cmd_rm.output().await;
+
+            if !output_pull.status.success() {
+                return Err(format!(
+                    "Failed to pull screenshot from device: {}",
+                    String::from_utf8_lossy(&output_pull.stderr)
+                ));
+            }
+
+            return Ok(path);
         }
-
-        return Ok(path);
     } else {
         output.stdout
     };

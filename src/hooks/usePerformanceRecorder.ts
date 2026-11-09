@@ -24,6 +24,7 @@ export interface DeviceStats {
     battery_power_source?: string;
     app_stats?: AppStats;
     foreground_activity?: string;
+    telemetry_source?: string;
 }
 
 

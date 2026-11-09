@@ -28,6 +28,77 @@ export function parseBounds(boundsStr: string): { x: number; y: number; w: numbe
     };
 }
 
+export interface CompanionNodeRaw {
+    className: string;
+    packageName: string;
+    text: string;
+    contentDescription: string;
+    resourceId: string;
+    isClickable: boolean;
+    isEnabled: boolean;
+    isFocused: boolean;
+    isScrollable: boolean;
+    depth: number;
+    bounds?: { left: number; top: number; right: number; bottom: number };
+}
+
+export function transformCompanionTreeToInspectorNode(nodes: CompanionNodeRaw[]): InspectorNode | null {
+    if (!nodes || nodes.length === 0) return null;
+
+    let idCounter = 0;
+    const stack: { node: InspectorNode; depth: number }[] = [];
+    let rootNode: InspectorNode | null = null;
+
+    nodes.forEach(raw => {
+        const left = raw.bounds?.left ?? 0;
+        const top = raw.bounds?.top ?? 0;
+        const right = raw.bounds?.right ?? 0;
+        const bottom = raw.bounds?.bottom ?? 0;
+        const w = Math.max(0, right - left);
+        const h = Math.max(0, bottom - top);
+
+        const className = raw.className || 'android.view.View';
+        const simpleName = className.includes('.') ? className.split('.').pop()! : className;
+
+        const attributes: Record<string, string> = {
+            'class': className,
+            'package': raw.packageName || '',
+            'resource-id': raw.resourceId || '',
+            'text': raw.text || '',
+            'content-desc': raw.contentDescription || '',
+            'clickable': String(raw.isClickable),
+            'enabled': String(raw.isEnabled),
+            'focused': String(raw.isFocused),
+            'scrollable': String(raw.isScrollable),
+            'bounds': `[${left},${top}][${right},${bottom}]`
+        };
+
+        const inspectorNode: InspectorNode = {
+            id: `companion_node_${idCounter++}`,
+            tagName: simpleName,
+            attributes,
+            children: [],
+            bounds: { x: left, y: top, w, h }
+        };
+
+        while (stack.length > 0 && stack[stack.length - 1].depth >= raw.depth) {
+            stack.pop();
+        }
+
+        if (stack.length > 0) {
+            const parent = stack[stack.length - 1].node;
+            inspectorNode.parent = parent;
+            parent.children.push(inspectorNode);
+        } else {
+            rootNode = inspectorNode;
+        }
+
+        stack.push({ node: inspectorNode, depth: raw.depth });
+    });
+
+    return rootNode;
+}
+
 /**
  * Transforms coordinates if there is an orientation mismatch between the UI dump and the screenshot.
  * Handles the case where the screenshot might be rotated relative to the XML bounds.
@@ -55,6 +126,27 @@ export function transformBounds(
         w: nw * actualImgWidth,
         h: nh * actualImgHeight
     };
+}
+
+/**
+ * Uniform scale factors from XML (device) space to screenshot space.
+ * The UI dump may exclude system bars (e.g. the 3-button nav bar on Android <= 11), so its extent
+ * can be smaller than the screenshot on one axis. Scaling each axis independently would stretch
+ * the overlay, so the axis fully covered by the dump (the smaller ratio) defines the scale.
+ */
+export function getXmlToImageScale(
+    xmlRootWidth: number,
+    xmlRootHeight: number,
+    actualImgWidth: number,
+    actualImgHeight: number
+): { sx: number; sy: number } {
+    if (!xmlRootWidth || !xmlRootHeight || !actualImgWidth || !actualImgHeight) return { sx: 1, sy: 1 };
+    const sx = actualImgWidth / xmlRootWidth;
+    const sy = actualImgHeight / xmlRootHeight;
+    // Orientation mismatch between dump and screenshot: keep legacy per-axis mapping
+    if ((xmlRootWidth > xmlRootHeight) !== (actualImgWidth > actualImgHeight)) return { sx, sy };
+    const k = Math.min(sx, sy);
+    return { sx: k, sy: k };
 }
 
 /**
@@ -930,13 +1022,18 @@ export function getHighlighterStyle(
         root = root.parent;
     }
     if (root?.bounds?.w && root.bounds.h) {
-        transformedBounds = transformBounds(
-            node.bounds,
+        const { sx, sy } = getXmlToImageScale(
             root.bounds.w,
             root.bounds.h,
             imgLayout.naturalWidth,
             imgLayout.naturalHeight
         );
+        transformedBounds = {
+            x: node.bounds.x * sx,
+            y: node.bounds.y * sy,
+            w: node.bounds.w * sx,
+            h: node.bounds.h * sy
+        };
     }
 
     const scaleX = imgLayout.width / imgLayout.naturalWidth;

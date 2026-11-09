@@ -22,94 +22,19 @@ Você é o especialista em automação de testes mobile do time de QA.
 
 ---
 
-## Mapeamento do app — `map/*.json`
+25: 
 
-Os arquivos `map/*.json` são a fonte de verdade para telas, elementos e fluxos de navegação. **Sempre consulte este arquivo antes de criar ou atualizar testes.**
-
-### Estrutura do JSON
-
-```
-{
-  "version": "2.0",
-  "screens": [                        ← array com 105 entradas
-    {
-      "id": "home",                   ← identificador único da tela
-      "name": "Home",                 ← nome legível
-      "type": "screen|modal|tab",     ← tipo de tela
-      "description": "...",           ← descrição funcional (útil para gerar cenários)
-      "tags": ["Home", "Dashboard"],  ← categorias para filtrar telas relacionadas
-      "elements": [
-        {
-          "id": "//android.widget.Button[@content-desc='...']",  ← xpath (fallback)
-          "name": "Botão Rotinas",    ← nome legível do elemento
-          "type": "button|input|...", ← tipo do elemento
-          "accessibility_id": "Rotinas",  ← preferido para locators
-          "android_id": "0.0.0.1...", ← ID interno (raramente usado)
-          "text": "",                 ← texto visível, quando presente
-          "description": "...",       ← descrição da ação do elemento
-          "navigates_to": {           ← null se não navega
-            "destination": "Rotinas", ← nome da tela de destino
-            "vertices": []
-          }
-        }
-      ]
-    }
-  ]
-}
-```
-
-### Como usar ao criar testes
-
-**1. Identificar telas do fluxo a testar**
-
-Carregue o JSON e filtre por `tags` ou `name` para encontrar telas do fluxo:
-
-```python
-import json
-with open('config/flowchart.json', encoding='utf-8') as f:
-    data = json.load(f)
-
-# Filtrar por tag
-login_screens = [s for s in data['screens'] if 'Login' in s.get('tags', [])]
-# Filtrar por nome parcial
-rotinas = [s for s in data['screens'] if 'rotina' in s['name'].lower()]
-```
-
-**2. Extrair locators para `resources/variaveis/`**
-
-Prioridade de locator do projeto: `accessibility_id` > `android UiSelector` > `xpath`
-
-```python
-for elem in screen['elements']:
-    if elem.get('accessibility_id'):
-        locator = f"accessibility_id={elem['accessibility_id']}"
-    else:
-        locator = elem['id']  # xpath como fallback
-```
-
-**3. Mapear navegação para definir o caminho do teste**
-
-Use `navigates_to` para entender a sequência de telas de um fluxo e planejar as keywords de navegação:
-
-```python
-# Exemplo: mapear caminho de Login → Home → Rotinas
-for elem in screen['elements']:
-    if elem.get('navigates_to'):
-        print(f"{elem['name']} → {elem['navigates_to']['destination']}")
-```
-
-### Checklist ao usar o flowchart para criar um teste
-
-- [ ] Identificar as telas do fluxo no flowchart (filtrar por `tags` ou `name`)
-- [ ] Verificar se `accessibility_id` está preenchido antes de usar xpath do campo `id`
-- [ ] Checar se locator já existe em `resources/variaveis/` antes de criar novo
-- [ ] Usar `description` da tela para documentar o teste e definir asserções
-- [ ] Seguir `navigates_to` para planejar a sequência de keywords de navegação
-- [ ] Verificar tipo da tela (`modal` vs `screen`) para tratar corretamente na keyword
-
----
 
 ## Robot Framework — convenções obrigatórias
+
+### 7 Regras de Ouro da Engenharia de Qualidade
+1. **Separação de Responsabilidades**: NUNCA misture a implementação técnica (cliques, loops) dentro dos testes (`.robot`). Eles devem conter APENAS especificação BDD em alto nível. A técnica reside nos resources (`.resource`).
+2. **Abordagem BDD (Gherkin)**: Todos os testes DEVEM usar sintaxe Gherkin (`Dado`, `Quando`, `Então`).
+3. **Page Object Model (POM)**: Cada tela do aplicativo deve ter seu módulo dedicado (ex: `LoginScreen.resource`). Centralize localizadores no início de cada POM.
+4. **Parametrização**: Keywords DEVEM ser parametrizáveis (`[Arguments]`) para servir a cenários de sucesso e falha.
+5. **Importações Eficientes**: Importe apenas os Page Objects necessários para cada suíte. Evite escopo global poluído.
+6. **Zero Tolerância ao Sleep**: Use sempre esperas condicionais (`Wait Until Element Is Visible`). `Sleep` absoluto é proibido.
+7. **Isolamento de Estado (Teardown)**: Garanta que cada cenário devolva o app a um estado neutro (`[Teardown]`).
 
 ### Estrutura de um arquivo `.robot`
 

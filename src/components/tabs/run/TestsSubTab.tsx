@@ -14,11 +14,12 @@ import { WarningModal } from "@/components/organisms/WarningModal";
 import { feedback } from "@/lib/feedback";
 import { Button } from "@/components/atoms/Button";
 import { SplitButton } from "@/components/molecules/SplitButton";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Zap } from "lucide-react";
 import { ExpressiveLoading } from "@/components/atoms/ExpressiveLoading";
 import { useSelection, SelectionItem } from "@/lib/selectionStore";
 import { SelectionCounter } from "@/components/molecules/SelectionCounter";
 import { useRemoteConfig } from '@/lib/RemoteConfigProvider';
+import { useCompanion } from '@/hooks/useCompanion';
 
 interface TestsSubTabProps {
     selectedDevices: string[];
@@ -68,6 +69,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
     const [isLaunching, setIsLaunching] = useState(false);
     const [warningModal, setWarningModal] = useState<{ isOpen: boolean, message: string, showSettingsAction?: boolean }>({ isOpen: false, message: '', showSettingsAction: false });
     const { items, setTests, setArgs, clearSelection } = useSelection();
+    const { status: companionStatus } = useCompanion(selectedDevices[0]);
 
     // Selector state
     const [selectorState, setSelectorState] = useState<{
@@ -198,7 +200,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         return () => window.removeEventListener('ai_run_test', onAiRunTest);
     }, []);
 
-    const handleRun = async (isAiAgent: boolean = false, aiPrompt?: string) => {
+    const handleRun = async (isAiAgent: boolean = false, isRrt: boolean = false, aiPrompt?: string) => {
         if (items.length === 0 && !isAiAgent) {
             feedback.toast.raw.error(t('tests.toasts.no_items_selected', { defaultValue: 'No items selected to run.' }));
             return;
@@ -237,8 +239,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
         const fw = settings.automationFramework || 'robot';
 
         try {
-            // 1. Check/Start Appium (Skip for Maestro, Cypress, Selenium, AI Agents, or if Robot is selected and noAppiumForRobot is enabled)
-            const skipAppium = fw === 'maestro' || fw === 'cypress' || fw === 'selenium' || isAiAgent || (fw === 'robot' && settings.noAppiumForRobot);
+            // 1. Check/Start Appium (Skip for Maestro, Cypress, Selenium, AI Agents, RRT, or if Robot is selected and noAppiumForRobot is enabled)
+            const skipAppium = fw === 'maestro' || fw === 'cypress' || fw === 'selenium' || isAiAgent || isRrt || (fw === 'robot' && settings.noAppiumForRobot);
             if (!skipAppium) {
                 const status = await invoke<{ running: boolean }>('get_appium_status', {
                     host: settings.appiumHost,
@@ -489,7 +491,8 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                     finalTests || undefined,
                     isAiAgent,
                     aiPrompt,
-                    activeProfileName
+                    activeProfileName,
+                    isRrt
                 );
 
                 if (isAiAgent) {
@@ -502,19 +505,35 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                 }
 
                 if (fw === 'robot') {
-                    invoke("run_robot_test", {
-                        runId,
-                        testPath: finalTestPath,
-                        outputDir: logDir,
-                        logs_path: activeProfileName,
-                        device: deviceUdid === 'local' ? null : deviceUdid,
-                        argumentsFile: finalArgsFile,
-                        timestampOutputs: settings.saveLogs,
-                        deviceModel: devModel,
-                        androidVersion: devVer,
-                        workingDir,
-                        selectedTests: finalTests
-                    }).catch(e => feedback.toast.error("tests.launch_failed", e));
+                    if (isRrt) {
+                        invoke("compile_and_send_rrt", {
+                            runId,
+                            testPath: finalTestPath,
+                            outputDir: logDir,
+                            logs_path: activeProfileName,
+                            device: deviceUdid === 'local' ? null : deviceUdid,
+                            argumentsFile: finalArgsFile,
+                            timestampOutputs: settings.saveLogs,
+                            deviceModel: devModel,
+                            androidVersion: devVer,
+                            workingDir,
+                            selectedTests: finalTests
+                        }).catch(e => feedback.toast.error("tests.launch_failed", e));
+                    } else {
+                        invoke("run_robot_test", {
+                            runId,
+                            testPath: finalTestPath,
+                            outputDir: logDir,
+                            logs_path: activeProfileName,
+                            device: deviceUdid === 'local' ? null : deviceUdid,
+                            argumentsFile: finalArgsFile,
+                            timestampOutputs: settings.saveLogs,
+                            deviceModel: devModel,
+                            androidVersion: devVer,
+                            workingDir,
+                            selectedTests: finalTests
+                        }).catch(e => feedback.toast.error("tests.launch_failed", e));
+                    }
                 } else if (fw === 'maestro') {
                     invoke("run_maestro_test", {
                         runId,
@@ -756,6 +775,12 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                 disabled: selectedDevices.length === 0 || items.length === 0 || isLaunching
                             }}
                             secondaryActions={[
+                                ...(companionStatus === 'connected' ? [{
+                                    label: t('tests.run_with_companion', "Run with Companion"),
+                                    icon: <Zap size={16} />,
+                                    disabled: selectedDevices.length === 0 || isLaunching || items.length === 0,
+                                    onClick: () => handleRun(false, true)
+                                }] : []),
                                 {
                                     label: t('tests.options.dont_overwrite'),
                                     icon: <History size={16} />,
@@ -767,7 +792,7 @@ export function TestsSubTab({ selectedDevices, devices, onNavigate }: TestsSubTa
                                     label: items.length === 0 ? t('tests.run_ai_prompt') : t('tests.run_ai'),
                                     icon: <Sparkles size={16} />,
                                     disabled: selectedDevices.length === 0 || isLaunching,
-                                    onClick: () => handleRun(true)
+                                    onClick: () => handleRun(true, false)
                                 }] : [])
                             ]}
                         />

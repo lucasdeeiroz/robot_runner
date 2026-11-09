@@ -1,5 +1,5 @@
 
-import { Smartphone, Battery, Cpu, HardDrive, Wrench, Monitor, MoreVertical, Camera, RotateCw, Layout, MousePointer2, RefreshCcw, Move } from 'lucide-react';
+import { Smartphone, Battery, Cpu, HardDrive, Wrench, Monitor, MoreVertical, Camera, RotateCw, Layout, MousePointer2, RefreshCcw, Move, Zap, Wifi } from 'lucide-react';
 import { Device } from '@/lib/types';
 import { Button } from '@/components/atoms/Button';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { AndroidVersionPill } from '@/components/atoms/AndroidVersionPill';
 import { DropdownMenu } from './DropdownMenu';
+import { CompanionBadge } from '@/components/atoms/CompanionBadge';
 
 interface DeviceCardProps {
     device: Device;
@@ -55,9 +56,23 @@ export function DeviceCard({ device, onMirror, onToolbox, onAction }: DeviceCard
                     </div>
                     <div className="flex flex-col min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
-                            <h3 className="font-bold text-xl text-on-surface tracking-tight truncate leading-tight" title={device.model}>
-                                {device.model || 'Unknown Device'}
-                            </h3>
+                            <div className="flex items-center gap-2 min-w-0">
+                                <h3 className="font-bold text-xl text-on-surface tracking-tight truncate leading-tight" title={device.model}>
+                                    {device.model || 'Unknown Device'}
+                                </h3>
+                                <CompanionBadge
+                                    variant="ghost"
+                                    status={device.is_companion_active ? 'connected' : (device.is_companion_installed ? 'disconnected' : 'not_installed')}
+                                    onConnect={() => onAction(device, 'connect_companion')}
+                                    onLaunch={() => onAction(device, 'launch_companion')}
+                                />
+                                {device.wifi_ip && (
+                                    <span className="text-[10px] font-mono bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20 flex items-center gap-1">
+                                        <Wifi size={10} />
+                                        {device.wifi_ip}
+                                    </span>
+                                )}
+                            </div>
                             {/* UDID - Floating top right of content area */}
                             <div className="flex flex-col items-end opacity-0 group-hover:opacity-40 transition-all duration-500 translate-x-2 group-hover:translate-x-0 hidden sm:flex">
                                 <span className="text-[11px] font-mono uppercase tracking-tighter">UDID</span>
@@ -66,7 +81,7 @@ export function DeviceCard({ device, onMirror, onToolbox, onAction }: DeviceCard
                                 </span>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <div className={clsx(
                                 "w-2.5 h-2.5 rounded-full",
                                 isOnline ? "bg-success animate-pulse shadow-sm shadow-success/50" : "bg-on-surface-variant/40"
@@ -85,11 +100,14 @@ export function DeviceCard({ device, onMirror, onToolbox, onAction }: DeviceCard
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="bg-surface-variant/10 rounded-2xl p-3 border border-outline-variant/10 flex items-center gap-3 hover:bg-surface-variant/20 transition-colors">
                         <div className={clsx("p-2 rounded-xl bg-surface/80 shadow-sm", getBatteryColor(batteryLevel))}>
-                            <Battery size={18} />
+                            {device.is_charging ? <Zap size={18} className="animate-pulse" /> : <Battery size={18} />}
                         </div>
                         <div className="flex flex-col">
                             <span className="text-[10px] text-on-surface-variant/50 uppercase font-bold tracking-wider leading-none mb-1">{t('home.device_card.battery')}</span>
-                            <span className="text-sm font-bold text-on-surface/80">{batteryLevel}%</span>
+                            <span className="text-sm font-bold text-on-surface/80">
+                                {batteryLevel}% {device.is_charging ? '⚡' : ''}
+                                {device.battery_temp ? ` (${device.battery_temp.toFixed(1)}°C)` : ''}
+                            </span>
                         </div>
                     </div>
                     <div className="bg-surface-variant/10 rounded-2xl p-3 border border-outline-variant/10 flex items-center gap-3 hover:bg-surface-variant/20 transition-colors">

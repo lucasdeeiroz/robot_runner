@@ -86,3 +86,13 @@ pub fn format_adb_error(output: &std::process::Output) -> String {
         }
     }
 }
+
+/// Validates an Android package name (`^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+$`) before it is
+/// interpolated into a device-side shell script or URL.
+pub fn is_valid_android_package(pkg: &str) -> bool {
+    let segments: Vec<&str> = pkg.split('.').collect();
+    segments.len() >= 2
+        && segments
+            .iter()
+            .all(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'))
+}

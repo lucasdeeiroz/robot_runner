@@ -31,6 +31,7 @@ pub struct DeviceStats {
     pub app_stats: Option<AppStats>,
     pub foreground_activity: Option<String>,
     pub screen_state: Option<String>,
+    pub telemetry_source: Option<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -107,6 +108,118 @@ async fn get_device_stats_internal(
     device: &str,
     package: Option<String>,
 ) -> Result<DeviceStats, String> {
+    let mut companion_stats: Option<DeviceStats> = None;
+
+    // Reject anything that is not a plain Android package name: it is interpolated into
+    // device-side `sh` scripts and into the Companion URL below.
+    if let Some(pkg) = &package {
+        if !pkg.is_empty() && !crate::cmd_utils::is_valid_android_package(pkg) {
+            return Err(format!("Invalid package name: {}", pkg));
+        }
+    }
+
+    // 🚀 Companion Telemetry Bridge (Sub-10ms for Hardware & Battery & Foreground)
+    let mut comp_endpoint = String::from("/telemetry");
+    if let Some(pkg) = &package {
+        if !pkg.is_empty() {
+            comp_endpoint.push_str(&format!("?package={}", pkg));
+        }
+    }
+
+    if let Some(val) = crate::companion::companion_get_json_ok(app, device, &comp_endpoint, Duration::from_millis(1500)).await {
+                        {
+                            let cpu_usage = val.get("cpu_usage").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                            let ram_used = val.get("ram_used").and_then(|v| v.as_u64()).unwrap_or(0);
+                            let ram_total = val.get("ram_total").and_then(|v| v.as_u64()).unwrap_or(0);
+                            let battery_level = val.get("battery_level").and_then(|v| v.as_u64()).unwrap_or(0) as u8;
+                            let temperature = val.get("temperature").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                            let battery_status = val.get("battery_status").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
+                            let battery_power_source = val.get("battery_power_source").and_then(|v| v.as_str()).unwrap_or("Battery").to_string();
+                            let foreground_activity = val.get("foreground_activity").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+                            let app_stats = val.get("app_stats").and_then(|a| {
+                                let app_cpu = a.get("cpu_usage").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                                let app_ram = a.get("ram_used").and_then(|v| v.as_u64()).unwrap_or(0);
+                                let app_fps = a.get("fps").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                                Some(AppStats {
+                                    cpu_usage: app_cpu,
+                                    ram_used: app_ram,
+                                    fps: app_fps,
+                                })
+                            });
+
+                            let has_valid_app_stats = package.as_ref().map_or(true, |pkg| {
+                                pkg.is_empty() || app_stats.as_ref().map_or(false, |a| a.ram_used > 0 && a.cpu_usage > 0.0)
+                            });
+
+                            let stats = DeviceStats {
+                                cpu_usage,
+                                ram_used,
+                                ram_total,
+                                battery_level,
+                                temperature,
+                                battery_status,
+                                battery_power_source,
+                                app_stats,
+                                foreground_activity,
+                                screen_state: Some("ON".into()),
+                                telemetry_source: Some("companion".into()),
+                            };
+
+                            // If Companion gave us both host CPU (>0) and valid app_stats (if package requested), return immediately!
+                            if cpu_usage > 0.0 && has_valid_app_stats {
+                                return Ok(stats);
+                            }
+
+                            companion_stats = Some(stats);
+                        }
+    }
+
+    // 🐢 Hybrid/ADB Telemetry Supplement
+    // If Companion is active, we supplement missing CPU or App Stats via a single targeted ADB call
+    if let Some(mut stats) = companion_stats {
+        let script = if let Some(pkg) = &package {
+            if !pkg.is_empty() {
+                format!("top -b -n 1 && echo ___SEP___ && dumpsys meminfo {} && echo ___SEP___ && dumpsys gfxinfo {} && echo ___SEP___ && pidof {}", pkg, pkg, pkg)
+            } else {
+                "top -b -n 1".to_string()
+            }
+        } else {
+            "top -b -n 1".to_string()
+        };
+
+        let combined_output = run_adb_shell(app, device, &script).await;
+        let parts: Vec<&str> = combined_output.split("___SEP___").collect();
+
+        let top_output = parts.get(0).unwrap_or(&"");
+        if stats.cpu_usage == 0.0 {
+            if let Some(cpu) = parse_cpu_usage(top_output) {
+                stats.cpu_usage = cpu;
+            }
+        }
+
+        if let Some(pkg) = &package {
+            if !pkg.is_empty() {
+                let app_ram_output = parts.get(1).unwrap_or(&"");
+                let app_fps_output = parts.get(2).unwrap_or(&"");
+                let app_pidof_output = parts.get(3).unwrap_or(&"");
+
+                let app_ram_res = parse_app_ram_from_string(app_ram_output);
+                let app_fps_res = parse_app_fps_from_string(device, pkg, app_fps_output);
+                let app_cpu_res = parse_app_cpu_from_string(pkg, top_output, app_pidof_output);
+
+                stats.app_stats = Some(AppStats {
+                    cpu_usage: app_cpu_res.unwrap_or(0.0),
+                    ram_used: app_ram_res.unwrap_or(0),
+                    fps: app_fps_res.unwrap_or(0),
+                });
+            }
+        }
+
+        return Ok(stats);
+    }
+
+    // 🐢 ADB Telemetry Fallback
     let mut script = String::from("dumpsys battery; echo ___S\"EP\"___; cat /proc/meminfo || dumpsys meminfo; echo ___S\"EP\"___; top -b -n 1; echo ___S\"EP\"___; dumpsys window displays; echo ___S\"EP\"___; dumpsys power");
     
     if let Some(pkg) = &package {
@@ -174,6 +287,7 @@ async fn get_device_stats_internal(
         app_stats,
         foreground_activity,
         screen_state,
+        telemetry_source: Some("adb".into()),
     })
 }
 
@@ -626,6 +740,23 @@ pub async fn get_battery_audit(app: AppHandle, device: String) -> Result<Battery
     })
 }
 
+pub fn parse_app_ram_from_string(output: &str) -> Option<u64> {
+    for line in output.lines() {
+        let trimmed = line.trim();
+        let upper = trimmed.to_uppercase();
+        if upper.starts_with("TOTAL") {
+            for token in trimmed.split_whitespace() {
+                let clean = token.replace(',', "").replace(':', "");
+                if let Ok(val) = clean.parse::<u64>() {
+                    if val > 100 {
+                        return Some(val);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
 
 fn parse_app_cpu_from_string(package: &str, fallback_top_output: &str, pidof_output: &str) -> Option<f32> {
     let mut found_cpu: Option<f32> = None;
@@ -707,39 +838,44 @@ fn parse_app_fps_from_string(device: &str, package: &str, output: &str) -> Optio
     let mut total_frames_rendered: Option<u64> = None;
 
     for line in output.lines() {
-        if line.starts_with("Total frames rendered: ") {
-            if let Ok(frames) = line.replace("Total frames rendered: ", "").trim().parse::<u64>() {
-                total_frames_rendered = Some(frames);
+        let trimmed = line.trim();
+
+        if trimmed.starts_with("Total frames rendered:") || trimmed.starts_with("Total frames rendered :") {
+            if let Some(val_str) = trimmed.split(':').nth(1) {
+                if let Ok(frames) = val_str.trim().parse::<u64>() {
+                    total_frames_rendered = Some(frames);
+                }
             }
             continue;
         }
 
-        if line.starts_with("Uptime: ") {
-            let parts: Vec<&str> = line.split_whitespace().collect();
+        if trimmed.starts_with("Uptime:") || trimmed.starts_with("Uptime :") {
+            let parts: Vec<&str> = trimmed.split_whitespace().collect();
             if parts.len() >= 2 {
-                if let Ok(uptime_ms) = parts[1].parse::<u64>() {
+                if let Ok(uptime_ms) = parts[1].replace(':', "").parse::<u64>() {
                     uptime_ns = uptime_ms * 1_000_000;
                 }
             }
             continue;
         }
 
-        if line.starts_with("Flags,") {
-            let headers: Vec<&str> = line.split(',').collect();
+        if trimmed.starts_with("Flags,") {
+            let headers: Vec<&str> = trimmed.split(',').collect();
             for (i, h) in headers.iter().enumerate() {
-                if *h == "IntendedVsync" {
+                let h_clean = h.trim();
+                if h_clean == "IntendedVsync" {
                     vsync_index = Some(i);
-                } else if *h == "FrameCompleted" {
+                } else if h_clean == "FrameCompleted" {
                     completed_index = Some(i);
                 }
             }
             continue;
         }
 
-        let parts: Vec<&str> = line.split(',').collect();
+        let parts: Vec<&str> = trimmed.split(',').collect();
         if let (Some(v_idx), Some(c_idx)) = (vsync_index, completed_index) {
             if parts.len() > v_idx && parts.len() > c_idx {
-                if let (Ok(vsync), Ok(completed)) = (parts[v_idx].parse::<u64>(), parts[c_idx].parse::<u64>()) {
+                if let (Ok(vsync), Ok(completed)) = (parts[v_idx].trim().parse::<u64>(), parts[c_idx].trim().parse::<u64>()) {
                     if completed > 0 && vsync > 0 {
                         if vsync < u64::MAX - 1000000 {
                             intended_vsyncs.push(vsync);
@@ -804,4 +940,42 @@ fn parse_app_fps_from_string(device: &str, package: &str, output: &str) -> Optio
     }
 
     None
+}
+
+#[derive(Debug, serde::Serialize, Clone)]
+pub struct HardwareFrameDelta {
+    pub tti_ms: u64,
+    pub last_touch_timestamp: u64,
+    pub last_redraw_timestamp: u64,
+    pub package_name: String,
+    pub source: String,
+}
+
+#[tauri::command]
+pub async fn get_companion_frame_delta(app: AppHandle, device: String) -> Result<HardwareFrameDelta, String> {
+    if let Some(val) = crate::companion::companion_get_json_ok(&app, &device, "/frame-delta", Duration::from_millis(1500)).await {
+                    {
+                        let tti_ms = val.get("tti_ms").and_then(|v| v.as_u64()).unwrap_or(0);
+                        let last_touch_timestamp = val.get("last_touch_timestamp").and_then(|v| v.as_u64()).unwrap_or(0);
+                        let last_redraw_timestamp = val.get("last_redraw_timestamp").and_then(|v| v.as_u64()).unwrap_or(0);
+                        let package_name = val.get("package_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                        let source = val.get("source").and_then(|v| v.as_str()).unwrap_or("companion_hardware").to_string();
+
+                        return Ok(HardwareFrameDelta {
+                            tti_ms,
+                            last_touch_timestamp,
+                            last_redraw_timestamp,
+                            package_name,
+                            source,
+                        });
+                    }
+    }
+
+    Ok(HardwareFrameDelta {
+        tti_ms: 0,
+        last_touch_timestamp: 0,
+        last_redraw_timestamp: 0,
+        package_name: "".to_string(),
+        source: "desktop_clock".to_string(),
+    })
 }

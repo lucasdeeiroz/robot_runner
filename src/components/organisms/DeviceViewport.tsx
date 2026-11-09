@@ -8,6 +8,7 @@ import { Button } from '@/components/atoms/Button';
 import { ExpressiveLoading } from '@/components/atoms/ExpressiveLoading';
 import { GestureOverlay } from '@/components/molecules/GestureOverlay';
 import { useSettings } from '@/lib/settings';
+import { CompanionBadge } from '@/components/atoms/CompanionBadge';
 
 interface DeviceViewportProps {
     screenshot: string | null;
@@ -25,6 +26,10 @@ interface DeviceViewportProps {
     // Interactions
     taps: { id: number, x: number, y: number }[];
     swipes: { id: number, startX: number, startY: number, endX: number, endY: number }[];
+
+    // Companion Performance Metrics
+    uiTreeSource?: 'companion' | 'adb' | null;
+    uiTreeFetchTimeMs?: number | null;
 
     // Handlers
     onRefresh: (forceClear?: boolean, targetWebUrl?: string) => void;
@@ -57,6 +62,8 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
     searchResults = [],
     taps,
     swipes,
+    uiTreeSource,
+    uiTreeFetchTimeMs,
     onRefresh,
     handlers,
     isExploring = false,
@@ -72,6 +79,19 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
     const isWeb = isWebOverride !== undefined ? isWebOverride : is_test_mode === 'web';
 
     const [urlInput, setUrlInput] = React.useState(activeWebUrl);
+    const [showEngineBadge, setShowEngineBadge] = React.useState(false);
+
+    React.useEffect(() => {
+        if (uiTreeSource) {
+            setShowEngineBadge(true);
+            const timer = setTimeout(() => {
+                setShowEngineBadge(false);
+            }, 5000);
+            return () => clearTimeout(timer);
+        } else {
+            setShowEngineBadge(false);
+        }
+    }, [uiTreeSource, uiTreeFetchTimeMs]);
 
     // Derived layout for fallback (if image fails but hierarchy is OK)
     const imgLayout = React.useMemo(() => {
@@ -435,6 +455,30 @@ export const DeviceViewport: React.FC<DeviceViewportProps> = ({
                     >
                         <RefreshCw size={12} />
                     </motion.button>
+                )}
+            </AnimatePresence>
+
+            {/* Floating Companion Engine Badge (Auto-hides after 5 seconds) */}
+            <AnimatePresence>
+                {showEngineBadge && uiTreeSource && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.9 }}
+                        transition={{ duration: 0.3 }}
+                        className="absolute top-1.5 right-2 z-[60]"
+                    >
+                        {uiTreeSource === 'companion' ? (
+                            <CompanionBadge
+                                status="connected"
+                                extraInfo={`${uiTreeFetchTimeMs ?? 0}ms`}
+                            />
+                        ) : (
+                            <div className="px-2.5 py-1 rounded-xl bg-surface-variant/40 border border-outline-variant/30 text-on-surface-variant text-xs font-medium">
+                                <span>ADB ({uiTreeFetchTimeMs ?? 0}ms)</span>
+                            </div>
+                        )}
+                    </motion.div>
                 )}
             </AnimatePresence>
 

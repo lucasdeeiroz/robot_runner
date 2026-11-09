@@ -53,6 +53,9 @@ export interface ClaudeResponse {
 function detectClaudeApiError(parsed: any): void {
     if (!parsed || typeof parsed !== 'object') return;
 
+    // If it has structured output or extracted texts or valid AI response data, it is NOT an error
+    if (parsed.texts || parsed.structured_output || parsed.reply || parsed.actions || Array.isArray(parsed)) return;
+
     const hasErrorObj = parsed.error !== null && parsed.error !== undefined && parsed.error !== false;
     const isError = parsed.is_error === true || (hasErrorObj && typeof parsed.error === 'object') || parsed.api_error_status !== undefined || parsed.terminal_reason === 'api_error';
     if (!isError) return;
@@ -137,8 +140,8 @@ export async function askClaudeCode(
                 };
             }
 
-            // Direct AI Agent Response format: { reply: "...", actions: [...] }
-            if (parsed.reply || parsed.actions) {
+            // Direct AI Agent Response or OCR format
+            if (parsed.reply || parsed.actions || parsed.texts) {
                 return rawResult;
             }
 
@@ -164,14 +167,22 @@ export async function askClaudeCode(
         console.error("[Claude CLI] Invocation failed. Raw Error:", error, "Type:", typeof error);
         const errorStr = typeof error === 'string' ? error : (error?.message || String(error));
 
-        // Recovery: If errorStr contains a valid JSON AI payload with "reply" or "actions", recover it!
+        // Recovery: If errorStr contains a valid JSON AI payload (like texts, reply, actions, structured_output), recover it!
         try {
             const firstBrace = errorStr.indexOf('{');
             const lastBrace = errorStr.lastIndexOf('}');
             if (firstBrace !== -1 && lastBrace > firstBrace) {
                 const candidate = errorStr.substring(firstBrace, lastBrace + 1);
                 const parsedCandidate = JSON.parse(candidate);
-                if (parsedCandidate && (parsedCandidate.reply || parsedCandidate.actions || parsedCandidate.suggested_prompts)) {
+                if (parsedCandidate && (parsedCandidate.reply || parsedCandidate.actions || parsedCandidate.suggested_prompts || parsedCandidate.texts || parsedCandidate.structured_output || parsedCandidate.result)) {
+                    if (options?.jsonSchema && parsedCandidate.structured_output) {
+                        return {
+                            result: parsedCandidate.result || "",
+                            structured_output: parsedCandidate.structured_output,
+                            session_id: parsedCandidate.session_id,
+                            usage: parsedCandidate.usage
+                        };
+                    }
                     return candidate;
                 }
             }

@@ -55,6 +55,7 @@ For detailed information on how to get the most out of Robot Runner, explore our
 ### 📖 Core Guides
 - [Setup & Configuration](docs/en/SETUP.md)
 - [Usage Guide](docs/en/USAGE.md)
+- [Companion Integration Architecture & Benchmarks](docs/en/CompanionIntegration.md)
 - [Troubleshooting](docs/en/TROUBLESHOOTING.md)
 
 ### 🏠 Main Modules
