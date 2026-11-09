@@ -81,7 +81,14 @@ const files = [
     }
 ];
 
-const hasAlphaTag = /[a-zA-Z]/.test(tag);
+// "-stableN" tags are stable releases: MSI stays enabled using a numeric WiX version (major.minor.patch.N),
+// since MSI only accepts numeric versions. Any other alphabetic tag (alpha, beta, rc...) is a pre-release.
+const stableMatch = tag.match(/^-stable(\d*)$/i);
+const isStableTag = !!stableMatch;
+const hasAlphaTag = /[a-zA-Z]/.test(tag) && !isStableTag;
+const wixVersion = isStableTag
+    ? `${major}.${minor}.${patch}${stableMatch[1] ? `.${parseInt(stableMatch[1], 10)}` : ''}`
+    : null;
 
 let hasError = false;
 
@@ -99,6 +106,17 @@ files.forEach(file => {
                     console.log(`Note: Disabled MSI target in tauri.conf.json due to pre-release tag.`);
                 } else {
                     tauriConf.bundle.targets = "all";
+                }
+
+                // Explicit MSI version for stable tags; otherwise let Tauri derive it from the app version
+                if (wixVersion) {
+                    tauriConf.bundle.windows = tauriConf.bundle.windows || {};
+                    tauriConf.bundle.windows.wix = { ...(tauriConf.bundle.windows.wix || {}), version: wixVersion };
+                    console.log(`Note: MSI (WiX) version set to ${wixVersion} for stable tag.`);
+                } else if (tauriConf.bundle.windows?.wix?.version) {
+                    delete tauriConf.bundle.windows.wix.version;
+                    if (Object.keys(tauriConf.bundle.windows.wix).length === 0) delete tauriConf.bundle.windows.wix;
+                    if (Object.keys(tauriConf.bundle.windows).length === 0) delete tauriConf.bundle.windows;
                 }
                 fs.writeFileSync(file.path, JSON.stringify(tauriConf, null, 2) + '\n', 'utf8');
                 console.log(`Updated ${path.basename(file.path)} to version ${newVersion}`);
