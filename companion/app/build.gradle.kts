@@ -22,6 +22,21 @@ android {
         }
     }
 
+    // Stable release signing (CI): enabled only when the keystore env vars are provided.
+    // Without them, release builds fall back to the debug key (local builds keep working).
+    val releaseKeystorePath: String? = System.getenv("COMPANION_KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
+
+    signingConfigs {
+        if (releaseKeystorePath != null) {
+            create("release") {
+                storeFile = file(releaseKeystorePath)
+                storePassword = System.getenv("COMPANION_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("COMPANION_KEY_ALIAS")
+                keyPassword = System.getenv("COMPANION_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -29,7 +44,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (releaseKeystorePath != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
     

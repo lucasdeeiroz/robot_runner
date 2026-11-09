@@ -82,3 +82,24 @@ If you intend to build Robot Runner from source:
 4. **Install Dependencies**: `npm install`
 5. **Run in Dev Mode**: `npm run tauri dev`
 6. **Build Production App**: `npm run tauri build`
+
+### 🚀 Publishing a Release (Maintainers)
+
+Releases are fully automated by `.github/workflows/release.yml`. The only manual steps are:
+
+1. **Bump the version**: `node scripts/bump_version.js 3.0.1-beta1` (updates `package.json`, `tauri.conf.json`, `Cargo.toml`, the Companion and the MSI settings).
+2. **Commit and tag**: `git commit -am "chore: bump version to 3.0.1-beta1"` then `git tag v3.0.1-beta1`.
+3. **Push the tag**: `git push origin v3.0.1-beta1`.
+
+The workflow then, without any intervention:
+
+- **Validates** that the tag matches every project version (fails early with the exact fix command otherwise).
+- **Generates the release notes** from the commits since the previous tag, grouped into Features / Improvements / Bug Fixes / etc., plus a download table for every platform. Stable releases list changes since the previous **stable** release.
+- **Builds** Windows, macOS, Linux and the Companion APK, and **fails if any expected file is missing**.
+- **Publishes** the release with a `SHA256SUMS.txt` only after every build succeeded.
+- **Channels**: tags containing `-alpha`, `-dev`, `-beta` or `-rc` are published as **pre-releases** (not offered to the Stable update channel and not sent to Winget). `-stableN` and plain `X.Y.Z` tags are **stable** releases.
+- **Winget**: stable releases are submitted automatically when the `WINGET_TOKEN` secret is configured.
+
+To rebuild an existing tag, open **Actions > Release > Run workflow** and type the tag (e.g. `v3.0.1-beta1`).
+
+**Companion signing (one-time setup):** to let users update `companion.apk` without uninstalling it, create a release keystore and add these repository secrets: `COMPANION_KEYSTORE_BASE64` (the `.jks` file in Base64), `COMPANION_KEYSTORE_PASSWORD`, `COMPANION_KEY_ALIAS` and `COMPANION_KEY_PASSWORD`. Without them, the APK is signed with a temporary debug key and the workflow shows a warning.

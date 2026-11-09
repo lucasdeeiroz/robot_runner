@@ -82,3 +82,24 @@ Se você pretende compilar o Robot Runner a partir do código-fonte:
 4. **Instalar Dependências**: `npm install`
 5. **Rodar em Modo Dev**: `npm run tauri dev`
 6. **Compilar para Produção**: `npm run tauri build`
+
+### 🚀 Publicando uma Release (Mantenedores)
+
+As releases são totalmente automatizadas pelo `.github/workflows/release.yml`. Os únicos passos manuais são:
+
+1. **Atualizar a versão**: `node scripts/bump_version.js 3.0.1-beta1` (atualiza `package.json`, `tauri.conf.json`, `Cargo.toml`, o Companion e as configurações do MSI).
+2. **Commitar e criar a tag**: `git commit -am "chore: bump version to 3.0.1-beta1"` e depois `git tag v3.0.1-beta1`.
+3. **Enviar a tag**: `git push origin v3.0.1-beta1`.
+
+A partir daí o workflow, sem nenhuma intervenção:
+
+- **Valida** se a tag bate com todas as versões do projeto (falha logo no início, indicando o comando exato para corrigir).
+- **Gera as notas da release** a partir dos commits desde a tag anterior, agrupados em Features / Improvements / Bug Fixes etc., com uma tabela de downloads para cada plataforma. Releases estáveis listam as mudanças desde a última release **estável**.
+- **Compila** Windows, macOS, Linux e o APK do Companion, e **falha se algum arquivo esperado estiver faltando**.
+- **Publica** a release com um `SHA256SUMS.txt` somente depois que todos os builds tiverem sucesso.
+- **Canais**: tags com `-alpha`, `-dev`, `-beta` ou `-rc` são publicadas como **pré-release** (não são oferecidas ao canal de atualização Stable nem enviadas ao Winget). Tags `-stableN` e `X.Y.Z` simples são releases **estáveis**.
+- **Winget**: releases estáveis são enviadas automaticamente quando o secret `WINGET_TOKEN` está configurado.
+
+Para refazer o build de uma tag existente, abra **Actions > Release > Run workflow** e informe a tag (ex.: `v3.0.1-beta1`).
+
+**Assinatura do Companion (configuração única):** para que os usuários atualizem o `companion.apk` sem desinstalar, crie uma keystore de release e cadastre estes secrets no repositório: `COMPANION_KEYSTORE_BASE64` (o arquivo `.jks` em Base64), `COMPANION_KEYSTORE_PASSWORD`, `COMPANION_KEY_ALIAS` e `COMPANION_KEY_PASSWORD`. Sem eles, o APK é assinado com uma chave de debug temporária e o workflow exibe um aviso.
