@@ -117,9 +117,14 @@ files.forEach(file => {
             if (file.path.endsWith('tauri.conf.json')) {
                 const tauriConf = JSON.parse(content);
                 tauriConf.version = versionToUse;
+                // RPM versions cannot contain '-', so any suffixed version (e.g. 3.0.0-stable1) skips RPM;
+                // MSI only accepts numeric versions, so pre-releases also skip MSI (stable tags use wixVersion).
                 if (hasAlphaTag) {
                     tauriConf.bundle.targets = ["nsis", "appimage", "deb", "dmg"];
-                    console.log(`Note: Disabled MSI target in tauri.conf.json due to pre-release tag.`);
+                    console.log(`Note: Disabled MSI and RPM targets in tauri.conf.json due to pre-release tag.`);
+                } else if (tag) {
+                    tauriConf.bundle.targets = ["nsis", "msi", "appimage", "deb", "app", "dmg"];
+                    console.log(`Note: Disabled RPM target in tauri.conf.json (RPM versions cannot contain '-').`);
                 } else {
                     tauriConf.bundle.targets = "all";
                 }

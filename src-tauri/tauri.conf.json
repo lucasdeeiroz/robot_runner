@@ -32,7 +32,14 @@
       "../scripts/web_record.cjs",
       "../scripts/rrt_compiler.py"
     ],
-    "targets": "all",
+    "targets": [
+      "nsis",
+      "msi",
+      "appimage",
+      "deb",
+      "app",
+      "dmg"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
