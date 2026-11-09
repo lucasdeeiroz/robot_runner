@@ -231,25 +231,25 @@ interface CheckupCacheEntry {
 
 const checkupCacheMap = new Map<string, CheckupCacheEntry>();
 
-async function callCompanionRest<T = any>(endpoint: string, method = 'GET', payload?: any): Promise<T | null> {
+interface CompanionHttpResponse {
+    status: number;
+    body: string;
+}
+
+/** Companion REST call routed through the per-device Rust gateway (forward + auth token). */
+async function callCompanionRest<T = any>(device: string | null | undefined, endpoint: string, method = 'GET', payload?: unknown): Promise<T | null> {
+    if (!device) return null;
     try {
-        const rawJson = await invoke<string>('trigger_companion_action', {
-            port: 9876,
-            endpoint,
+        const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+        const res = await invoke<CompanionHttpResponse>('companion_http_request', {
+            device,
             method,
-            payload: payload ? JSON.stringify(payload) : undefined
+            endpoint: cleanEndpoint,
+            body: payload !== undefined ? JSON.stringify(payload) : null
         });
-        return JSON.parse(rawJson) as T;
+        if (res.status < 200 || res.status >= 300 || !res.body.trim()) return null;
+        return JSON.parse(res.body) as T;
     } catch (_) {
-        try {
-            const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-            const res = await fetch(`http://127.0.0.1:9876${cleanEndpoint}`, {
-                method,
-                headers: payload ? { 'Content-Type': 'application/json; charset=utf-8' } : undefined,
-                body: payload ? JSON.stringify(payload) : undefined
-            });
-            if (res.ok) return (await res.json()) as T;
-        } catch (_) { }
         return null;
     }
 }
@@ -845,6 +845,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
 
             // 1. Try REST call to Companion
             let res = await callCompanionRest<{ status: string; saved: boolean; resolvedVersion?: string }>(
+                selectedDevice,
                 '/firmware/recipe',
                 'POST',
                 desktopRecipeJson
@@ -1069,13 +1070,9 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         if (!selectedDevice) return;
         setIsLoadingCompanionTests(true);
         try {
-            try {
-                await invoke('start_companion_forward', { device: selectedDevice, localPort: 9876, remotePort: 9876 });
-            } catch (_) { }
-
-            let data = await callCompanionRest<{ status: string; suites: any[] }>('/rrt/suites');
+            let data = await callCompanionRest<{ status: string; suites: any[] }>(selectedDevice, '/rrt/suites');
             if (!data || data.status !== 'ok' || !Array.isArray(data.suites) || data.suites.length === 0) {
-                data = await callCompanionRest<{ status: string; suites: any[] }>('/bdd/suites');
+                data = await callCompanionRest<{ status: string; suites: any[] }>(selectedDevice, '/bdd/suites');
             }
             if (data && data.status === 'ok' && Array.isArray(data.suites) && data.suites.length > 0) {
                 setCompanionBddSuites(data.suites);
@@ -1130,11 +1127,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
         if (selectedDevice) {
             const syncCompanionSpecs = async () => {
                 try {
-                    try {
-                        await invoke('start_companion_forward', { device: selectedDevice, localPort: 9876, remotePort: 9876 });
-                    } catch (_) { }
-
-                    const c = await callCompanionRest<any>('/device/info');
+                    const c = await callCompanionRest<any>(selectedDevice, '/device/info');
                     if (c && c.status === 'ok') {
                         const newProps: Record<string, string> = {};
                         if (c.manufacturer) newProps['ro.product.manufacturer'] = c.manufacturer;
@@ -1170,7 +1163,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 } catch (_) { }
 
                 try {
-                    const results = await callCompanionRest<Record<string, boolean | null>>('/hardware/interactive-tests');
+                    const results = await callCompanionRest<Record<string, boolean | null>>(selectedDevice, '/hardware/interactive-tests');
                     if (results && typeof results === 'object' && Object.keys(results).length > 0) {
                         setInteractiveTestResults(prev => ({ ...prev, ...results }));
                     }
@@ -1192,7 +1185,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
                 }
             }
             if (Object.keys(payload).length > 0) {
-                callCompanionRest('/hardware/additional-specs', 'POST', payload)
+                callCompanionRest(selectedDevice, '/hardware/additional-specs', 'POST', payload)
                     .catch((e: unknown) => console.error("Failed to push specs to Companion", e));
             }
         }
@@ -1238,7 +1231,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
 
             let xmlContent = '';
             try {
-                const text: string = await invoke('fetch_companion_ui_tree', { port: 9876 });
+                const text: string = await invoke('fetch_companion_ui_tree', { device: selectedDevice });
                 if (text && (text.includes('nodes') || text.includes('text') || text.includes('status'))) {
                     xmlContent = text;
                 }
@@ -1604,7 +1597,7 @@ export const CheckupSubTab = ({ selectedDevice, isTestRunning, allowActionsDurin
     const fetchDeviceProperties = useCallback(async (targetDevice: string): Promise<Record<string, string>> => {
         const companionProps: Record<string, string> = {};
         try {
-            const c = await callCompanionRest<any>('/device/info');
+            const c = await callCompanionRest<any>(targetDevice, '/device/info');
             if (c && c.status === 'ok') {
                 if (c.manufacturer) companionProps['ro.product.manufacturer'] = c.manufacturer;
                 if (c.model) companionProps['ro.product.model'] = c.model;

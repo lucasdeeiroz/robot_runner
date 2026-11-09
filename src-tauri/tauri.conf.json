@@ -43,7 +43,7 @@
     "publisher": "Lucas de Eiroz Rodrigues",
     "windows": {
       "wix": {
-        "version": "3.0.0.1"
+        "version": "3.0.71"
       }
     }
   }

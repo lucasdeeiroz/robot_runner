@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { invoke } from '@tauri-apps/api/core';
 import { feedback } from './feedback';
 import { checkForUpdates, UpdateInfo } from './updater';
+import { getRemoteString } from './remoteConfig';
 
 export interface SystemVersions {
     adb: string;
@@ -168,6 +169,10 @@ export interface AppSettings {
     customLogoDark?: string;
 }
 
+// Logcat priorities accepted by the Logcat/Stopwatch level selects (`adb logcat *:<level>`)
+const VALID_LOGCAT_LEVELS = ['V', 'D', 'I', 'W', 'E', 'F', 'S'];
+const isValidLogcatLevel = (level: string | undefined): boolean => !level || VALID_LOGCAT_LEVELS.includes(level);
+
 const getDefaultSettings = (): AppSettings => ({
     language: 'en_US',
     zoomFactor: 1.0,
@@ -200,14 +205,14 @@ const getDefaultSettings = (): AppSettings => ({
         mappings: ''
     },
     logcatKeywords: [],
-    logcatLevel: 'verbose',
+    logcatLevel: 'E',
     logcatExtraTags: '',
     logcatSelectedPackage: '',
     stopwatchSelectedPackage: '',
 
     tools: {
-        appiumArgs: '',
-        scrcpyArgs: '',
+        appiumArgs: getRemoteString('default_appium_args') || '--relaxed-security',
+        scrcpyArgs: getRemoteString('default_scrcpy_args') || '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake',
         robotArgs: '',
         maestroArgs: '',
         appiumJavaArgs: '',
@@ -576,7 +581,7 @@ interface SettingsContextType {
     loading: boolean;
     hasHydrated: boolean;
     systemVersions: SystemVersions | null;
-    checkSystemVersions: (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium', useCache?: boolean) => Promise<void>;
+    checkSystemVersions: (forceUsageMode?: 'explorer' | 'automator', forceFramework?: 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium', useCache?: boolean, forceNgrok?: boolean) => Promise<void>;
     systemCheckStatus: SystemCheckStatus;
     updateInfo: UpdateInfo | null;
     checkForAppUpdate: (manual?: boolean) => Promise<void>;
@@ -690,11 +695,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                         // Active Migration for Remote Config overrides
                         const s = migrated.profiles[pid].settings;
                         const ds = getDefaultSettings();
-                        if (s.geminiModel === 'gemini-1.5-flash' || s.geminiModel === 'gemini-3.1-flash-lite') s.geminiModel = ds.geminiModel;
+                        if (s.geminiModel === 'gemini-1.5-flash') s.geminiModel = ds.geminiModel;
                         if (s.claudeModel === 'claude-3-5-sonnet-20240620') s.claudeModel = ds.claudeModel;
                         if (s.openaiModel === 'gpt-4o') s.openaiModel = ds.openaiModel;
-                        if (s.tools.scrcpyArgs === '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake') s.tools.scrcpyArgs = ds.tools.scrcpyArgs;
-                        if (s.tools.appiumArgs === '--relaxed-security') s.tools.appiumArgs = ds.tools.appiumArgs;
+                        if (!isValidLogcatLevel(s.logcatLevel)) s.logcatLevel = ds.logcatLevel;
                     });
 
                     // Validate activeProfileId
@@ -720,11 +724,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
                     // Active Migration for old flat format
                     const ds = getDefaultSettings();
-                    if (migratedSettings.geminiModel === 'gemini-1.5-flash' || migratedSettings.geminiModel === 'gemini-3.1-flash-lite') migratedSettings.geminiModel = ds.geminiModel;
+                    if (migratedSettings.geminiModel === 'gemini-1.5-flash') migratedSettings.geminiModel = ds.geminiModel;
                     if (migratedSettings.claudeModel === 'claude-3-5-sonnet-20240620') migratedSettings.claudeModel = ds.claudeModel;
                     if (migratedSettings.openaiModel === 'gpt-4o') migratedSettings.openaiModel = ds.openaiModel;
-                    if (migratedSettings.tools.scrcpyArgs === '-m 1024 -b 2M --max-fps=30 --no-audio --stay-awake') migratedSettings.tools.scrcpyArgs = ds.tools.scrcpyArgs;
-                    if (migratedSettings.tools.appiumArgs === '--relaxed-security') migratedSettings.tools.appiumArgs = ds.tools.appiumArgs;
+                    if (!isValidLogcatLevel(migratedSettings.logcatLevel)) migratedSettings.logcatLevel = ds.logcatLevel;
 
                     const newStoreData: SettingsStoreData = {
                         activeProfileId: 'default',
@@ -997,11 +1000,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
      *   (no blocking screen) and revalidates every tool in background, fixing the state if anything changed.
      * - useCache = false (manual refresh): ignores the saved versions and reads every tool fresh.
      */
-    const checkSystemVersions = async (forceUsageMode?: UsageMode, forceFramework?: Framework, useCache: boolean = false) => {
+    const checkSystemVersions = async (forceUsageMode?: UsageMode, forceFramework?: Framework, useCache: boolean = false, forceNgrok?: boolean) => {
         const runId = ++checkRunIdRef.current;
         const mode = forceUsageMode || activeProfile.settings.usageMode;
         const framework: Framework = forceFramework || activeProfile.settings.automationFramework || 'robot';
-        const checkNgrok = isNgrokEnabled;
+        // forceNgrok avoids reading a stale isNgrokEnabled right after enableNgrok()
+        const checkNgrok = forceNgrok ?? isNgrokEnabled;
         const isWebMode = mode === 'explorer'
             ? (activeProfile.settings.explorerPlatform === 'web')
             : ['cypress', 'selenium'].includes(framework);

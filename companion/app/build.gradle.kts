@@ -13,7 +13,7 @@ android {
         applicationId = "com.lucasdeeiroz.robotrunner"
         minSdk = 24
         targetSdk = 37
-        versionCode = 300
+        versionCode = 3000071
         versionName = "3.0.0-stable1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

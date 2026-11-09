@@ -8,24 +8,28 @@ As seguintes diretrizes arquiteturais e técnicas são estritamente obrigatória
 
 ## Arquitetura da Ponte TCP
 
-O Companion funciona como um servidor REST embarcado via TCP porta 9876.
+O Companion funciona como um servidor REST embarcado que escuta **somente no loopback do dispositivo** (`127.0.0.1:9876`). Cada dispositivo conectado recebe uma porta local própria no desktop (faixa `19876–19975`), encaminhada via ADB para a porta `9876` do aparelho.
 
 ```
 +-------------------------------------------------------------+
 |                    Robot Runner Desktop                     |
 |  [ React Frontend ] <--- IPC ---> [ Tauri Rust Backend ]    |
+|          (gateway companion_request + X-RR-Token)           |
 +----------------------------------------+--------------------+
                                          |
-                            ADB Forward  | Localhost TCP Port 9876
-                            (tcp:9876)   v
+       ADB Forward por dispositivo       | 127.0.0.1:<19876..19975> (host)
+  (tcp:<porta_local> -> tcp:9876)        v
 +-------------------------------------------------------------+
 |               Android Device (Companion App)                |
+|  [ NanoHTTPD REST @ 127.0.0.1:9876 (só loopback) ]          |
 |  [ NanoHTTPD REST ] <---> [ CompanionAccessibilityService ] |
 |  [ 720p Frame Engine ] <---> [ Native Hardware Sensors ]    |
 +-------------------------------------------------------------+
 ```
 
-### Endpoints Principais (`http://127.0.0.1:9876`)
+### Endpoints Principais (`127.0.0.1:9876` no dispositivo, acessados pela porta local encaminhada do desktop)
+Todos exigem o cabeçalho `X-RR-Token`, exceto `GET /ping`.
+
 - `GET /ping`: Health check (`{"status": "ok", "type": "pong"}`).
 - `GET /info` ou `GET /device-info`: Telemetria em tempo real (`battery`, `storage`, `nfc`, `printer`).
 - `GET /ui-tree`: Retorna a árvore JSON da tela ativa em **~8ms**.
@@ -36,13 +40,15 @@ O Companion funciona como um servidor REST embarcado via TCP porta 9876.
 ---
 
 ## 1. Arquitetura de Ponte e Fallback Silencioso (Dual-Bridge)
-- **Companion como Primário**: A comunicação via Companion (porta HTTP local `9876` encaminhada via ADB forward `tcp:9876 tcp:9876`) deve SEMPRE ser a primeira tentativa para busca de árvore de UI e estatísticas.
+- **Companion como Primário**: A comunicação via Companion deve SEMPRE ser a primeira tentativa para busca de árvore de UI e estatísticas. Cada dispositivo usa **sua própria porta local** no desktop (faixa `19876–19975`), encaminhada para a porta `9876` do aparelho (`adb -s <serial> forward tcp:<porta_local> tcp:9876`), para que vários dispositivos não colidam. O forward é criado **uma única vez por sessão de dispositivo** e fica em cache em memória no Rust (porta local + token).
+- **Servidor só em loopback**: O servidor HTTP do Companion escuta apenas em `127.0.0.1:9876` no dispositivo; não é alcançável pela rede Wi-Fi/LAN.
+- **Token de sessão**: O desktop gera um token por sessão e o entrega via `adb shell am broadcast ... START_SERVER --es AUTH_TOKEN <token>` (receiver protegido por `android.permission.DUMP`, que só o `adb shell` possui). Toda requisição, exceto `GET /ping`, DEVE enviar o cabeçalho `X-RR-Token`.
 - **ADB como Fallback Silencioso**: Se o Companion estiver ausente, desativado ou falhar em responder, o sistema DEVE alternar silenciosamente e sem travamentos para os comandos legados do ADB (`uiautomator dump`, `screencap`).
 
 ---
 
 ## 2. Otimização de Micro-Timeouts (Host IPC Latency)
-- **Timeouts Curtos de TCP (150ms a 1000ms)**: As requisições HTTP do Rust (`reqwest`) direcionadas ao Companion (`http://127.0.0.1:9876`) NUNCA devem usar timeouts longos padrão (como 5s ou 10s).
+- **Timeouts Curtos de TCP (150ms a 1000ms)**: As requisições HTTP do Rust (`reqwest`) direcionadas ao Companion (`http://127.0.0.1:<porta_local>`) NUNCA devem usar timeouts longos padrão (como 5s ou 10s).
 - **Justificativa**: A comunicação é via `localhost` sobre socket USB TCP. Se a ponte estiver ativa, a resposta chega em <10ms. Se estiver inativa, o Rust deve falhar em no máximo **1000ms** para não acumular atraso no fallback para o ADB.
 
 ---
@@ -72,11 +78,11 @@ O Companion funciona como um servidor REST embarcado via TCP porta 9876.
 
 ## 6. Habilitação Autônoma de Serviços via ADB
 - **Concessão Transparente de Permissões**: O usuário não deve ser obrigado a abrir manualmente as configurações do Android para ativar o serviço de acessibilidade do Companion.
-- **Regra**: Sempre que um dispositivo com Companion instalado for selecionado, a aplicação DEVE executar via ADB no Rust:
-  ```bash
-  settings put secure enabled_accessibility_services com.robotrunner.companion/.service.CompanionAccessibilityService
-  settings put secure accessibility_enabled 1
-  ```
+- **Regra**: Sempre que um dispositivo com Companion instalado for selecionado, a aplicação DEVE, via ADB no Rust, **acrescentar** o Companion à lista existente de serviços (nunca sobrescrevê-la, para preservar o TalkBack e outros serviços ativos):
+  1. Ler a lista atual: `settings get secure enabled_accessibility_services`.
+  2. Se `com.lucasdeeiroz.robotrunner/.service.CompanionAccessibilityService` ainda não estiver na lista, gravar a lista atual + `:` + o componente do Companion com `settings put secure enabled_accessibility_services '<lista_atual>:<companion>'` (se a lista estiver vazia ou for `null`, gravar só o componente).
+  3. Executar `settings put secure accessibility_enabled 1`.
+- **Proibido**: `settings put secure enabled_accessibility_services <companion>` sem antes ler e mesclar a lista atual.
 
 ---
 
@@ -107,7 +113,7 @@ O Companion funciona como um servidor REST embarcado via TCP porta 9876.
 
 ## 11. Pareamento Wireless e Dashboard de Frota (Fase 10)
 - **Endpoint HTTP `/device/info`**: O Companion expõe metadados de rede, IP da interface `wlan0`, nível de bateria, temperatura °C, estado de carregamento e RAM disponível em um único payload JSON de **<10ms**.
-- **Pareamento ADB Wireless (Android 11+)**: O backend Rust oferece `adb_pair_device` que auto-executa `adb pair IP:PORT CODE` seguido de `adb connect IP:PORT` sem necessidade de cabo USB.
+- **Pareamento ADB Wireless (Android 11+)**: O backend Rust oferece `adb_pair_device`, que executa apenas `adb pair IP:PORT CODE` (código e IP:PORTA do diálogo "Parear dispositivo com código de pareamento"). Ele **não** conecta automaticamente: a conexão é feita depois com `adb connect` na porta principal da Depuração por Wi-Fi. Pareamento por QR Code (`WIFI:T:ADB`) não é suportado, pois exige anúncio mDNS que o app não oferece.
 - **Painel Fleet Health**: O `HomeSubTab.tsx` consulta periodicamente `get_fleet_health` em Rust para apresentar o status de saúde consolidado (Companion 🟢/🟡/⚪, Bateria %, Temp °C, IP Wi-Fi e RAM) de todos os dispositivos conectados na frota.
 
 ---
@@ -117,6 +123,14 @@ O Companion funciona como um servidor REST embarcado via TCP porta 9876.
 - **`fetchDeviceProperties` (<15ms)**: As buscas de propriedades do sistema (`getprop`) priorizam a consulta ao endpoint `/device/info` do Companion em RAM em **<15ms**, recorrendo ao ADB `getprop` apenas se o Companion estiver desconectado.
 - **`runSingleUiTextCheck` (<10ms)**: A verificação de textos em telas (`UiTextCheckConfig`) consulta diretamente o endpoint `/xml` do `CompanionAccessibilityService` em **<10ms**, eliminando o atraso de ~2.0s do `uiautomator dump` do ADB.
 - **`runAdditionalChecks` (<15ms)**: Os testes de Memória (`/proc/meminfo`) e Armazenamento (`/data`) utilizam os dados locais em RAM de `/checkup/run` do Companion quando ativo, reduzindo requisições seriais do ADB.
+
+---
+
+## 13. Segurança do Transporte Desktop ↔ Companion
+- **Nunca faça bind em `0.0.0.0`**: O servidor do Companion DEVE escutar apenas em `127.0.0.1` (loopback). Expor a porta na rede Wi-Fi/LAN é proibido.
+- **Nunca reintroduza CORS**: O CORS foi removido de propósito; a interface web não fala diretamente com o Companion.
+- **Gateway único no Rust**: Toda chamada desktop ↔ Companion DEVE passar pelo gateway `companion_request` (e variantes `companion_request_bytes` / `companion_request_ok`) em `src-tauri/src/companion.rs`, que resolve a porta local do dispositivo e envia o cabeçalho `X-RR-Token`. Não crie clientes HTTP paralelos nem URLs fixas `http://127.0.0.1:9876`.
+- **Token fora de logs**: Nunca registre em log nem exponha o valor do token de sessão.
 
 
 

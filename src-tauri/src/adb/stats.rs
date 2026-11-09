@@ -110,21 +110,24 @@ async fn get_device_stats_internal(
 ) -> Result<DeviceStats, String> {
     let mut companion_stats: Option<DeviceStats> = None;
 
-    // 🚀 Companion Telemetry Bridge (Sub-10ms for Hardware & Battery & Foreground)
-    let _ = crate::companion::start_companion_forward(app.clone(), device.to_string(), Some(9876), Some(9876)).await;
-    let mut comp_url = String::from("http://127.0.0.1:9876/telemetry");
+    // Reject anything that is not a plain Android package name: it is interpolated into
+    // device-side `sh` scripts and into the Companion URL below.
     if let Some(pkg) = &package {
-        if !pkg.is_empty() {
-            comp_url.push_str(&format!("?package={}", pkg));
+        if !pkg.is_empty() && !crate::cmd_utils::is_valid_android_package(pkg) {
+            return Err(format!("Invalid package name: {}", pkg));
         }
     }
 
-    if let Ok(c) = reqwest::Client::builder().timeout(Duration::from_millis(1200)).build() {
-        if let Ok(resp) = c.get(&comp_url).send().await {
-            if resp.status().is_success() {
-                if let Ok(json_text) = resp.text().await {
-                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&json_text) {
-                        if val.get("status").and_then(|s| s.as_str()) == Some("ok") {
+    // 🚀 Companion Telemetry Bridge (Sub-10ms for Hardware & Battery & Foreground)
+    let mut comp_endpoint = String::from("/telemetry");
+    if let Some(pkg) = &package {
+        if !pkg.is_empty() {
+            comp_endpoint.push_str(&format!("?package={}", pkg));
+        }
+    }
+
+    if let Some(val) = crate::companion::companion_get_json_ok(app, device, &comp_endpoint, Duration::from_millis(1500)).await {
+                        {
                             let cpu_usage = val.get("cpu_usage").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
                             let ram_used = val.get("ram_used").and_then(|v| v.as_u64()).unwrap_or(0);
                             let ram_total = val.get("ram_total").and_then(|v| v.as_u64()).unwrap_or(0);
@@ -170,10 +173,6 @@ async fn get_device_stats_internal(
 
                             companion_stats = Some(stats);
                         }
-                    }
-                }
-            }
-        }
     }
 
     // 🐢 Hybrid/ADB Telemetry Supplement
@@ -954,13 +953,8 @@ pub struct HardwareFrameDelta {
 
 #[tauri::command]
 pub async fn get_companion_frame_delta(app: AppHandle, device: String) -> Result<HardwareFrameDelta, String> {
-    let _ = crate::companion::start_companion_forward(app.clone(), device.clone(), Some(9876), Some(9876)).await;
-    let comp_url = "http://127.0.0.1:9876/frame-delta".to_string();
-    if let Ok(c) = reqwest::Client::builder().timeout(Duration::from_millis(1200)).build() {
-        if let Ok(resp) = c.get(&comp_url).send().await {
-            if resp.status().is_success() {
-                if let Ok(val) = resp.json::<serde_json::Value>().await {
-                    if val.get("status").and_then(|s| s.as_str()) == Some("ok") {
+    if let Some(val) = crate::companion::companion_get_json_ok(&app, &device, "/frame-delta", Duration::from_millis(1500)).await {
+                    {
                         let tti_ms = val.get("tti_ms").and_then(|v| v.as_u64()).unwrap_or(0);
                         let last_touch_timestamp = val.get("last_touch_timestamp").and_then(|v| v.as_u64()).unwrap_or(0);
                         let last_redraw_timestamp = val.get("last_redraw_timestamp").and_then(|v| v.as_u64()).unwrap_or(0);
@@ -975,9 +969,6 @@ pub async fn get_companion_frame_delta(app: AppHandle, device: String) -> Result
                             source,
                         });
                     }
-                }
-            }
-        }
     }
 
     Ok(HardwareFrameDelta {

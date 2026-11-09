@@ -116,7 +116,10 @@ export const en = {
             update_manual_hint: "The installer will open automatically after download.",
             view_releases: "View all releases on GitHub",
             update_downloaded: "Download complete! Opening installer...",
-            update_download_error: "Failed to download update."
+            update_download_error: "Failed to download update.",
+            update_checksum_mismatch: "Integrity check failed: the downloaded file does not match SHA256SUMS.txt. The update was NOT applied. Please download it manually from the GitHub releases page.",
+            update_checksum_missing: "This release has no SHA256SUMS.txt entry for the portable file, so it cannot be verified. The update was NOT applied. Please download it manually from the GitHub releases page.",
+            update_invalid_asset: "Unexpected update file name. The update was NOT applied. Please download it manually from the GitHub releases page."
         },
         ai_agent: {
             title: "AI Agent",
@@ -381,14 +384,15 @@ export const en = {
             wireless: {
                 title: "Wireless Connection",
                 desc: "Connect to devices via Wi-Fi ADB",
-                qr_title: "QR Code & 1-Click Wireless Onboarding",
-                qr_desc: "Scan QR Code using Mobile Companion or enter 6-digit PIN in Android Developer Options -> Wireless Debugging",
-                pin_code: "Pairing PIN",
-                refresh_pin: "Generate New PIN",
                 auto_pair_btn: "1-Click Auto-Pair & Connect",
                 host_ip: "PC Host IP",
-                step1: "1. Open Android Settings → Developer Options → Wireless Debugging.",
-                step2: "2. Tap Pair device with pairing code and enter {{pin}} on IP {{ip}}:5555."
+                pairing_title: "Pair with Wireless Debugging (Android 11+)",
+                pairing_desc: "Pair the computer once using the code shown by Android, then connect over Wi-Fi.",
+                pair_step1: "1. Make sure the phone and this computer are on the same Wi-Fi network.",
+                pair_step2: "2. On the phone, open Settings → Developer options → Wireless debugging and tap \"Pair device with pairing code\".",
+                pair_step3: "3. Type the \"Wi-Fi pairing code\" into the Code field above, and the IP address and port shown in that dialog into the IP and Port fields.",
+                pair_step4: "4. Open the Connect menu arrow and choose \"Pair\".",
+                pair_step5: "5. After pairing, close the dialog, enter the IP address & port shown on the main Wireless debugging screen (a different port) and click \"Connect\"."
             },
             remote: {
                 title: "Remote Access (Ngrok)",

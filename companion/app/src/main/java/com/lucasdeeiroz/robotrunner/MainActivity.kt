@@ -156,15 +156,20 @@ class MainActivity : ComponentActivity() {
         val shouldStart = intent?.getBooleanExtra("START_SERVER", false) == true ||
                 intent?.action == CompanionServerService.ACTION_START_SERVER
         if (shouldStart) {
-            val timeout = intent.getIntExtra(
-                CompanionServerService.EXTRA_IDLE_TIMEOUT_SECONDS,
-                CompanionServerService.DEFAULT_DESKTOP_TIMEOUT_SECONDS
+            // MainActivity is exported: any AUTH_TOKEN extra is deliberately ignored here.
+            // Only the DUMP-protected CompanionCommandReceiver may set the session token.
+            val timeout = CompanionServerService.clampIdleTimeout(
+                intent.getIntExtra(
+                    CompanionServerService.EXTRA_IDLE_TIMEOUT_SECONDS,
+                    CompanionServerService.DEFAULT_DESKTOP_TIMEOUT_SECONDS
+                )
             )
             startServerInternal(timeout)
         }
     }
 
-    private fun startServerInternal(timeoutSeconds: Int) {
+    private fun startServerInternal(requestedTimeoutSeconds: Int) {
+        val timeoutSeconds = CompanionServerService.clampIdleTimeout(requestedTimeoutSeconds)
         try {
             val startIntent = Intent(this, CompanionServerService::class.java).apply {
                 action = CompanionServerService.ACTION_START_SERVER

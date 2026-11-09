@@ -28,6 +28,22 @@ export interface UpdateAsset {
     size: number;
     isCompatible: boolean;
     type: 'installer' | 'portable' | 'other';
+    /** URL of SHA256SUMS.txt in the same release (required to apply portable updates). */
+    checksumsUrl?: string;
+}
+
+/** Thrown when a portable update fails integrity checks; `code` maps to an i18n key. */
+export class UpdateIntegrityError extends Error {
+    constructor(public code: 'checksum_mismatch' | 'checksum_missing' | 'invalid_asset', message: string) {
+        super(message);
+        this.name = 'UpdateIntegrityError';
+    }
+}
+
+const SAFE_ASSET_NAME = /^Robot\.Runner_[A-Za-z0-9._-]+$/;
+
+function isSafeAssetName(name: string): boolean {
+    return SAFE_ASSET_NAME.test(name) && !name.includes('..');
 }
 
 export interface UpdateInfo {
@@ -89,6 +105,9 @@ export async function checkForUpdates(channel: 'stable' | 'beta' | 'alpha' = 'st
 
         const available = gt(latestTag, currentVersion);
 
+        const checksumsAsset = data.assets.find(a => a.name === 'SHA256SUMS.txt');
+        const checksumsUrl = checksumsAsset?.browser_download_url;
+
         // Map and filter assets
         const assets: UpdateAsset[] = data.assets.map(asset => {
             const name = asset.name.toLowerCase();
@@ -121,7 +140,8 @@ export async function checkForUpdates(channel: 'stable' | 'beta' | 'alpha' = 'st
                 url: asset.browser_download_url,
                 size: asset.size,
                 isCompatible,
-                type
+                type,
+                checksumsUrl
             };
         }).filter(a => a.isCompatible);
 
@@ -176,20 +196,40 @@ export async function downloadAndInstall(asset: UpdateAsset, onProgress?: (p: nu
             offset += chunk.length;
         }
 
+        if (asset.type === 'portable' && !isSafeAssetName(asset.name)) {
+            throw new UpdateIntegrityError('invalid_asset', `Unexpected asset name: ${asset.name}`);
+        }
+        if (asset.type === 'portable' && !asset.checksumsUrl) {
+            throw new UpdateIntegrityError('checksum_missing', 'SHA256SUMS.txt not found in release');
+        }
+
         const temp = await tempDir();
-        const filePath = await join(temp, asset.name);
+        const safeName = asset.name.replace(/[\\/:]/g, '_');
+        const filePath = await join(temp, safeName);
 
         await writeFile(filePath, data);
 
         if (asset.type === 'portable') {
+            // The backend verifies SHA-256 against SHA256SUMS.txt and refuses to apply on mismatch.
+            // Never fall back to opening an unverified binary.
             try {
                 await invoke('apply_portable_update', {
                     tempDownloadPath: filePath,
-                    assetName: asset.name
+                    assetName: asset.name,
+                    checksumsUrl: asset.checksumsUrl
                 });
             } catch (err) {
-                console.warn("Failed to apply portable update in-place, opening file fallback:", err);
-                await openPath(filePath);
+                const msg = String(err);
+                if (msg.includes('UPDATE_CHECKSUM_MISMATCH')) {
+                    throw new UpdateIntegrityError('checksum_mismatch', msg);
+                }
+                if (msg.includes('UPDATE_CHECKSUM_MISSING')) {
+                    throw new UpdateIntegrityError('checksum_missing', msg);
+                }
+                if (msg.includes('UPDATE_CHECKSUM_INVALID_ASSET')) {
+                    throw new UpdateIntegrityError('invalid_asset', msg);
+                }
+                throw err;
             }
         } else {
             // Open the installer

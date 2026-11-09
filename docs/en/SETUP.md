@@ -102,4 +102,4 @@ The workflow then, without any intervention:
 
 To rebuild an existing tag, open **Actions > Release > Run workflow** and type the tag (e.g. `v3.0.1-beta1`).
 
-**Companion signing (one-time setup):** to let users update `companion.apk` without uninstalling it, create a release keystore and add these repository secrets: `COMPANION_KEYSTORE_BASE64` (the `.jks` file in Base64), `COMPANION_KEYSTORE_PASSWORD`, `COMPANION_KEY_ALIAS` and `COMPANION_KEY_PASSWORD`. Without them, the APK is signed with a temporary debug key and the workflow shows a warning.
+**Companion signing (one-time setup):** to let users update `companion.apk` without uninstalling it, create a release keystore and add these repository secrets: `COMPANION_KEYSTORE_BASE64` (the `.jks` file in Base64), `COMPANION_KEYSTORE_PASSWORD`, `COMPANION_KEY_ALIAS` and `COMPANION_KEY_PASSWORD`. Without them, **stable releases fail** (to avoid shipping an APK that cannot be updated in place); pre-releases are signed with a temporary debug key and the workflow shows a warning.

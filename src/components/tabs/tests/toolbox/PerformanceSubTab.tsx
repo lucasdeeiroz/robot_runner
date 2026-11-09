@@ -176,7 +176,7 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
             let data: BatteryAuditData;
             if (companionStatus === 'connected') {
                 const rawJson = await invoke<string>('trigger_companion_action', {
-                    port: 9876,
+                    device: selectedDevice,
                     endpoint: '/performance/battery-audit',
                     method: 'GET'
                 });
@@ -215,7 +215,7 @@ export const PerformanceSubTab = React.memo(function PerformanceSubTab({
         try {
             if (companionStatus === 'connected') {
                 await invoke('trigger_companion_action', {
-                    port: 9876,
+                    device: selectedDevice,
                     endpoint: '/performance/battery-audit',
                     method: 'POST'
                 });

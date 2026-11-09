@@ -102,4 +102,4 @@ A partir de ahí el workflow, sin ninguna intervención:
 
 Para recompilar una tag existente, abra **Actions > Release > Run workflow** e indique la tag (ej.: `v3.0.1-beta1`).
 
-**Firma del Companion (configuración única):** para que los usuarios actualicen `companion.apk` sin desinstalarlo, cree una keystore de release y registre estos secrets en el repositorio: `COMPANION_KEYSTORE_BASE64` (el archivo `.jks` en Base64), `COMPANION_KEYSTORE_PASSWORD`, `COMPANION_KEY_ALIAS` y `COMPANION_KEY_PASSWORD`. Sin ellos, el APK se firma con una clave de debug temporal y el workflow muestra una advertencia.
+**Firma del Companion (configuración única):** para que los usuarios actualicen `companion.apk` sin desinstalarlo, cree una keystore de release y registre estos secrets en el repositorio: `COMPANION_KEYSTORE_BASE64` (el archivo `.jks` en Base64), `COMPANION_KEYSTORE_PASSWORD`, `COMPANION_KEY_ALIAS` y `COMPANION_KEY_PASSWORD`. Sin ellos, **las releases estables fallan** (para no publicar un APK que no se pueda actualizar encima); las pre-releases se firman con una clave de debug temporal y el workflow muestra una advertencia.

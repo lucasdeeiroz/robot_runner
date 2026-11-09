@@ -102,4 +102,4 @@ A partir daí o workflow, sem nenhuma intervenção:
 
 Para refazer o build de uma tag existente, abra **Actions > Release > Run workflow** e informe a tag (ex.: `v3.0.1-beta1`).
 
-**Assinatura do Companion (configuração única):** para que os usuários atualizem o `companion.apk` sem desinstalar, crie uma keystore de release e cadastre estes secrets no repositório: `COMPANION_KEYSTORE_BASE64` (o arquivo `.jks` em Base64), `COMPANION_KEYSTORE_PASSWORD`, `COMPANION_KEY_ALIAS` e `COMPANION_KEY_PASSWORD`. Sem eles, o APK é assinado com uma chave de debug temporária e o workflow exibe um aviso.
+**Assinatura do Companion (configuração única):** para que os usuários atualizem o `companion.apk` sem desinstalar, crie uma keystore de release e cadastre estes secrets no repositório: `COMPANION_KEYSTORE_BASE64` (o arquivo `.jks` em Base64), `COMPANION_KEYSTORE_PASSWORD`, `COMPANION_KEY_ALIAS` e `COMPANION_KEY_PASSWORD`. Sem eles, **releases estáveis falham** (para não publicar um APK que não pode ser atualizado por cima); pré-releases são assinadas com uma chave de debug temporária e o workflow exibe um aviso.

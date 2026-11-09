@@ -116,7 +116,10 @@ export const pt = {
             update_manual_hint: "O instalador abrirá automaticamente após o download.",
             view_releases: "Ver todos os releases no GitHub",
             update_downloaded: "Download concluído! Abrindo instalador...",
-            update_download_error: "Falha ao baixar atualização."
+            update_download_error: "Falha ao baixar atualização.",
+            update_checksum_mismatch: "Falha na verificação de integridade: o arquivo baixado não confere com o SHA256SUMS.txt. A atualização NÃO foi aplicada. Baixe-a manualmente na página de releases do GitHub.",
+            update_checksum_missing: "Esta release não possui entrada no SHA256SUMS.txt para o arquivo portátil, então ele não pode ser verificado. A atualização NÃO foi aplicada. Baixe-a manualmente na página de releases do GitHub.",
+            update_invalid_asset: "Nome de arquivo de atualização inesperado. A atualização NÃO foi aplicada. Baixe-a manualmente na página de releases do GitHub."
         },
         ai_agent: {
             title: "Agente IA",
@@ -382,14 +385,15 @@ export const pt = {
             wireless: {
                 title: "Conexão Sem Fio (Wi-Fi)",
                 desc: "Conecte dispositivos via Wi-Fi ADB sem fio",
-                qr_title: "QR Code e Pareamento Sem Fio 1-Clique",
-                qr_desc: "Escaneie o QR Code no Mobile Companion ou digite o PIN de 6 dígitos nas Opções do Desenvolvedor -> Depuração Sem Fio",
-                pin_code: "PIN de Pareamento",
-                refresh_pin: "Gerar Novo PIN",
                 auto_pair_btn: "Pareamento Sem Fio 1-Clique",
                 host_ip: "IP do PC Host",
-                step1: "1. Abra Configurações do Android → Opções do Desenvolvedor → Depuração Sem Fio.",
-                step2: "2. Toque em Parear dispositivo com código de pareamento e digite {{pin}} no IP {{ip}}:5555."
+                pairing_title: "Parear com Depuração por Wi-Fi (Android 11+)",
+                pairing_desc: "Pareie o computador uma vez usando o código exibido pelo Android e depois conecte via Wi-Fi.",
+                pair_step1: "1. Garanta que o celular e este computador estejam na mesma rede Wi-Fi.",
+                pair_step2: "2. No celular, abra Configurações → Opções do desenvolvedor → Depuração por Wi-Fi e toque em \"Parear dispositivo com código de pareamento\".",
+                pair_step3: "3. Digite o \"Código de pareamento Wi-Fi\" no campo Código acima, e o endereço IP e a porta exibidos nesse diálogo nos campos IP e Porta.",
+                pair_step4: "4. Abra a seta do menu Conectar e escolha \"Parear\".",
+                pair_step5: "5. Após parear, feche o diálogo, informe o IP e a porta exibidos na tela principal de Depuração por Wi-Fi (uma porta diferente) e clique em \"Conectar\"."
             },
             remote: {
                 title: "Acesso Remoto (Ngrok)",

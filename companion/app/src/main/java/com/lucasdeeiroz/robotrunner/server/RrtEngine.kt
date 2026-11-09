@@ -63,6 +63,7 @@ data class RrtSavedSuite(
 
 object RrtEngine {
     private const val TAG = "RrtEngine"
+    private val PACKAGE_NAME_REGEX = Regex("^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+$")
     private val gson: Gson = GsonBuilder().setPrettyPrinting().create()
 
     val logsFlow = MutableStateFlow<List<String>>(emptyList())
@@ -1036,8 +1037,14 @@ object RrtEngine {
                             delay(2000)
                             return ActionStatus.SUCCESS
                         } else {
+                            if (!PACKAGE_NAME_REGEX.matches(pkg)) {
+                                log("  -> Failed to launch app: invalid package name")
+                                return ActionStatus.FAILED
+                            }
                             log("  -> Warning: No launch intent found for $pkg, attempting monkey launch")
-                            Runtime.getRuntime().exec("monkey -p $pkg -c android.intent.category.LAUNCHER 1")
+                            Runtime.getRuntime().exec(
+                                arrayOf("monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1")
+                            )
                             delay(2000)
                             return ActionStatus.SUCCESS
                         }

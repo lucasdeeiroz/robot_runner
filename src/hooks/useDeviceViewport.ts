@@ -89,7 +89,7 @@ export function useDeviceViewport({
             if (!isWeb) {
                 try {
                     const companionStart = performance.now();
-                    const rawJson = await invoke<string>('fetch_companion_ui_tree', { port: 9876 });
+                    const rawJson = await invoke<string>('fetch_companion_ui_tree', { device: deviceId });
                     const companionTreeData = JSON.parse(rawJson);
                     if (companionTreeData.status === 'ok' && Array.isArray(companionTreeData.nodes) && companionTreeData.nodes.length > 0) {
                         root = transformCompanionTreeToInspectorNode(companionTreeData.nodes);
@@ -127,11 +127,11 @@ export function useDeviceViewport({
                 if (source === 'companion') {
                     try {
                         const compStart = performance.now();
-                        b64 = await invoke<string>('fetch_companion_fast_screenshot', { port: 9876, device: deviceId });
+                        b64 = await invoke<string>('fetch_companion_fast_screenshot', { device: deviceId });
                         console.log(`⚡ [DeviceViewport] Fast 720p Screenshot fetched via Companion Bridge in ${Math.round(performance.now() - compStart)}ms!`);
                     } catch {
                         try {
-                            b64 = await invoke<string>('fetch_companion_screenshot', { port: 9876, device: deviceId });
+                            b64 = await invoke<string>('fetch_companion_screenshot', { device: deviceId });
                         } catch (e) {
                             console.warn("[DeviceViewport] Companion screenshot fallback to parallel ADB screencap:", e);
                         }

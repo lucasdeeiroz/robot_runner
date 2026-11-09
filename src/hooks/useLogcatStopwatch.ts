@@ -112,7 +112,7 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
     useEffect(() => {
         if (selectedDevice) {
             invoke('trigger_companion_action', {
-                port: 9876,
+                device: selectedDevice,
                 endpoint: '/stopwatch/keywords',
                 method: 'POST',
                 payload: JSON.stringify({ keywords })
@@ -127,7 +127,7 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
         if (!selectedDevice) return;
         const interval = setInterval(() => {
             invoke<string>('trigger_companion_action', {
-                port: 9876,
+                device: selectedDevice,
                 endpoint: '/stopwatch/logcat/laps',
                 method: 'GET'
             })
@@ -151,7 +151,7 @@ export function useLogcatStopwatch(selectedDevice: string, selectedPackage: stri
     const handleCompanionAction = async (action: string, payload: any = {}) => {
         try {
             await invoke('trigger_companion_action', {
-                port: 9876,
+                device: selectedDevice,
                 endpoint: '/stopwatch/logcat/action',
                 method: 'POST',
                 payload: JSON.stringify({ action, ...payload })

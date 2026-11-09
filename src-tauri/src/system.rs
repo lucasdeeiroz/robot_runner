@@ -102,6 +102,11 @@ async fn get_version(cmd_name: &str, args: &[&str]) -> String {
                 cmd_fallback.args(args);
                 cmd_fallback.as_std_mut().creation_flags(0x08000000); // CREATE_NO_WINDOW
                 if let Ok(o) = cmd_fallback.output().await {
+                    // A non-zero exit means the tool is missing/broken; never surface
+                    // stderr like "'appium' is not recognized..." as a version string.
+                    if !o.status.success() {
+                        return String::new();
+                    }
                     let stdout = String::from_utf8_lossy(&o.stdout).to_string();
                     let stderr = String::from_utf8_lossy(&o.stderr).to_string();
                     if stdout.is_empty() { stderr } else { stdout }

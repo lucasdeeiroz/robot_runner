@@ -172,6 +172,7 @@ macro_rules! generate_robot_runner_handler {
             crate::companion::push_companion_payload,
             crate::companion::get_host_metadata,
             crate::companion::fetch_companion_pending_snippet,
+            crate::companion::companion_http_request,
             crate::files::get_reports_dir,
             crate::files::save_app_report,
             crate::files::list_app_reports,

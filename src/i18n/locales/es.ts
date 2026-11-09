@@ -116,7 +116,10 @@ export const es = {
             update_manual_hint: "El instalador se abrirá automáticamente después de la descarga.",
             view_releases: "Ver todos los lanzamientos en GitHub",
             update_downloaded: "¡Descarga completa! Abriendo instalador...",
-            update_download_error: "Error al descargar la actualización."
+            update_download_error: "Error al descargar la actualización.",
+            update_checksum_mismatch: "Falló la verificación de integridad: el archivo descargado no coincide con SHA256SUMS.txt. La actualización NO se aplicó. Descárguela manualmente desde la página de releases de GitHub.",
+            update_checksum_missing: "Esta versión no tiene una entrada en SHA256SUMS.txt para el archivo portable, por lo que no se puede verificar. La actualización NO se aplicó. Descárguela manualmente desde la página de releases de GitHub.",
+            update_invalid_asset: "Nombre de archivo de actualización inesperado. La actualización NO se aplicó. Descárguela manualmente desde la página de releases de GitHub."
         },
         ai_agent: {
             title: "Agente de IA",
@@ -379,14 +382,15 @@ export const es = {
             wireless: {
                 title: "Conexión Inalámbrica (Wi-Fi)",
                 desc: "Conecte dispositivos a través de Wi-Fi ADB inalámbrico",
-                qr_title: "Código QR y Emparejamiento Inalámbrico 1-Clic",
-                qr_desc: "Escanee el código QR con Mobile Companion o ingrese el PIN de 6 dígitos en Opciones de Desarrollador -> Depuración Inalámbrica",
-                pin_code: "PIN de Emparejamiento",
-                refresh_pin: "Generar Nuevo PIN",
                 auto_pair_btn: "Emparejamiento Inalámbrico 1-Clic",
                 host_ip: "IP del PC Host",
-                step1: "1. Abra Ajustes de Android → Opciones de Desarrollador → Depuración Inalámbrica.",
-                step2: "2. Toque en Emparejar dispositivo con código de emparejamiento e ingrese {{pin}} en la IP {{ip}}:5555."
+                pairing_title: "Emparejar con Depuración inalámbrica (Android 11+)",
+                pairing_desc: "Empareje la computadora una vez usando el código que muestra Android y luego conéctese por Wi-Fi.",
+                pair_step1: "1. Asegúrese de que el teléfono y esta computadora estén en la misma red Wi-Fi.",
+                pair_step2: "2. En el teléfono, abra Ajustes → Opciones de desarrollador → Depuración inalámbrica y toque \"Vincular dispositivo con código de vinculación\".",
+                pair_step3: "3. Escriba el \"Código de vinculación Wi-Fi\" en el campo Código de arriba, y la dirección IP y el puerto que muestra ese diálogo en los campos IP y Puerto.",
+                pair_step4: "4. Abra la flecha del menú Conectar y elija \"Emparejar\".",
+                pair_step5: "5. Tras emparejar, cierre el diálogo, ingrese la IP y el puerto que se muestran en la pantalla principal de Depuración inalámbrica (un puerto distinto) y haga clic en \"Conectar\"."
             },
             remote: {
                 title: "Acceso Remoto (Ngrok)",

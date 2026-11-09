@@ -20,7 +20,7 @@ export function useScannerStopwatch(selectedDevice: string) {
         if (!selectedDevice) return;
         const interval = setInterval(() => {
             invoke<string>('trigger_companion_action', {
-                port: 9876,
+                device: selectedDevice,
                 endpoint: '/stopwatch/scanner/laps',
                 method: 'GET'
             })
@@ -46,7 +46,7 @@ export function useScannerStopwatch(selectedDevice: string) {
         if (!selectedDevice) return;
         try {
             await invoke('trigger_companion_action', {
-                port: 9876,
+                device: selectedDevice,
                 endpoint: '/stopwatch/scanner/action',
                 method: 'POST',
                 payload: JSON.stringify({ action: 'clearLaps' })

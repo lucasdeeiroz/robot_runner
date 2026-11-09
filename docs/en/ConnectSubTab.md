@@ -7,7 +7,7 @@ The **Connect** tab specializes in managing wireless connections (Wireless ADB) 
 ## Key Features
 
 - **Wireless ADB:** Direct connection with devices on the same local Wi-Fi network via the ADB TCP/IP protocol.
-- **Android 11+ Pairing (AOSP & One UI):** Full support for secure pairing handshakes with 6-digit PIN and standard `WIFI:T:ADB` QR Code schema.
+- **Android 11+ Pairing (AOSP & One UI):** Secure pairing using the 6-digit Wi-Fi pairing code shown by Android (**"Pair device with pairing code"**).
 - **Auto-Discovery of IP:** Automatically detects the device's Wi-Fi IP address (`wlan0`) over USB.
 - **1-Click TCP/IP Activation (5555):** Enables port 5555 on a connected USB device with a single click.
 - **Integrated Ngrok Tunnel:** Securely exposes local ADB / Appium services to the internet for remote test execution.
@@ -25,27 +25,19 @@ The **Connect** tab specializes in managing wireless connections (Wireless ADB) 
 
 ---
 
-### Workflow 2: Manual Pairing on Android 11+ (Without USB Cable)
-On modern Android 11+ devices (e.g., Samsung Galaxy One UI, Google Pixel, Xiaomi):
-1. On your phone, navigate to **Settings → Developer Options → Wireless Debugging**.
-2. Turn on the **Wireless Debugging** switch.
+### Workflow 2: Pairing with a Pairing Code on Android 11+ (Without USB Cable)
+On modern Android 11+ devices (e.g., Samsung Galaxy One UI, Google Pixel, Xiaomi). The **Pair with Wireless Debugging (Android 11+)** card in the Connect tab summarizes these same steps and shows your **PC Host IP**.
+1. Make sure the phone and the computer are on the same Wi-Fi network.
+2. On your phone, navigate to **Settings → Developer Options → Wireless Debugging** and turn on the **Wireless Debugging** switch.
 3. Tap **"Pair device with pairing code"**.
-4. Android will display a popup modal with:
+4. Android will display a dialog with:
    - **Wi-Fi pairing code:** (e.g. `123456`)
-   - **IP address & Port:** (e.g. `192.168.1.50:37485` — *Note: The pairing port is ephemeral and different from port 5555*).
-5. In Robot Runner Desktop, enter the IP, the dynamic pairing port, and the 6-digit PIN code into the corresponding input fields.
-6. Click the arrow dropdown next to the main action button and select **"Pair"** (`adb pair <ip>:<pairing_port> <code>`).
-7. Once pairing succeeds, enter the primary connection port (shown on Android's main Wireless Debugging page) and click **"Connect"**.
+   - **IP address & Port:** (e.g. `192.168.1.50:37485` — *Note: the pairing port is ephemeral and different from the connection port*).
+5. In Robot Runner Desktop, type the **Wi-Fi pairing code** into the **Code** field, and the IP address and pairing port shown in that dialog into the **IP** and **Port** fields.
+6. Open the arrow dropdown next to the main action button and select **"Pair"** (`adb pair <ip>:<pairing_port> <code>`).
+7. Pairing does **not** connect automatically. After pairing succeeds, close the dialog on the phone, enter the IP address & port shown on Android's **main Wireless Debugging screen** (a different port from the pairing one) and click **"Connect"**.
 
----
-
-### Workflow 3: Pairing via QR Code (`WIFI:T:ADB`)
-1. In Robot Runner, the **QR Code & Wireless Pairing** card renders the standard AOSP Wireless Debugging schema:
-   ```text
-   WIFI:T:ADB;S:robotrunner-<PIN>;P:<PIN>;;
-   ```
-2. On Android, go to **Wireless Debugging → Pair device with QR code**, and scan the QR code from the Desktop screen.
-3. Ensure both computer and mobile device are connected to the same local Wi-Fi subnet.
+> **Note:** Pairing via QR Code is not supported. Android's **"Pair device with QR code"** option requires the computer to advertise a pairing service over mDNS, which Robot Runner does not provide. Always use **"Pair device with pairing code"**.
 
 ---
 

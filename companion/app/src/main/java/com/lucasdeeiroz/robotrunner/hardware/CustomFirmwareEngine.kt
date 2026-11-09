@@ -15,7 +15,8 @@ import java.util.regex.Pattern
  * Generic & Configurable POS Firmware Expression Engine.
  *
  * Allows users to define custom recipe templates, property lookups with fallback chains,
- * regex extraction rules, dynamic Java reflection hooks, or shell commands to reconstruct
+ * regex extraction rules, allowlisted static reflection (Build, Build.VERSION, SystemProperties)
+ * or allowlisted `getprop` shell lookups to reconstruct
  * POS Firmware Version strings without hardcoding proprietary vendor logic in the codebase.
  */
 object CustomFirmwareEngine {
@@ -23,6 +24,16 @@ object CustomFirmwareEngine {
     private const val TAG = "CustomFirmwareEngine"
     private const val PREFS_NAME = "robotrunner_custom_firmware_prefs"
     private const val KEY_RECIPE_JSON = "custom_firmware_recipe_json"
+
+    /** Only plain `getprop` (optionally with one property key) may run as a "shell" rule. */
+    private val SHELL_GETPROP_REGEX = Regex("^getprop( [A-Za-z0-9._-]+)?$")
+
+    /** Only static getters/fields of these classes may be reached by a "reflection" rule. */
+    private val REFLECTION_CLASS_ALLOWLIST = setOf(
+        "android.os.Build",
+        "android.os.Build\$VERSION",
+        "android.os.SystemProperties"
+    )
 
     data class FirmwareField(
         @SerializedName("type") val type: String = "prop", // "prop", "reflection", "shell", "static"
@@ -268,13 +279,36 @@ object CustomFirmwareEngine {
     ): String? {
         if (className.isNullOrBlank() || invokeMethod.isNullOrBlank()) return null
 
+        // Security allowlist: recipes are writable over the REST API, so arbitrary class loading
+        // and method invocation are refused. Only static getters/fields of Build, Build.VERSION
+        // and SystemProperties are permitted; the field then falls back to its property chain.
+        if (className !in REFLECTION_CLASS_ALLOWLIST) {
+            Log.w(TAG, "Reflection rule rejected: class '$className' is not allowed (allowed: $REFLECTION_CLASS_ALLOWLIST)")
+            return null
+        }
+        if (!getterMethod.isNullOrBlank()) {
+            Log.w(TAG, "Reflection rule rejected: 'getterMethod' instance lookups are not allowed; use a static getter or field")
+            return null
+        }
+
         try {
             val clazz = Class.forName(className)
-            var targetInstance: Any? = null
 
-            if (!getterMethod.isNullOrBlank()) {
-                val getter = clazz.getMethod(getterMethod)
-                targetInstance = getter.invoke(null)
+            // Static field access (e.g. Build.MODEL, Build.VERSION.RELEASE)
+            if (methodArgs.isEmpty()) {
+                val field = try { clazz.getField(invokeMethod) } catch (_: NoSuchFieldException) { null }
+                if (field != null) {
+                    if (!java.lang.reflect.Modifier.isStatic(field.modifiers)) {
+                        Log.w(TAG, "Reflection rule rejected: field '$className.$invokeMethod' is not static")
+                        return null
+                    }
+                    return field.get(null)?.toString()
+                }
+            }
+
+            if (!invokeMethod.startsWith("get")) {
+                Log.w(TAG, "Reflection rule rejected: only static getter methods (get*) are allowed, got '$invokeMethod'")
+                return null
             }
 
             val paramTypes = methodArgs.map { arg ->
@@ -292,12 +326,12 @@ object CustomFirmwareEngine {
             } else {
                 clazz.getMethod(invokeMethod)
             }
-
-            val result = if (targetInstance != null) {
-                method.invoke(targetInstance, *methodArgs.toTypedArray())
-            } else {
-                method.invoke(null, *methodArgs.toTypedArray())
+            if (!java.lang.reflect.Modifier.isStatic(method.modifiers)) {
+                Log.w(TAG, "Reflection rule rejected: method '$className.$invokeMethod' is not static")
+                return null
             }
+
+            val result = method.invoke(null, *methodArgs.toTypedArray())
 
             return result?.toString()
         } catch (e: Throwable) {
@@ -307,8 +341,14 @@ object CustomFirmwareEngine {
     }
 
     private fun executeShellCommand(command: String): String {
+        val trimmed = command.trim()
+        // Security allowlist: only `getprop [key]` is executed, as an argument list (no `sh -c`).
+        if (!SHELL_GETPROP_REGEX.matches(trimmed)) {
+            Log.w(TAG, "Shell rule rejected: only 'getprop [property.key]' is allowed")
+            return ""
+        }
         return try {
-            val process = ProcessBuilder("sh", "-c", command).start()
+            val process = ProcessBuilder(trimmed.split(' ')).redirectErrorStream(true).start()
             val output = process.inputStream.bufferedReader().readText().trim()
             process.waitFor()
             output

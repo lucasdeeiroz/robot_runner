@@ -503,8 +503,23 @@ pub fn list_app_reports() -> AppResult<Vec<ReportFileInfo>> {
 #[command]
 pub fn delete_app_report(path: String) -> AppResult<()> {
     let path_buf = std::path::PathBuf::from(&path);
-    if path_buf.exists() && path_buf.is_file() {
-        fs::remove_file(path_buf).map_err(|e| AppError::FileSystemError(e.to_string()))?;
+    if !path_buf.exists() {
+        return Ok(());
+    }
+    // Only files inside the app-managed reports directory may be deleted through this command.
+    let reports_dir = resolve_reports_dir()
+        .canonicalize()
+        .map_err(|e| AppError::FileSystemError(format!("Failed to resolve reports directory: {}", e)))?;
+    let target = path_buf
+        .canonicalize()
+        .map_err(|e| AppError::FileSystemError(format!("Failed to resolve report path: {}", e)))?;
+    if !target.starts_with(&reports_dir) || target == reports_dir {
+        return Err(AppError::FileSystemError(
+            "Refusing to delete a file outside the reports directory".to_string(),
+        ));
+    }
+    if target.is_file() {
+        fs::remove_file(target).map_err(|e| AppError::FileSystemError(e.to_string()))?;
     }
     Ok(())
 }

@@ -117,7 +117,7 @@ pub async fn get_connected_devices(app: AppHandle) -> Result<Vec<Device>, String
                     .unwrap_or((0, 0));
 
                 let is_companion_installed = parts.get(5).map(|s| s.contains("com.lucasdeeiroz.robotrunner"));
-                let companion_port = if is_companion_installed == Some(true) { Some(9876) } else { None };
+                let companion_port = if is_companion_installed == Some(true) { Some(crate::companion::COMPANION_REMOTE_PORT) } else { None };
 
                 let mut is_companion_active = None;
                 let mut battery_temp = None;
@@ -126,34 +126,24 @@ pub async fn get_connected_devices(app: AppHandle) -> Result<Vec<Device>, String
 
                 // Try Companion HTTP bridge for live telemetry (<10ms)
                 if is_companion_installed == Some(true) {
-                    let _ = crate::companion::start_companion_forward(app_clone.clone(), udid.clone(), Some(9876), Some(9876)).await;
-                    let comp_url = "http://127.0.0.1:9876/device/info".to_string();
-                    if let Ok(client) = reqwest::Client::builder().timeout(std::time::Duration::from_millis(1500)).build() {
-                        if let Ok(resp) = client.get(&comp_url).send().await {
-                            if resp.status().is_success() {
-                                if let Ok(val) = resp.json::<serde_json::Value>().await {
-                                    if val.get("status").and_then(|s| s.as_str()) == Some("ok") {
-                                        is_companion_active = Some(true);
-                                        if let Some(b) = val.get("battery_level").and_then(|v| v.as_i64()) {
-                                            if b >= 0 { battery_level = Some(b as u8); }
-                                        }
-                                        if let Some(t) = val.get("battery_temp").and_then(|v| v.as_f64()) {
-                                            if t > 0.0 { battery_temp = Some(t as f32); }
-                                        }
-                                        if let Some(c) = val.get("is_charging").and_then(|v| v.as_bool()) {
-                                            is_charging = Some(c);
-                                        }
-                                        if let Some(ip) = val.get("wifi_ip").and_then(|v| v.as_str()) {
-                                            if !ip.is_empty() { wifi_ip = Some(ip.to_string()); }
-                                        }
-                                        if let (Some(tot_mb), Some(avail_mb)) = (val.get("total_ram_mb").and_then(|v| v.as_i64()), val.get("avail_ram_mb").and_then(|v| v.as_i64())) {
-                                            if tot_mb > 0 {
-                                                ram_total = (tot_mb * 1024 * 1024) as u64;
-                                                ram_used = ((tot_mb.saturating_sub(avail_mb)) * 1024 * 1024) as u64;
-                                            }
-                                        }
-                                    }
-                                }
+                    if let Some(val) = crate::companion::fetch_companion_device_info(&app_clone, &udid).await {
+                        is_companion_active = Some(true);
+                        if let Some(b) = val.get("battery_level").and_then(|v| v.as_i64()) {
+                            if (0..=100).contains(&b) { battery_level = Some(b as u8); }
+                        }
+                        if let Some(t) = val.get("battery_temp").and_then(|v| v.as_f64()) {
+                            if t > 0.0 { battery_temp = Some(t as f32); }
+                        }
+                        if let Some(c) = val.get("is_charging").and_then(|v| v.as_bool()) {
+                            is_charging = Some(c);
+                        }
+                        if let Some(ip) = val.get("wifi_ip").and_then(|v| v.as_str()) {
+                            if !ip.is_empty() { wifi_ip = Some(ip.to_string()); }
+                        }
+                        if let (Some(tot_mb), Some(avail_mb)) = (val.get("total_ram_mb").and_then(|v| v.as_i64()), val.get("avail_ram_mb").and_then(|v| v.as_i64())) {
+                            if tot_mb > 0 {
+                                ram_total = (tot_mb as u64) * 1024 * 1024;
+                                ram_used = (tot_mb.saturating_sub(avail_mb).max(0) as u64) * 1024 * 1024;
                             }
                         }
                     }
@@ -223,11 +213,9 @@ pub async fn adb_pair_device(app: AppHandle, ip: String, port: String, code: Str
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
     if output.status.success() || stdout.contains("Successfully paired") {
-        let mut conn_cmd = new_tokio_command(&program);
-        conn_cmd.args(["connect", &target]);
-        let _ = conn_cmd.output().await;
-
-        Ok(format!("Successfully paired and connected to {}", target))
+        // The pairing port differs from the "Wireless debugging" connect port, so no
+        // `adb connect` is attempted here (adb usually auto-connects via mDNS after pairing).
+        Ok(format!("Successfully paired with {}", target))
     } else {
         Err(format!("Pairing failed: {} {}", stdout, stderr))
     }
@@ -251,24 +239,16 @@ pub async fn get_fleet_health(app: AppHandle) -> Result<Vec<FleetDeviceHealth>, 
         let mut ram_avail_mb = dev.ram_used.zip(dev.ram_total).map(|(u, t)| ((t.saturating_sub(u)) / (1024 * 1024)) as i32).unwrap_or(0);
         let mut android_version = dev.android_version.unwrap_or_default();
 
-        let _ = crate::companion::start_companion_forward(app.clone(), udid.clone(), Some(9876), Some(9876)).await;
-        let comp_url = "http://127.0.0.1:9876/device/info".to_string();
-        if let Ok(client) = reqwest::Client::builder().timeout(std::time::Duration::from_millis(1500)).build() {
-            if let Ok(resp) = client.get(&comp_url).send().await {
-                if resp.status().is_success() {
-                    if let Ok(val) = resp.json::<serde_json::Value>().await {
-                        if val.get("status").and_then(|s| s.as_str()) == Some("ok") {
-                            is_companion_active = true;
-                            if let Some(b) = val.get("battery_level").and_then(|v| v.as_i64()) { battery_level = b as i32; }
-                            if let Some(t) = val.get("battery_temp").and_then(|v| v.as_f64()) { battery_temp = t as f32; }
-                            if let Some(c) = val.get("is_charging").and_then(|v| v.as_bool()) { is_charging = c; }
-                            if let Some(ip) = val.get("wifi_ip").and_then(|v| v.as_str()) { if !ip.is_empty() { wifi_ip = ip.to_string(); } }
-                            if let Some(tot) = val.get("total_ram_mb").and_then(|v| v.as_i64()) { ram_total_mb = tot as i32; }
-                            if let Some(avail) = val.get("avail_ram_mb").and_then(|v| v.as_i64()) { ram_avail_mb = avail as i32; }
-                            if let Some(ver) = val.get("android_version").and_then(|v| v.as_str()) { android_version = ver.to_string(); }
-                        }
-                    }
-                }
+        if dev.is_companion_installed == Some(true) {
+            if let Some(val) = crate::companion::fetch_companion_device_info(&app, &udid).await {
+                is_companion_active = true;
+                if let Some(b) = val.get("battery_level").and_then(|v| v.as_i64()) { battery_level = b as i32; }
+                if let Some(t) = val.get("battery_temp").and_then(|v| v.as_f64()) { battery_temp = t as f32; }
+                if let Some(c) = val.get("is_charging").and_then(|v| v.as_bool()) { is_charging = c; }
+                if let Some(ip) = val.get("wifi_ip").and_then(|v| v.as_str()) { if !ip.is_empty() { wifi_ip = ip.to_string(); } }
+                if let Some(tot) = val.get("total_ram_mb").and_then(|v| v.as_i64()) { ram_total_mb = tot as i32; }
+                if let Some(avail) = val.get("avail_ram_mb").and_then(|v| v.as_i64()) { ram_avail_mb = avail as i32; }
+                if let Some(ver) = val.get("android_version").and_then(|v| v.as_str()) { android_version = ver.to_string(); }
             }
         }
 

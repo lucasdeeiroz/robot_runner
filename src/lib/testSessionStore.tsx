@@ -461,7 +461,7 @@ export function TestSessionProvider({ children }: { children: React.ReactNode })
         try {
             // Notificar Android Companion sobre o início da atividade de teste
             invoke('trigger_companion_action', {
-                port: 9876,
+                device: session.deviceUdid,
                 endpoint: '/sync/activity',
                 payload: JSON.stringify({
                     type: "bdd_test",

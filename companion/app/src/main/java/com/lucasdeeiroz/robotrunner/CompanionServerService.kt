@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.lucasdeeiroz.robotrunner.server.CompanionAuth
 import com.lucasdeeiroz.robotrunner.server.CompanionHttpServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +56,10 @@ class CompanionServerService : Service() {
         val action = intent?.action
         if (action == ACTION_STOP_SERVER) {
             Log.i("CompanionService", "Received ACTION_STOP_SERVER command")
+            // A start request (possibly via startForegroundService) must always be paired with
+            // startForeground() before stopping, otherwise Android throws
+            // "Context.startForegroundService() did not then call Service.startForeground()".
+            startForegroundServiceNotification()
             stopServer()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -66,8 +71,21 @@ class CompanionServerService : Service() {
             return START_NOT_STICKY
         }
 
-        val timeoutSeconds = intent?.getIntExtra(EXTRA_IDLE_TIMEOUT_SECONDS, DEFAULT_DESKTOP_TIMEOUT_SECONDS)
-            ?: DEFAULT_DESKTOP_TIMEOUT_SECONDS
+        val timeoutSeconds = clampIdleTimeout(
+            intent?.getIntExtra(EXTRA_IDLE_TIMEOUT_SECONDS, DEFAULT_DESKTOP_TIMEOUT_SECONDS)
+                ?: DEFAULT_DESKTOP_TIMEOUT_SECONDS
+        )
+
+        // Only the receiver (protected by android.permission.DUMP) forwards a desktop token.
+        // This service is not exported, so the extra cannot come from third-party apps.
+        val incomingToken = intent?.getStringExtra(CompanionAuth.EXTRA_AUTH_TOKEN)
+        if (incomingToken != null) {
+            if (CompanionAuth.setToken(incomingToken)) {
+                Log.i("CompanionService", "Session token updated from START_SERVER broadcast")
+            } else {
+                Log.w("CompanionService", "Ignoring START_SERVER token with invalid format")
+            }
+        }
 
         startForegroundServiceNotification()
         startServer(timeoutSeconds)
@@ -75,9 +93,12 @@ class CompanionServerService : Service() {
     }
 
     fun startServer(timeoutSeconds: Int = DEFAULT_DESKTOP_TIMEOUT_SECONDS) {
+        val safeTimeout = clampIdleTimeout(timeoutSeconds)
+        // In-app starts carry no desktop token: generate a random one so the server is never open.
+        CompanionAuth.ensureToken()
         if (server != null) {
             server?.touchRequest()
-            startWatchdog(timeoutSeconds)
+            startWatchdog(safeTimeout)
             return
         }
         try {
@@ -90,18 +111,19 @@ class CompanionServerService : Service() {
             server?.touchRequest()
             isRunning = true
             startForegroundServiceNotification()
-            startWatchdog(timeoutSeconds)
+            startWatchdog(safeTimeout)
             onStatusChangedListener?.invoke()
-            Log.i("CompanionService", "HTTP Server started on port $SERVER_PORT with idle timeout ${timeoutSeconds}s")
+            Log.i("CompanionService", "HTTP Server started on 127.0.0.1:$SERVER_PORT with idle timeout ${safeTimeout}s")
         } catch (e: Exception) {
             Log.e("CompanionService", "Failed to start Companion HTTP server", e)
             isRunning = false
         }
     }
 
-    private fun startWatchdog(timeoutSeconds: Int) {
+    private fun startWatchdog(requestedTimeoutSeconds: Int) {
         watchdogJob?.cancel()
-        if (timeoutSeconds <= 0) return
+        // The watchdog can never be disabled: the timeout is always clamped to a sane range.
+        val timeoutSeconds = clampIdleTimeout(requestedTimeoutSeconds)
 
         watchdogJob = serviceScope.launch {
             val timeoutMs = timeoutSeconds * 1000L
@@ -136,6 +158,7 @@ class CompanionServerService : Service() {
         }
         server = null
         isRunning = false
+        CompanionAuth.clear()
         onStatusChangedListener?.invoke()
     }
 
@@ -212,6 +235,20 @@ class CompanionServerService : Service() {
         const val EXTRA_IDLE_TIMEOUT_SECONDS = "IDLE_TIMEOUT_SECONDS"
         const val DEFAULT_DESKTOP_TIMEOUT_SECONDS = 120 // 2 minutes for desktop connection
         const val DEFAULT_MANUAL_TIMEOUT_SECONDS = 900 // 15 minutes extended timeout for on-device manual start
+        const val MIN_IDLE_TIMEOUT_SECONDS = 60
+        const val MAX_IDLE_TIMEOUT_SECONDS = 3600
+
+        /**
+         * Normalizes an idle timeout coming from any intent: missing or <= 0 falls back to the
+         * default, anything else is clamped to [MIN_IDLE_TIMEOUT_SECONDS, MAX_IDLE_TIMEOUT_SECONDS].
+         */
+        fun clampIdleTimeout(
+            seconds: Int?,
+            defaultSeconds: Int = DEFAULT_DESKTOP_TIMEOUT_SECONDS
+        ): Int {
+            val value = if (seconds == null || seconds <= 0) defaultSeconds else seconds
+            return value.coerceIn(MIN_IDLE_TIMEOUT_SECONDS, MAX_IDLE_TIMEOUT_SECONDS)
+        }
 
         var instance: CompanionServerService? = null
             private set

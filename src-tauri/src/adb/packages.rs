@@ -15,17 +15,14 @@ pub struct PackageInfo {
 
 #[command]
 pub async fn get_installed_packages(app: AppHandle, device: String) -> Result<Vec<PackageInfo>, String> {
-    // 1. Ensure ADB port forwarding is active for target device
-    let _ = crate::companion::start_companion_forward(app.clone(), device.clone(), Some(9876), Some(9876)).await;
-
-    // 2. Try Companion Hybrid Bridge First (<20ms) with pooled connection and fallback
-    if let Ok(json_str) = crate::companion::trigger_companion_action(
-        app.clone(),
-        Some(9876),
-        "/apps".to_string(),
+    // 1. Try Companion Hybrid Bridge First (<20ms) through the per-device gateway
+    if let Ok(json_str) = crate::companion::companion_request_ok(
+        &app,
+        &device,
+        "GET",
+        "/apps",
         None,
-        Some("GET".to_string()),
-        Some(device.clone()),
+        crate::companion::TIMEOUT_MEDIUM,
     ).await {
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(&json_str) {
             if val.get("status").and_then(|s| s.as_str()) == Some("ok") {
@@ -143,14 +140,16 @@ pub async fn get_installed_packages(app: AppHandle, device: String) -> Result<Ve
 
 #[command]
 pub async fn get_app_icon(app: AppHandle, device: String, package: String) -> Result<String, String> {
-    let _ = crate::companion::start_companion_forward(app.clone(), device.clone(), Some(9876), Some(9876)).await;
-    if let Ok(json_str) = crate::companion::trigger_companion_action(
-        app.clone(),
-        Some(9876),
-        format!("/app/icon?package={}", package),
+    if !crate::cmd_utils::is_valid_android_package(&package) {
+        return Err(format!("Invalid package name: {}", package));
+    }
+    if let Ok(json_str) = crate::companion::companion_request_ok(
+        &app,
+        &device,
+        "GET",
+        &format!("/app/icon?package={}", package),
         None,
-        Some("GET".to_string()),
-        Some(device.clone()),
+        crate::companion::TIMEOUT_SHORT,
     ).await {
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(&json_str) {
             if val.get("status").and_then(|s| s.as_str()) == Some("ok") {

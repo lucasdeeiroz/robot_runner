@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Wifi, Link, Unplug, Globe, Copy, QrCode, RotateCw, Sparkles } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
+import { Wifi, Link, Unplug, Globe, Copy, KeyRound } from "lucide-react";
 import clsx from "clsx";
 import { useSettings, isToolGroupUnavailable } from "@/lib/settings";
 import { useTranslation } from "react-i18next";
@@ -33,17 +32,12 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
     const [statusMsg, setStatusMsg] = useState<{ text: string, type: 'success' | 'error' | 'info' } | null>(null);
     const [loading, setLoading] = useState(false);
     const [hostIp, setHostIp] = useState<string>("");
-    const [pairingPin, setPairingPin] = useState<string>(() => Math.floor(100000 + Math.random() * 900000).toString());
 
     useEffect(() => {
         invoke<string>('get_host_local_ip')
             .then(resIp => setHostIp(resIp))
-            .catch(() => setHostIp("192.168.1.100"));
+            .catch(() => setHostIp(""));
     }, []);
-
-    const handleRefreshPin = () => {
-        setPairingPin(Math.floor(100000 + Math.random() * 900000).toString());
-    };
 
     useEffect(() => {
         if (selectedDevice) {
@@ -203,7 +197,8 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                 cmd = 'adb_connect';
                 args = { ip, port };
             } else if (action === 'pair') {
-                cmd = 'adb_pair';
+                // CODE and IP:PORT come from Android's "Pair device with pairing code" dialog
+                cmd = 'adb_pair_device';
                 args = { ip, port, code };
             } else if (action === 'disconnect') {
                 cmd = 'adb_disconnect';
@@ -312,7 +307,8 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                     setIsLoadingSecurity(true);
                     try {
                         enableNgrok();
-                        await checkSystemVersions(); // Trigger re-check to potentially find ngrok if it was skipped
+                        // isNgrokEnabled is still stale in this closure: force the ngrok check explicitly
+                        await checkSystemVersions(undefined, undefined, false, true);
                         setShowSecurityModal(false);
                     } finally {
                         setIsLoadingSecurity(false);
@@ -472,71 +468,26 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                 </div>
             </Section>
 
-            {/* QR Code & 1-Click Wireless Onboarding Card */}
+            {/* Wireless Debugging Pairing (Android 11+) */}
             <Section
-                title={t('connect.wireless.qr_title', 'QR Code & 1-Click Wireless Onboarding')}
-                icon={QrCode}
-                description={t('connect.wireless.qr_desc', 'Scan QR Code using Mobile Companion or enter 6-digit PIN in Android Developer Options -> Wireless Debugging')}
+                title={t('connect.wireless.pairing_title', 'Pair with Wireless Debugging (Android 11+)')}
+                icon={KeyRound}
+                description={t('connect.wireless.pairing_desc', 'Pair the computer once using the code shown by Android, then connect over Wi-Fi.')}
                 variant="card"
             >
-                <div className="flex flex-col md:flex-row items-center gap-6 p-4 bg-surface/50 border border-outline-variant/15 rounded-3xl">
-                    {/* QR Code */}
-                    <div className="bg-white p-4 rounded-2xl border border-outline-variant/20 shadow-md flex items-center justify-center shrink-0">
-                        <QRCodeSVG
-                            value={`WIFI:T:ADB;S:robotrunner-${pairingPin};P:${pairingPin};;`}
-                            size={140}
-                            bgColor="#FFFFFF"
-                            fgColor="#0F172A"
-                            level="M"
-                        />
-                    </div>
-
-                    {/* Info & PIN */}
-                    <div className="flex-1 flex flex-col gap-3 min-w-0">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <div className="flex items-center gap-2">
-                                <Sparkles size={16} className="text-primary animate-pulse" />
-                                <span className="text-xs font-bold text-on-surface-variant/80 uppercase tracking-wider">
-                                    {t('connect.wireless.pin_code', 'Wireless Pairing PIN')}
-                                </span>
-                            </div>
-                            {hostIp && (
-                                <span className="text-[11px] font-mono bg-primary/10 text-primary px-2.5 py-0.5 rounded-full border border-primary/20">
-                                    {t('connect.wireless.host_ip', 'PC Host IP')}: {hostIp}
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Big 6-Digit PIN Display */}
-                        <div className="flex items-center gap-3">
-                            <div className="flex gap-2">
-                                {pairingPin.split('').map((digit, idx) => (
-                                    <div key={idx} className="w-10 h-12 rounded-xl bg-surface border border-outline-variant/30 flex items-center justify-center font-mono font-extrabold text-xl text-primary shadow-inner">
-                                        {digit}
-                                    </div>
-                                ))}
-                            </div>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={handleRefreshPin}
-                                className="h-10 w-10 rounded-xl border border-outline-variant/20 hover:bg-surface-variant/50"
-                                title={t('connect.wireless.refresh_pin', 'Generate New PIN')}
-                            >
-                                <RotateCw size={16} />
-                            </Button>
-                        </div>
-
-                        <div className="text-xs text-on-surface-variant/60 leading-relaxed space-y-0.5">
-                            <p>{t('connect.wireless.step1', '1. Open Android Settings → Developer Options → Wireless Debugging.')}</p>
-                            <p>
-                                {t('connect.wireless.step2', '2. Tap Pair device with pairing code and enter {{pin}} on IP {{ip}}:5555.', {
-                                    pin: pairingPin,
-                                    ip: hostIp || '192.168.x.x'
-                                })}
-                            </p>
-                        </div>
-                    </div>
+                <div className="flex flex-col gap-3 p-4 bg-surface/50 border border-outline-variant/15 rounded-3xl">
+                    {hostIp && (
+                        <span className="self-start text-[11px] font-mono bg-primary/10 text-primary px-2.5 py-0.5 rounded-full border border-primary/20">
+                            {t('connect.wireless.host_ip', 'PC Host IP')}: {hostIp}
+                        </span>
+                    )}
+                    <ol className="text-xs text-on-surface-variant/80 leading-relaxed space-y-1 list-none">
+                        <li>{t('connect.wireless.pair_step1', '1. Make sure the phone and this computer are on the same Wi-Fi network.')}</li>
+                        <li>{t('connect.wireless.pair_step2', '2. On the phone, open Settings → Developer options → Wireless debugging and tap "Pair device with pairing code".')}</li>
+                        <li>{t('connect.wireless.pair_step3', '3. Type the "Wi-Fi pairing code" into the Code field above, and the IP address and port shown in that dialog into the IP and Port fields.')}</li>
+                        <li>{t('connect.wireless.pair_step4', '4. Open the Connect menu arrow and choose "Pair".')}</li>
+                        <li>{t('connect.wireless.pair_step5', '5. After pairing, close the dialog, enter the IP address & port shown on the main Wireless debugging screen (a different port) and click "Connect".')}</li>
+                    </ol>
                 </div>
             </Section>
 

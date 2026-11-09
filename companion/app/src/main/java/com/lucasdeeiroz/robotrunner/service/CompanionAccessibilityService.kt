@@ -462,7 +462,7 @@ class CompanionAccessibilityService : AccessibilityService() {
     private fun takeInternalScreencapFallback(onComplete: (ByteArray?) -> Unit) {
         Thread {
             try {
-                val process = Runtime.getRuntime().exec("screencap -p")
+                val process = Runtime.getRuntime().exec(arrayOf("screencap", "-p"))
                 val bytes = process.inputStream.readBytes()
                 process.waitFor()
                 if (bytes.isNotEmpty()) {

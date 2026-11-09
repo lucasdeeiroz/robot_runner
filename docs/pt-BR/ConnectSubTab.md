@@ -7,7 +7,7 @@ A aba **Conectar** é especializada no gerenciamento de conexões sem fio (Wirel
 ## Principais Funcionalidades
 
 - **ADB sem Fio (Wireless Debugging):** Conexão direta com dispositivos na mesma rede Wi-Fi via protocolo ADB TCP/IP.
-- **Pareamento Android 11+ (AOSP & One UI):** Suporte completo ao handshake de pareamento seguro com PIN de 6 dígitos e QR Code no padrão oficial `WIFI:T:ADB`.
+- **Pareamento Android 11+ (AOSP & One UI):** Pareamento seguro usando o código de pareamento Wi-Fi de 6 dígitos exibido pelo Android (**"Parear dispositivo com código de pareamento"**).
 - **Descoberta Automática de IP:** Detecção automática do endereço IP do dispositivo via USB através da interface de rede ativa (`wlan0`).
 - **Ativação 1-Clique de TCP/IP (5555):** Habilita a porta 5555 no dispositivo conectado via USB com um único clique.
 - **Túnel Ngrok Integrado:** Exposição segura do serviço ADB / Appium local à internet para execuções remotas.
@@ -25,27 +25,19 @@ A aba **Conectar** é especializada no gerenciamento de conexões sem fio (Wirel
 
 ---
 
-### Fluxo 2: Pareamento Manual Android 11+ (Sem Cabo USB)
-Em dispositivos modernos com Android 11 ou superior (ex: Samsung Galaxy One UI, Google Pixel, Xiaomi):
-1. No dispositivo móvel, acesse **Configurações → Opções do Desenvolvedor → Depuração Sem Fio**.
-2. Ative a chave **Depuração Sem Fio**.
+### Fluxo 2: Pareamento com Código de Pareamento no Android 11+ (Sem Cabo USB)
+Em dispositivos modernos com Android 11 ou superior (ex: Samsung Galaxy One UI, Google Pixel, Xiaomi). O card **Parear com Depuração por Wi-Fi (Android 11+)** da aba Conectar resume estes mesmos passos e exibe o **IP do PC Host**.
+1. Garanta que o celular e o computador estejam na mesma rede Wi-Fi.
+2. No dispositivo móvel, acesse **Configurações → Opções do desenvolvedor → Depuração por Wi-Fi** e ative a chave **Depuração por Wi-Fi**.
 3. Toque em **"Parear dispositivo com código de pareamento"**.
-4. O Android exibirá uma tela modal com:
+4. O Android exibirá um diálogo com:
    - **Código de pareamento Wi-Fi:** (ex: `123456`)
-   - **Endereço IP e Porta:** (ex: `192.168.1.50:37485` — *Atenção: a porta de pareamento é dinâmica e diferente da porta 5555*).
-5. No Robot Runner Desktop, insira o IP, a porta de pareamento exibida e o código de 6 dígitos nos campos correspondentes.
-6. Clique na seta do botão de ação e selecione **"Parear"** (`adb pair <ip>:<porta_pareamento> <codigo>`).
-7. Após a mensagem de sucesso de pareamento, insira a porta principal de conexão (exibida na tela principal de Depuração Sem Fio do Android, geralmente 5555 ou uma porta fixa) e clique em **"Conectar"**.
+   - **Endereço IP e Porta:** (ex: `192.168.1.50:37485` — *Atenção: a porta de pareamento é temporária e diferente da porta de conexão*).
+5. No Robot Runner Desktop, digite o **Código de pareamento Wi-Fi** no campo **Código**, e o endereço IP e a porta de pareamento exibidos nesse diálogo nos campos **IP** e **Porta**.
+6. Abra a seta ao lado do botão de ação principal e selecione **"Parear"** (`adb pair <ip>:<porta_pareamento> <codigo>`).
+7. O pareamento **não** conecta automaticamente. Após o sucesso do pareamento, feche o diálogo no celular, informe o IP e a porta exibidos na **tela principal de Depuração por Wi-Fi** do Android (uma porta diferente da de pareamento) e clique em **"Conectar"**.
 
----
-
-### Fluxo 3: Pareamento via QR Code (`WIFI:T:ADB`)
-1. No Robot Runner, o card **QR Code & Pareamento Sem Fio** exibe o QR Code no formato de pareamento oficial do AOSP:
-   ```text
-   WIFI:T:ADB;S:robotrunner-<PIN>;P:<PIN>;;
-   ```
-2. No Android, em **Depuração Sem Fio → Parear dispositivo com código QR**, aponte a câmera para o QR Code gerado na tela do Desktop.
-3. Certifique-se de que o computador e o dispositivo móvel estejam na mesma rede Wi-Fi local.
+> **Observação:** O pareamento via QR Code não é suportado. A opção **"Parear dispositivo com QR code"** do Android exige que o computador anuncie um serviço de pareamento via mDNS, o que o Robot Runner não oferece. Use sempre **"Parear dispositivo com código de pareamento"**.
 
 ---
 

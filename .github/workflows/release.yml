@@ -167,9 +167,15 @@ jobs:
           echo "$COMPANION_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/companion-release.jks"
           echo "COMPANION_KEYSTORE_PATH=$RUNNER_TEMP/companion-release.jks" >> "$GITHUB_ENV"
 
-      - name: Warn about debug signing
+      # Stable releases must be updatable in place, so a missing keystore is fatal; pre-releases only warn
+      - name: Require release signing for stable releases
         if: env.COMPANION_KEYSTORE_BASE64 == ''
-        run: echo "::warning::COMPANION_KEYSTORE_BASE64 secret is not set. companion.apk will be signed with an ephemeral debug key and users must uninstall the previous version before updating."
+        run: |
+          if [ "${{ needs.prepare.outputs.prerelease }}" = "false" ]; then
+            echo "::error::COMPANION_KEYSTORE_BASE64 secret is not set. Stable releases require the Companion release keystore (see docs/en/SETUP.md > Publishing a Release)."
+            exit 1
+          fi
+          echo "::warning::COMPANION_KEYSTORE_BASE64 secret is not set. companion.apk will be signed with an ephemeral debug key and users must uninstall the previous version before updating."
 
       - name: Build Companion APK
         env:

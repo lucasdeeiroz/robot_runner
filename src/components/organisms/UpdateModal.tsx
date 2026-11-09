@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/organisms/Modal';
 import { Button } from '@/components/atoms/Button';
 import { Download, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
-import { UpdateAsset, downloadAndInstall } from '@/lib/updater';
+import { UpdateAsset, UpdateIntegrityError, downloadAndInstall } from '@/lib/updater';
 import { feedback } from '@/lib/feedback';
 import { openUrl } from '@tauri-apps/plugin-opener';
 
@@ -28,7 +28,11 @@ export function UpdateModal({ isOpen, onClose, assets, latestVersion }: UpdateMo
             setDownloadedAsset(asset.name);
             feedback.toast.success('about.update_downloaded');
         } catch (e) {
-            feedback.toast.error('about.update_download_error');
+            if (e instanceof UpdateIntegrityError) {
+                feedback.toast.error(`about.update_${e.code}`);
+            } else {
+                feedback.toast.error('about.update_download_error');
+            }
         } finally {
             setIsDownloading(false);
         }

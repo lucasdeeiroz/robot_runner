@@ -300,7 +300,8 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
 
     const handleDownloadCompanion = async () => {
         try {
-            let version = packageJson.version || '2.3.3';
+            // Companion APK is published with the same version as the desktop release
+            let version = packageJson.version;
             try {
                 const { getVersion } = await import('@tauri-apps/api/app');
                 const v = await getVersion();
@@ -406,36 +407,28 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                 menus={
                     !isCompact && !isWebMode && (
                         <>
-                            {companionStatus === 'not_installed' ? (
+                            {(companionStatus === 'not_installed' || companionStatus === 'needs_update') ? (
                                 <Button
                                     onClick={handleDownloadCompanion}
                                     variant="ghost"
                                     size="sm"
                                     className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 hover:bg-primary/20 border border-primary/30 rounded-xl py-1.5 px-3 transition-all h-auto"
-                                    data-tooltip={t('apps.download_companion_tooltip', { version: packageJson.version, defaultValue: `Download companion.apk from current release (v${packageJson.version})` })}
+                                    data-tooltip={companionStatus === 'needs_update'
+                                        ? t('apps.update_companion_tooltip', { version: packageJson.version, defaultValue: `Update companion.apk from current release (v${packageJson.version})` })
+                                        : t('apps.download_companion_tooltip', { version: packageJson.version, defaultValue: `Download companion.apk from current release (v${packageJson.version})` })}
                                     data-position="bottom"
                                 >
                                     <Rocket size={14} className="text-primary animate-pulse" />
-                                    <span>{t('apps.download_companion', 'Download Companion APK')}</span>
-                                </Button>
-                            ) : companionStatus === 'needs_update' ? (
-                                <Button
-                                    onClick={handleDownloadCompanion}
-                                    variant="ghost"
-                                    size="sm"
-                                    className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 hover:bg-primary/20 border border-primary/30 rounded-xl py-1.5 px-3 transition-all h-auto"
-                                    data-tooltip={t('apps.update_companion_tooltip', { version: packageJson.version, defaultValue: `Update companion.apk from current release (v${packageJson.version})` })}
-                                    data-position="bottom"
-                                >
-                                    <Rocket size={14} className="text-primary animate-pulse" />
-                                    <span>{t('apps.update_companion', `Update Companion APK`)}</span>
+                                    <span>{companionStatus === 'needs_update'
+                                        ? t('apps.update_companion', 'Update Companion APK')
+                                        : t('apps.download_companion', 'Download Companion APK')}</span>
                                 </Button>
                             ) : (
                                 <CompanionBadge
                                     status={companionStatus}
                                     deviceInfo={companionInfo}
                                     showBattery={true}
-                                    onConnect={connectCompanion}
+                                    onConnect={() => connectCompanion(true, true)}
                                     onLaunch={launchCompanion}
                                 />
                             )}

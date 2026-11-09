@@ -60,7 +60,7 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
 
     // Restore the default Launcher tab once its dependencies are confirmed in background
     useEffect(() => {
-        if (!isLauncherDisabled && !userSelectedTabRef.current && !initialTab && activeTab === 'inspector') {
+        if (!isLauncherDisabled && !userSelectedTabRef.current && (!initialTab || initialTab === 'tests') && activeTab === 'inspector') {
             setActiveTab('tests');
         }
     }, [isLauncherDisabled]);
@@ -182,7 +182,7 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
                             status={companionStatus}
                             deviceInfo={companionInfo}
                             showBattery={true}
-                            onConnect={connectCompanion}
+                            onConnect={() => connectCompanion(true, true)}
                             onLaunch={launchCompanion}
                         />
                     ) : undefined
