@@ -25,6 +25,32 @@ Antes de executar o aplicativo, certifique-se de ter as seguintes ferramentas in
 
 ---
 
+## 🚀 Detecção de Ferramentas na Inicialização
+
+O Robot Runner lembra quais ferramentas foram encontradas na última abertura, então abre **instantaneamente** e confirma tudo em segundo plano.
+
+**Aberturas normais (ferramentas já detectadas antes):**
+
+1. O app abre **sem tela de carregamento**, aplicando as versões salvas na última abertura.
+2. Uma pequena pílula na parte inferior da tela mostra **"Confirmando versões das ferramentas... X/Y"** enquanto cada ferramenta é verificada novamente em segundo plano.
+3. Se algo mudou desde a última abertura (uma ferramenta foi instalada, removida ou o caminho personalizado do ADB foi alterado), a funcionalidade relacionada é ativada ou desativada automaticamente e uma notificação lista as ferramentas que mudaram. Se o **ADB** não for mais encontrado, a tela **Ferramentas Críticas Ausentes** é exibida.
+
+**Primeira abertura (ou ao trocar de modo de uso / framework pela primeira vez):** ainda não há versões salvas, então a detecção abaixo é executada. Apenas o **ADB** bloqueia a inicialização — todo o resto é identificado em segundo plano.
+
+1. **Abrindo o app**: uma tela de carregamento curta é exibida **somente enquanto o ADB é localizado**. Normalmente leva cerca de um segundo.
+2. **ADB encontrado**: a tela de carregamento fecha e o app já pode ser usado (lista de dispositivos, Inspector, Mapper, Toolbox etc.).
+3. **ADB não encontrado**: a tela **Ferramentas Críticas Ausentes** é exibida com um link para baixar o Platform Tools, pois nada funciona sem o ADB.
+4. **Detecção em segundo plano**: enquanto as demais ferramentas (Scrcpy, Node.js, Appium, UiAutomator2, Python, Robot Framework, AppiumLibrary, Java, Maven, Maestro, Ngrok, Claude Code, Antigravity) são identificadas, uma pequena pílula na parte inferior da tela mostra **"Identificando ferramentas em segundo plano... X/Y"**.
+5. **Funcionalidades liberadas uma a uma**: cada funcionalidade é ativada assim que as ferramentas das quais depende são confirmadas:
+   - Aba **Launcher** (página Run) — aguarda as ferramentas de teste do framework selecionado (ex.: Python + Robot Framework + AppiumLibrary). Enquanto pendente, a dica (tooltip) mostra **"Verificando ferramentas necessárias..."**. Se você não escolheu outra aba, o app muda para o Launcher automaticamente quando ele fica disponível.
+   - Botão de **espelhamento de tela** (Toolbox) — aguarda o **Scrcpy**.
+   - Botão **Iniciar Appium** (Configurações) — aguarda **Node.js**, **Appium** e **UiAutomator2**.
+   - Card de **acesso remoto** (Connect) — aguarda o **Ngrok** (somente quando o Ngrok está habilitado).
+6. **Ferramentas opcionais ausentes**: ao final da detecção em segundo plano, se alguma ferramenta de teste ou de espelhamento estiver faltando, o aviso de sempre é exibido para que você possa instalá-la.
+7. **Configurações > Versões do Sistema**: ferramentas ainda em verificação mostram um indicador **Verificando...** e são preenchidas assim que cada uma é identificada. Clicar em **Atualizar** ignora as versões salvas e lê todas as ferramentas novamente do zero — use logo após instalar ou atualizar uma ferramenta.
+
+---
+
 ## 🔧 Configuração Inicial
 
 Após iniciar o Robot Runner, navegue até a aba **Settings (Configurações)** para finalizar sua configuração.

@@ -9,7 +9,7 @@ import { AIGeneratorSubTab } from "@/components/tabs/run/AIGeneratorSubTab";
 import { useTestSessions } from "@/lib/testSessionStore";
 import { useDevices } from '@/lib/deviceStore'; // Import Global Store
 
-import { useSettings } from "@/lib/settings";
+import { useSettings, isToolGroupUnavailable } from "@/lib/settings";
 import { Device } from "@/lib/types";
 import { logEvent } from "@/lib/analytics";
 
@@ -44,14 +44,26 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
         return () => observer.disconnect();
     }, []);
 
-    const isLauncherDisabled = (systemCheckStatus?.missingTesting?.length ?? 0) > 0 || settings.usageMode === 'explorer';
+    // Launcher stays unavailable while its testing dependencies are missing or still being identified in background
+    const isLauncherDisabled = isToolGroupUnavailable(systemCheckStatus, 'testing') || settings.usageMode === 'explorer';
+    const isLauncherPending = settings.usageMode !== 'explorer' && (systemCheckStatus?.pendingGroups?.includes('testing') ?? false);
     const isInspectorDisabled = false;
+
+    // Tracks whether the user picked a tab, so a late dependency check never overrides their choice
+    const userSelectedTabRef = useRef(false);
 
     const [activeTab, setActiveTab] = useState<TabType>(() => {
         if (initialTab && !(initialTab === 'tests' && isLauncherDisabled) && !(initialTab === 'inspector' && isInspectorDisabled)) return initialTab;
         if (isLauncherDisabled) return 'inspector';
         return 'tests';
     });
+
+    // Restore the default Launcher tab once its dependencies are confirmed in background
+    useEffect(() => {
+        if (!isLauncherDisabled && !userSelectedTabRef.current && !initialTab && activeTab === 'inspector') {
+            setActiveTab('tests');
+        }
+    }, [isLauncherDisabled]);
 
     // Safety check if status updates later
     useEffect(() => {
@@ -79,6 +91,7 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
         const handleNavigateSubTab = (e: Event) => {
             const detail = (e as CustomEvent).detail;
             if (detail && (detail === 'tests' || detail === 'inspector' || detail === 'mapper' || detail === 'ai_generator')) {
+                userSelectedTabRef.current = true;
                 setActiveTab(detail as TabType);
             }
         };
@@ -88,7 +101,14 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
 
     // Define Tabs
     const tabs: TabItem[] = [
-        ...(settings.usageMode === 'explorer' ? [] : [{ id: 'tests', label: !isNarrow ? t('run_tab.launcher') : '', icon: Play, tooltip: isNarrow ? t('run_tab.launcher') : undefined }]),
+        ...(settings.usageMode === 'explorer' ? [] : [{
+            id: 'tests',
+            label: !isNarrow ? t('run_tab.launcher') : '',
+            icon: Play,
+            tooltip: isLauncherPending
+                ? t('startup.background.feature_pending', 'Checking required tools...')
+                : (isNarrow ? t('run_tab.launcher') : undefined)
+        }]),
         { id: 'inspector', label: !isNarrow ? t('run_tab.inspector') : '', icon: ScanEye, tooltip: isNarrow ? t('run_tab.inspector') : undefined },
         { id: 'mapper', label: !isNarrow ? t('dashboard.tabs.mapper', "Mapper") : '', icon: Map, tooltip: isNarrow ? t('dashboard.tabs.mapper', "Mapper") : undefined },
         { id: 'ai_generator', label: !isNarrow ? t('dashboard.tabs.scenarios', "Scenarios") : '', icon: Sparkles, tooltip: isNarrow ? t('dashboard.tabs.scenarios', "Scenarios") : undefined },
@@ -150,6 +170,7 @@ export function RunPage({ onNavigate, initialTab }: RunPageProps) {
                 onChange={(id) => {
                     if (id === 'tests' && isLauncherDisabled) return;
                     if (id === 'inspector' && isInspectorDisabled) return;
+                    userSelectedTabRef.current = true;
                     setActiveTab(id as TabType);
                     logEvent('run_tab_changed', { tab: id });
                 }}

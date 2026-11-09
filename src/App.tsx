@@ -12,6 +12,7 @@ import { Toaster } from "sonner";
 import "sonner/dist/styles.css";
 import { useSettings } from "./lib/settings";
 import { SystemCheckOverlay } from "./components/organisms/SystemCheckOverlay";
+import { BackgroundToolCheckIndicator } from "./components/molecules/BackgroundToolCheckIndicator";
 import { EnvironmentManager } from "./components/organisms/EnvironmentManager";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Onboarding } from "./components/organisms/Onboarding";
@@ -49,13 +50,14 @@ function AppContent() {
 
   // Initial check moved to dependence on settings_loading
 
-  // Determine if we should show the overlay
+  // Only the ADB check blocks the UI; optional tools are reported once the background check finishes
   const showOverlay = !initialCheckDismissed && (
     systemCheckStatus.loading ||
-    !systemCheckStatus.complete ||
     systemCheckStatus.missingCritical.length > 0 ||
-    systemCheckStatus.missingTesting.length > 0 ||
-    systemCheckStatus.missingMirroring.length > 0
+    (systemCheckStatus.complete && (
+      systemCheckStatus.missingTesting.length > 0 ||
+      systemCheckStatus.missingMirroring.length > 0
+    ))
   );
 
   const handleCriticalExit = async () => {
@@ -221,6 +223,7 @@ function AppContent() {
   // Only check system versions AFTER settings are loaded
   useEffect(() => {
     if (!settings_loading) {
+      // Apply cached versions instantly and revalidate every tool in background
       checkSystemVersions(undefined, undefined, true);
       checkForAppUpdate(false); // Silent global check on startup
     }
@@ -370,6 +373,7 @@ function AppContent() {
               </AnimatePresence>
             </div>
           </Layout>
+          {settings.usageMode && <BackgroundToolCheckIndicator status={systemCheckStatus} />}
           <Toaster richColors position="bottom-right" theme={settings.theme === 'dark' ? 'dark' : 'light'} />
         </SelectionProvider>
       </DeviceProvider>

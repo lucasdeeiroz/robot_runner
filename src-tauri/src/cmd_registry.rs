@@ -35,7 +35,7 @@ macro_rules! generate_robot_runner_handler {
             crate::adb::device::adb_pair_device,
             crate::adb::device::get_fleet_health,
             crate::adb::device::get_host_local_ip,
-            crate::system::get_system_versions,
+            crate::system::get_tool_version,
             crate::adb::shell::is_adb_server_running,
             crate::adb::shell::kill_adb_server,
             crate::adb::shell::start_adb_server,

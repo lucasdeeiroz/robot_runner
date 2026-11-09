@@ -1,4 +1,4 @@
-import { useSettings } from "@/lib/settings";
+import { useSettings, isToolGroupUnavailable, isToolInstalled, TOOL_CHECKING } from "@/lib/settings";
 import { Moon, Sun, Server, Monitor, FolderOpen, Wrench, Play, Square, Terminal, Users, Plus, Edit2, Trash2, Settings as SettingsIcon, Sparkles, FileJson, RefreshCcw, GitBranch, Link2, Briefcase, ChevronDown, FilePlus, Copy, FileText, Activity, ShieldAlert } from "lucide-react";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -106,10 +106,10 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     const [isRestartingADB, setIsRestartingADB] = useState(false);
 
     const claudeCodeVersion = systemVersions?.claude_code;
-    const isClaudeCodeInstalled = !!claudeCodeVersion && claudeCodeVersion !== 'Not Found';
+    const isClaudeCodeInstalled = isToolInstalled(claudeCodeVersion);
 
     const antigravityVersion = systemVersions?.antigravity;
-    const isAntigravityInstalled = !!antigravityVersion && antigravityVersion !== 'Not Found';
+    const isAntigravityInstalled = isToolInstalled(antigravityVersion);
 
     const { isFeatureEnabled } = useRemoteConfig();
     const isCypressEnabled = isFeatureEnabled('is_cypress_enabled');
@@ -342,7 +342,7 @@ export function SettingsPage({ onNavigate: _onNavigate }: SettingsPageProps) {
     useEffect(() => {
         // Cached System Versions
         if (!systemVersions) {
-            checkSystemVersions();
+            checkSystemVersions(undefined, undefined, true);
         }
 
         // Initial status check
@@ -1604,7 +1604,7 @@ const parsed = JSON.parse(fileContent);
                                     if (!settings.automationFramework) {
                                         updateSetting('automationFramework', 'robot');
                                     }
-                                    checkSystemVersions(mode, currentFramework);
+                                    checkSystemVersions(mode, currentFramework, true);
                                 }
                             }}
                             label={t('onboarding.step2_title')}
@@ -1622,7 +1622,7 @@ const parsed = JSON.parse(fileContent);
                                 onChange={async (e) => {
                                     const framework = e.target.value as 'robot' | 'appium' | 'maestro' | 'cypress' | 'selenium';
                                     updateSetting('automationFramework', framework);
-                                    checkSystemVersions('automator', framework);
+                                    checkSystemVersions('automator', framework, true);
                                 }}
                                 label={t('onboarding.step3_title')}
                                 options={[
@@ -1788,7 +1788,7 @@ const parsed = JSON.parse(fileContent);
                                                     icon: <Terminal size={16} />
                                                 }
                                             ]}
-                                            disabled={systemCheckStatus?.missingAppium?.length > 0 || settings.noAppiumForRobot}
+                                            disabled={isToolGroupUnavailable(systemCheckStatus, 'appium') || settings.noAppiumForRobot}
                                             variant="primary"
                                             className="shadow-lg hover:shadow-xl transition-all"
                                         />
@@ -2484,18 +2484,18 @@ const parsed = JSON.parse(fileContent);
                     actions={
                         <Button
                             onClick={() => checkSystemVersions()}
-                            disabled={systemCheckStatus.loading}
+                            disabled={!systemCheckStatus.complete}
                             variant="ghost"
                             size="icon"
                             className={
                                 clsx(
                                     "rounded-2xl hover:bg-surface-variant/30",
-                                    systemCheckStatus.loading ? "text-primary dark:text-primary/80 bg-primary/10" : "text-on-surface-variant/80 hover:text-primary"
+                                    !systemCheckStatus.complete ? "text-primary dark:text-primary/80 bg-primary/10" : "text-on-surface-variant/80 hover:text-primary"
                                 )
                             }
                             title={t('common.loading')}
                         >
-                            {systemCheckStatus.loading ? (
+                            {!systemCheckStatus.complete ? (
                                 <ExpressiveLoading size="xsm" variant="circular" />
                             ) : (
                                 <RefreshCcw size={18} />
@@ -2529,9 +2529,16 @@ const parsed = JSON.parse(fileContent);
                                         headerRight={<span className="text-on-surface-variant/80">↗</span>}
                                         className="h-20"
                                     >
-                                        <span className="text-sm font-mono text-on-surface/80 truncate block mt-1" title={systemVersions[key]}>
-                                            {systemVersions[key]}
-                                        </span>
+                                        {systemVersions[key] === TOOL_CHECKING ? (
+                                            <span className="text-sm text-on-surface-variant/80 italic flex items-center gap-2 mt-1">
+                                                <ExpressiveLoading size="xsm" variant="circular" />
+                                                {t('common.checking')}
+                                            </span>
+                                        ) : (
+                                            <span className="text-sm font-mono text-on-surface/80 truncate block mt-1" title={systemVersions[key]}>
+                                                {systemVersions[key]}
+                                            </span>
+                                        )}
                                     </InfoCard>
                                 ))
                         ) : (

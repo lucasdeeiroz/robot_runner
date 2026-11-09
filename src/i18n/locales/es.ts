@@ -1696,6 +1696,12 @@ export const es = {
         startup: {
             loading: "Inicializando aplicación...",
             checking: "Verificando herramientas del sistema...",
+            background: {
+                checking: "Identificando herramientas en segundo plano...",
+                feature_pending: "Verificando herramientas necesarias...",
+                revalidating: "Confirmando versiones de las herramientas...",
+                tools_changed: "La disponibilidad de herramientas cambió desde la última apertura: {{tools}}",
+            },
             critical: {
                 title: "Herramientas Críticas Faltantes",
                 description: "Las siguientes herramientas son necesarias para ejecutar esta aplicación:",

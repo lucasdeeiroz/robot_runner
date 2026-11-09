@@ -2,7 +2,6 @@ use crate::cmd_utils::{new_tokio_command, get_adb_program};
 use crate::errors::{AppError, AppResult};
 use nosleep::{NoSleep, NoSleepType};
 use regex::Regex;
-use serde::Serialize;
 use std::sync::Mutex;
 use tauri::{command, State, AppHandle};
 use walkdir::WalkDir;
@@ -26,133 +25,63 @@ pub async fn get_folder_size(path: String) -> AppResult<u64> {
     .map_err(|e| AppError::StringError(e.to_string()))
 }
 
-#[derive(Serialize, Default, Debug)]
-pub struct SystemVersions {
-    pub adb: String,
-    pub node: String,
-    pub appium: String,
-    pub uiautomator2: String,
-    pub python: String,
-    pub robot: String,
-    pub appium_lib: String,
-    pub java: String,
-    pub maven: String,
-    pub maestro: String,
-    pub scrcpy: String,
-    pub ngrok: String,
-    pub claude_code: String,
-    pub antigravity: String,
+const NOT_FOUND: &str = "Not Found";
+
+/// Resolves the installed version of a single host tool.
+/// The frontend calls this once per tool in parallel so each feature can be enabled
+/// as soon as its own dependency is identified, instead of waiting for the slowest tool.
+#[command]
+pub async fn get_tool_version(app: AppHandle, tool: String) -> AppResult<String> {
+    let version = match tool.as_str() {
+        "adb" => {
+            let raw = get_version(&get_adb_program(&app), &["--version"]).await;
+            format_adb_version(&raw)
+        }
+        "scrcpy" => extract_or_not_found(&get_version("scrcpy", &["--version"]).await, r"scrcpy ([\d\.]+)"),
+        "node" => {
+            let v = get_version("node", &["--version"]).await.trim().replace('v', "");
+            non_empty_or_not_found(v)
+        }
+        "java" => extract_or_not_found(&get_version("java", &["-version"]).await, r#"(?:version|openjdk version) "([\d\._]+)""#),
+        "python" => extract_or_not_found(&get_version("python", &["--version"]).await, r"Python ([\d\.]+)"),
+        "robot" => extract_or_not_found(&get_version("python", &["-m", "robot", "--version"]).await, r"Robot Framework ([\d\.]+)"),
+        "appium_lib" => get_pip_version("robotframework-appiumlibrary").await,
+        "maven" => extract_or_not_found(&get_version("mvn", &["--version"]).await, r"Apache Maven ([\d\.]+)"),
+        "maestro" => non_empty_or_not_found(get_version("maestro", &["--version"]).await.trim().to_string()),
+        "appium" => non_empty_or_not_found(get_version("appium", &["--version"]).await.trim().to_string()),
+        // Returns "Not Found" on its own when the appium CLI is missing (empty output).
+        "uiautomator2" => get_appium_driver_version("uiautomator2").await,
+        "ngrok" => extract_or_not_found(&get_version("ngrok", &["--version"]).await, r"ngrok version ([\d\.]+)"),
+        "claude_code" => non_empty_or_not_found(get_version("claude", &["--version"]).await.trim().to_string()),
+        "antigravity" => non_empty_or_not_found(get_version("agy", &["--version"]).await.trim().to_string()),
+        other => return Err(AppError::StringError(format!("Unknown tool: {}", other))),
+    };
+    Ok(version)
 }
 
-#[command]
-pub async fn get_system_versions(
-    app: AppHandle,
-    check_automator: bool,
-    framework: Option<String>,
-    check_ngrok: bool,
-) -> SystemVersions {
-    let adb_program = get_adb_program(&app);
-    let f = framework.unwrap_or_default();
+fn format_adb_version(adb_raw: &str) -> String {
+    let adb_bridge = extract_version(adb_raw, r"Android Debug Bridge version ([\d\.]+)");
+    let adb_sdk = extract_version(adb_raw, r"Version ([\w\.\-]+)");
 
-    let adb_fut = async { get_version(&adb_program, &["--version"]).await };
-    let scrcpy_fut = async { get_version("scrcpy", &["--version"]).await };
-    let node_fut = async { if check_automator { get_version("node", &["--version"]).await } else { String::new() } };
-    let java_fut = async { if check_automator { get_version("java", &["-version"]).await } else { String::new() } };
-    let python_fut = async { if check_automator { get_version("python", &["--version"]).await } else { String::new() } };
-    
-    let robot_fut = async { if check_automator && f == "robot" { get_version("python", &["-m", "robot", "--version"]).await } else { String::new() } };
-    let appium_lib_fut = async { if check_automator && f == "robot" { get_pip_version("robotframework-appiumlibrary").await } else { "Not Found".to_string() } };
-    
-    let maven_fut = async { if check_automator && f == "appium" { get_version("mvn", &["--version"]).await } else { String::new() } };
-    let maestro_fut = async { if check_automator && f == "maestro" { get_version("maestro", &["--version"]).await } else { String::new() } };
-    
-    let appium_fut = async { if check_automator && (f == "robot" || f == "appium") { get_version("appium", &["--version"]).await } else { String::new() } };
-    let uiaut_fut = async { if check_automator && (f == "robot" || f == "appium") { get_appium_driver_version("uiautomator2").await } else { "Not Found".to_string() } };
-
-    let ngrok_fut = async { if check_ngrok { get_version("ngrok", &["--version"]).await } else { String::new() } };
-    let claude_fut = async { get_version("claude", &["--version"]).await };
-    let agy_fut = async { get_version("agy", &["--version"]).await };
-
-    let (
-        adb_raw, scrcpy_raw, node_raw, java_raw, python_raw,
-        robot_raw, appium_lib_raw, maven_raw, maestro_raw,
-        appium_raw, uiautomator2, ngrok_raw, claude_raw, antigravity_raw
-    ) = tokio::join!(
-        adb_fut, scrcpy_fut, node_fut, java_fut, python_fut,
-        robot_fut, appium_lib_fut, maven_fut, maestro_fut,
-        appium_fut, uiaut_fut, ngrok_fut, claude_fut, agy_fut
-    );
-
-    let adb_bridge = extract_version(&adb_raw, r"Android Debug Bridge version ([\d\.]+)");
-    let adb_sdk = extract_version(&adb_raw, r"Version ([\w\.\-]+)");
-
-    let adb_display = match (adb_bridge, adb_sdk) {
+    match (adb_bridge, adb_sdk) {
         (Some(bridge), Some(sdk)) => format!("{} ({})", bridge, sdk),
         (Some(bridge), None) => bridge,
         (None, _) => {
             if adb_raw.contains("Command not allowed") || adb_raw.to_lowercase().contains("error") || !adb_raw.trim().is_empty() {
                 "Custom Binary".to_string()
             } else {
-                "Not Found".to_string()
-            }
-        }
-    };
-
-    let mut versions = SystemVersions {
-        adb: adb_display,
-        node: "Not Checked".to_string(),
-        appium: "Not Checked".to_string(),
-        uiautomator2: "Not Checked".to_string(),
-        python: "Not Checked".to_string(),
-        robot: "Not Checked".to_string(),
-        appium_lib: "Not Checked".to_string(),
-        java: "Not Checked".to_string(),
-        maven: "Not Checked".to_string(),
-        maestro: "Not Checked".to_string(),
-        ngrok: "Not Checked".to_string(),
-        claude_code: "Not Found".to_string(),
-        antigravity: "Not Found".to_string(),
-        scrcpy: "Not Found".to_string(),
-    };
-
-    versions.scrcpy = extract_version(&scrcpy_raw, r"scrcpy ([\d\.]+)").unwrap_or_else(|| "Not Found".to_string());
-
-    if check_automator {
-        versions.node = node_raw.trim().replace("v", "");
-        if versions.node.is_empty() { versions.node = "Not Found".to_string(); }
-
-        versions.java = extract_version(&java_raw, r#"(?:version|openjdk version) "([\d\._]+)""#).unwrap_or_else(|| "Not Found".to_string());
-        versions.python = extract_version(&python_raw, r"Python ([\d\.]+)").unwrap_or_else(|| "Not Found".to_string());
-
-        if f == "robot" {
-            versions.robot = extract_version(&robot_raw, r"Robot Framework ([\d\.]+)").unwrap_or_else(|| "Not Found".to_string());
-            versions.appium_lib = appium_lib_raw;
-        } else if f == "appium" {
-            versions.maven = extract_version(&maven_raw, r"Apache Maven ([\d\.]+)").unwrap_or_else(|| "Not Found".to_string());
-        } else if f == "maestro" {
-            versions.maestro = maestro_raw.trim().to_string();
-            if versions.maestro.is_empty() { versions.maestro = "Not Found".to_string(); }
-        }
-
-        if f == "robot" || f == "appium" {
-            let appium_ver = appium_raw.trim().to_string();
-            versions.appium = if appium_ver.is_empty() { "Not Found".to_string() } else { appium_ver };
-            if versions.appium != "Not Found" {
-                versions.uiautomator2 = uiautomator2;
-            } else {
-                versions.uiautomator2 = "Not Found".to_string();
+                NOT_FOUND.to_string()
             }
         }
     }
+}
 
-    if check_ngrok {
-        versions.ngrok = extract_version(&ngrok_raw, r"ngrok version ([\d\.]+)").unwrap_or_else(|| "Not Found".to_string());
-    }
+fn extract_or_not_found(raw: &str, pattern: &str) -> String {
+    extract_version(raw, pattern).unwrap_or_else(|| NOT_FOUND.to_string())
+}
 
-    versions.claude_code = if !claude_raw.is_empty() { claude_raw.trim().to_string() } else { "Not Found".to_string() };
-    versions.antigravity = if !antigravity_raw.is_empty() { antigravity_raw.trim().to_string() } else { "Not Found".to_string() };
-
-    versions
+fn non_empty_or_not_found(value: String) -> String {
+    if value.is_empty() { NOT_FOUND.to_string() } else { value }
 }
 
 async fn get_version(cmd_name: &str, args: &[&str]) -> String {

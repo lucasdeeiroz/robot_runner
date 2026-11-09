@@ -1691,6 +1691,12 @@ export const en = {
         startup: {
             loading: "Initializing application...",
             checking: "Checking system tools...",
+            background: {
+                checking: "Identifying tools in background...",
+                feature_pending: "Checking required tools...",
+                revalidating: "Confirming tool versions...",
+                tools_changed: "Tool availability changed since last launch: {{tools}}",
+            },
             critical: {
                 title: "Missing Critical Tools",
                 description: "The following tools are required to run this application:",

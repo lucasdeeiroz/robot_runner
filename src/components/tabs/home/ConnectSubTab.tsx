@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Wifi, Link, Unplug, Globe, Copy, QrCode, RotateCw, Sparkles } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import clsx from "clsx";
-import { useSettings } from "@/lib/settings";
+import { useSettings, isToolGroupUnavailable } from "@/lib/settings";
 import { useTranslation } from "react-i18next";
 import { feedback } from "@/lib/feedback";
 import { ConfirmationModal } from "@/components/organisms/ConfirmationModal";
@@ -549,10 +549,14 @@ export function ConnectSubTab({ onDeviceConnected, selectedDevice }: ConnectSubT
                     variant="card"
                     className={clsx(
                         "transition-opacity",
-                        systemCheckStatus?.missingTunnelling?.length > 0 ? "opacity-50 pointer-events-none grayscale" : ""
+                        isToolGroupUnavailable(systemCheckStatus, 'tunnelling') ? "opacity-50 pointer-events-none grayscale" : ""
                     )}
                     status={
-                        systemCheckStatus?.missingTunnelling?.length > 0 && (
+                        systemCheckStatus?.pendingGroups?.includes('tunnelling') ? (
+                            <span className="text-xs font-bold text-on-surface-variant bg-surface-variant px-2 py-1 rounded">
+                                {t('startup.background.feature_pending', 'Checking required tools...')}
+                            </span>
+                        ) : systemCheckStatus?.missingTunnelling?.length > 0 && (
                             <span className="text-xs font-bold text-error bg-error-container px-2 py-1 rounded">
                                 Ngrok Not Found
                             </span>

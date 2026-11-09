@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { AlignLeft, Terminal, Cpu, Cast, FileText, StopCircle, RefreshCcw, Camera, Video, Square, LayoutGrid, Minimize2, Maximize2, Package, Globe, Activity, Timer, ShieldCheck, Rocket } from "lucide-react";
 import clsx from "clsx";
 import { invoke } from "@tauri-apps/api/core";
-import { useSettings } from "@/lib/settings";
+import { useSettings, isToolGroupUnavailable } from "@/lib/settings";
 import { logEvent } from "@/lib/analytics";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import packageJson from "../../../../../package.json";
@@ -42,7 +42,8 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
     const { stopSession, rerunSession, setSessionActiveTool } = useTestSessions();
     const { t } = useTranslation();
     const { settings, systemCheckStatus } = useSettings();
-    const isMirrorDisabled = systemCheckStatus?.missingMirroring?.length > 0;
+    const isMirrorPending = systemCheckStatus?.pendingGroups?.includes('mirroring') ?? false;
+    const isMirrorDisabled = isToolGroupUnavailable(systemCheckStatus, 'mirroring');
     const isWebMode = session.androidVersion === 'web';
 
     const [activeTool, setActiveTool] = useState<ToolTab>(
@@ -483,7 +484,9 @@ export function ToolboxView({ session, isCompact = false, onNavigate }: ToolboxV
                                                 ? "text-on-surface/80 cursor-not-allowed"
                                                 : "text-on-surface/80 hover:text-primary hover:bg-primary/10"
                                         )}
-                                        data-tooltip={isMirrorDisabled ? t('startup.mirroring.description') : t('scrcpy.title')}
+                                        data-tooltip={isMirrorPending
+                                            ? t('startup.background.feature_pending', 'Checking required tools...')
+                                            : isMirrorDisabled ? t('startup.mirroring.description') : t('scrcpy.title')}
                                         data-position="top"
                                     >
                                         <Cast size={18} />
