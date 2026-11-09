@@ -47,7 +47,8 @@ const { channel, prerelease } = classifyTag(tag);
 function findPreviousTag() {
     let tags;
     try {
-        tags = git('tag', '--merged', `${ref}^`, '--sort=-creatordate').split('\n').filter(Boolean);
+        // All tags reachable through any parent (merge commits included); the current tag is excluded below
+        tags = git('tag', '--merged', ref, '--sort=-creatordate').split('\n').filter(Boolean);
     } catch {
         return null;
     }
