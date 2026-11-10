@@ -39,7 +39,6 @@
     "html-to-image": "^1.11.13",
     "i18next": "^27.1.0",
     "i18next-browser-languagedetector": "^8.3.0",
-    "lint": "^1.2.2",
     "lucide-react": "^1.70.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.3.1",
