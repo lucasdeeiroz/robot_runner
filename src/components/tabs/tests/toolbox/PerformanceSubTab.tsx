@@ -901,7 +901,7 @@ const PerformanceCharts = React.memo(({ history, t, selectedPackage }: { history
                             <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" vertical={false} />
                             <RechartsTooltip
                                 contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-outline-variant)', borderRadius: '8px', fontSize: '12px', color: 'var(--color-on-surface)' }}
-                                labelFormatter={(label) => new Date(label).toLocaleTimeString()}
+                                labelFormatter={(label) => new Date(label as string | number).toLocaleTimeString()}
                                 formatter={(value: any, name: any) => {
                                     if (name === 'ram_used') return [(Number(value) / 1024).toFixed(1) + ' MB', t('performance.system_ram', 'System RAM')];
                                     if (name === 'cpu_usage') return [Number(value).toFixed(1) + '%', t('performance.cpu', 'CPU')];
@@ -942,7 +942,7 @@ const PerformanceCharts = React.memo(({ history, t, selectedPackage }: { history
                                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" vertical={false} />
                                 <RechartsTooltip
                                     contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-outline-variant)', borderRadius: '8px', fontSize: '12px', color: 'var(--color-on-surface)' }}
-                                    labelFormatter={(label) => new Date(label).toLocaleTimeString()}
+                                    labelFormatter={(label) => new Date(label as string | number).toLocaleTimeString()}
                                     formatter={(value: any, name: any) => {
                                         if (name === 'app_ram') return [(Number(value) / 1024).toFixed(1) + ' MB', t('performance.app_ram', 'App RAM')];
                                         if (name === 'app_cpu') return [Number(value).toFixed(1) + '%', t('performance.cpu', 'CPU')];

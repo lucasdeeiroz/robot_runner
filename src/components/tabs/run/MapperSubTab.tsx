@@ -1561,7 +1561,7 @@ export function MapperSubTab({ isActive, selectedDeviceId }: MapperSubTabProps) 
         const circuitBreaker = parseInt(circuitBreakerStr, 10) || 50;
         const maxSteps = Math.min(settings.maxExplorationSteps || 30, circuitBreaker);
 
-        explorerRef.current = new AutonomousExplorer(t, maxSteps, engineConfig, currentDiskMaps);
+        explorerRef.current = new AutonomousExplorer((key: string, options?: any) => String(t(key, options)), maxSteps, engineConfig, currentDiskMaps);
         explorationPromptRef.current = customPrompt;
 
         explorerRef.current.addLog(explorerRef.current.getGraphSummaryLog(currentDiskMaps, t('mapper.exploration.summary_initial', 'Resumo Inicial do Grafo')), 'info');

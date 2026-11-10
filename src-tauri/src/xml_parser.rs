@@ -434,7 +434,7 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(
                     Event::Start(e) | Event::Empty(e) => e,
                     _ => unreachable!(),
                 };
-                let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let tag_name = e.name().as_ref().to_string();
                 text_buffer.clear();
 
                 match tag_name.as_str() {
@@ -457,10 +457,10 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(
                         let mut name = String::new();
                         let mut id = String::new();
                         for attr in e.attributes().flatten() {
-                            if attr.key.as_ref() == b"name" {
-                                name = String::from_utf8_lossy(&attr.value).into_owned();
-                            } else if attr.key.as_ref() == b"id" {
-                                id = String::from_utf8_lossy(&attr.value).into_owned();
+                            if attr.key.as_ref() == "name" {
+                                name = attr.value.clone().into_owned();
+                            } else if attr.key.as_ref() == "id" {
+                                id = attr.value.clone().into_owned();
                             }
                         }
                         node_counter += 1;
@@ -491,10 +491,10 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(
                         let mut name = String::new();
                         let mut id = String::new();
                         for attr in e.attributes().flatten() {
-                            if attr.key.as_ref() == b"name" {
-                                name = String::from_utf8_lossy(&attr.value).into_owned();
-                            } else if attr.key.as_ref() == b"id" {
-                                id = String::from_utf8_lossy(&attr.value).into_owned();
+                            if attr.key.as_ref() == "name" {
+                                name = attr.value.clone().into_owned();
+                            } else if attr.key.as_ref() == "id" {
+                                id = attr.value.clone().into_owned();
                             }
                         }
                         node_counter += 1;
@@ -529,20 +529,20 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(
                         let mut st_pattern = String::new();
 
                         for attr in e.attributes().flatten() {
-                            if attr.key.as_ref() == b"name" {
-                                name = String::from_utf8_lossy(&attr.value).into_owned();
-                            } else if attr.key.as_ref() == b"id" {
-                                id = String::from_utf8_lossy(&attr.value).into_owned();
-                            } else if attr.key.as_ref() == b"type" {
-                                kw_type = String::from_utf8_lossy(&attr.value).into_owned();
-                            } else if attr.key.as_ref() == b"flavor" {
-                                st_flavor = String::from_utf8_lossy(&attr.value).into_owned();
-                            } else if attr.key.as_ref() == b"condition" {
-                                st_condition = String::from_utf8_lossy(&attr.value).into_owned();
-                            } else if attr.key.as_ref() == b"variable" {
-                                st_variable = String::from_utf8_lossy(&attr.value).into_owned();
-                            } else if attr.key.as_ref() == b"pattern" {
-                                st_pattern = String::from_utf8_lossy(&attr.value).into_owned();
+                            if attr.key.as_ref() == "name" {
+                                name = attr.value.clone().into_owned();
+                            } else if attr.key.as_ref() == "id" {
+                                id = attr.value.clone().into_owned();
+                            } else if attr.key.as_ref() == "type" {
+                                kw_type = attr.value.clone().into_owned();
+                            } else if attr.key.as_ref() == "flavor" {
+                                st_flavor = attr.value.clone().into_owned();
+                            } else if attr.key.as_ref() == "condition" {
+                                st_condition = attr.value.clone().into_owned();
+                            } else if attr.key.as_ref() == "variable" {
+                                st_variable = attr.value.clone().into_owned();
+                            } else if attr.key.as_ref() == "pattern" {
+                                st_pattern = attr.value.clone().into_owned();
                             }
                         }
                         node_counter += 1;
@@ -614,17 +614,17 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(
                         let mut end = String::new();
                         let mut elapsed_attr = String::new();
                         for attr in e.attributes().flatten() {
-                            if attr.key.as_ref() == b"status" {
-                                status_val = String::from_utf8_lossy(&attr.value).into_owned();
-                            } else if attr.key.as_ref() == b"starttime"
-                                || attr.key.as_ref() == b"start"
+                            if attr.key.as_ref() == "status" {
+                                status_val = attr.value.clone().into_owned();
+                            } else if attr.key.as_ref() == "starttime"
+                                || attr.key.as_ref() == "start"
                             {
-                                start = String::from_utf8_lossy(&attr.value).into_owned();
-                            } else if attr.key.as_ref() == b"endtime" || attr.key.as_ref() == b"end"
+                                start = attr.value.clone().into_owned();
+                            } else if attr.key.as_ref() == "endtime" || attr.key.as_ref() == "end"
                             {
-                                end = String::from_utf8_lossy(&attr.value).into_owned();
-                            } else if attr.key.as_ref() == b"elapsed" {
-                                elapsed_attr = String::from_utf8_lossy(&attr.value).into_owned();
+                                end = attr.value.clone().into_owned();
+                            } else if attr.key.as_ref() == "elapsed" {
+                                elapsed_attr = attr.value.clone().into_owned();
                             }
                         }
                         if status_val == "NOT RUN" {
@@ -699,7 +699,7 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(
             }
 
             Ok(Event::Text(e)) => {
-                let text_str = String::from_utf8_lossy(e.as_ref());
+                let text_str: &str = e.as_ref();
                 if let Ok(unescaped) = quick_xml::escape::unescape(&text_str) {
                     text_buffer.push_str(unescaped.as_ref());
                 } else {
@@ -708,7 +708,7 @@ fn parse_robot_xml_sax_internal<R: tauri::Runtime>(
             }
 
             Ok(Event::End(e)) => {
-                let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let tag_name = e.name().as_ref().to_string();
 
                 match tag_name.as_str() {
                     "arg" => {

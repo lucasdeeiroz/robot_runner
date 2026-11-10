@@ -3,7 +3,6 @@ use aes_gcm::{
     Aes256Gcm, Nonce
 };
 use sha2::{Digest, Sha256};
-use rand::RngCore;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 
 fn get_encryption_key() -> Result<Aes256Gcm, String> {
@@ -28,10 +27,10 @@ pub async fn encrypt_secret(plain_text: String) -> Result<String, String> {
     let key = get_encryption_key()?;
     
     let mut nonce_bytes = [0u8; 12];
-    rand::thread_rng().fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
-    
-    let ciphertext = key.encrypt(nonce, plain_text.as_bytes()).map_err(|e| e.to_string())?;
+    rand::fill(&mut nonce_bytes);
+    let nonce = Nonce::from(nonce_bytes);
+
+    let ciphertext = key.encrypt(&nonce, plain_text.as_bytes()).map_err(|e| e.to_string())?;
     
     let mut payload = Vec::with_capacity(12 + ciphertext.len());
     payload.extend_from_slice(&nonce_bytes);
@@ -53,9 +52,9 @@ pub async fn decrypt_secret(encrypted_text: String) -> Result<String, String> {
     }
     
     let (nonce_bytes, ciphertext) = decoded.split_at(12);
-    let nonce = Nonce::from_slice(nonce_bytes);
-    
-    let decrypted = key.decrypt(nonce, ciphertext).map_err(|e| e.to_string())?;
+    let nonce = Nonce::try_from(nonce_bytes).map_err(|_| "Invalid nonce length".to_string())?;
+
+    let decrypted = key.decrypt(&nonce, ciphertext).map_err(|e| e.to_string())?;
     
     String::from_utf8(decrypted).map_err(|e| e.to_string())
 }
